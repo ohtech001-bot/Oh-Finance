@@ -1,0 +1,395 @@
+// ═══════════════════════════════════════════════════════════════════════════
+//  Oh-Finance — مخطط قاعدة البيانات (المرحلة 1: الجداول الإدارية فقط)
+//
+//  ⛔ جداول Order / Payment / LedgerEntry / Customer ليست هنا عمدًا.
+//     مكانها المرحلتان 4 و5، ولن تُضاف قبل اكتمال أساس العزل والمصادقة.
+//
+//  المزوّد PostgreSQL حصرًا. النظام يعتمد على:
+//    • RLS               — عزل المستأجرين على مستوى قاعدة البيانات
+//    • NUMERIC(18,4)     — دقة مالية بلا فاصلة عائمة
+//    • citext            — بريد إلكتروني غير حسّاس لحالة الأحرف
+//    • advisory locks    — تسلسل قيود دفتر الحركات (المرحلة 5)
+//  لا شيء من هذا متوفر في SQLite. لا يُستبدل المزوّد.
+// ═══════════════════════════════════════════════════════════════════════════
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+//  جداول المنصة  —  بلا RLS  (المدير العام فقط)
+// ───────────────────────────────────────────────────────────────────────────
+
+enum TenantStatus {
+  ACTIVE
+  TRIAL
+  SUSPENDED
+  CANCELLED
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+/// الباقة — تعريف حدود الاستخدام والسعر.
+model Plan {
+  id     String @id @default(uuid()) @db.Uuid
+  code   String @unique @db.VarChar(32)
+  nameAr String @map("name_ar") @db.VarChar(80)
+  nameHe String @map("name_he") @db.VarChar(80)
+  nameEn String @map("name_en") @db.VarChar(80)
+
+  /// السعر بـ NUMERIC — لا float. حتى أسعار الباقات لا تُستثنى من القاعدة.
+  priceMonthly Decimal @map("price_monthly") @db.Decimal(18, 4)
+  currency     String  @default("ILS") @db.VarChar(3)
+
+  maxStores         Int @default(1) @map("max_stores")
+  maxUsers          Int @default(5) @map("max_users")
+  maxCustomers      Int @default(1000) @map("max_customers")
+  maxOrdersPerMonth Int @default(5000) @map("max_orders_per_month")
+  maxStorageMb      Int @default(1024) @map("max_storage_mb")
+
+  features Json    @default("{}")
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  subscriptions Subscription[]
+
+  @@index([isActive])
+  @@map("plans")
+}
+
+/// المستأجر — الحساب الأعلى. يملك محلًا واحدًا أو أكثر.
+/// كل جدول أعمال في النظام يحمل `tenantId` ويخضع لسياسة RLS عليه.
+model Tenant {
+  id     String       @id @default(uuid()) @db.Uuid
+  slug   String       @unique @db.VarChar(48)
+  name   String       @db.VarChar(120)
+  status TenantStatus @default(TRIAL)
+
+  locale   String @default("ar") @db.VarChar(5)
+  currency String @default("ILS") @db.VarChar(3)
+  timezone String @default("Asia/Jerusalem") @db.VarChar(48)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  suspendedAt DateTime? @map("suspended_at") @db.Timestamptz(6)
+
+  stores        Store[]
+  users         User[]
+  roles         Role[]
+  subscriptions Subscription[]
+  auditLogs     AuditLog[]
+  sessions      Session[]
+
+  @@index([status])
+  @@map("tenants")
+}
+
+/// الاشتراك — يربط المستأجر بباقة لفترة محددة.
+/// قيد جزئي في الهجرة يضمن اشتراكًا نشطًا واحدًا لكل مستأجر.
+model Subscription {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  planId   String @map("plan_id") @db.Uuid
+
+  status SubscriptionStatus @default(TRIALING)
+
+  startedAt          DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  currentPeriodStart DateTime  @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd   DateTime  @map("current_period_end") @db.Timestamptz(6)
+  trialEndsAt        DateTime? @map("trial_ends_at") @db.Timestamptz(6)
+  cancelledAt        DateTime? @map("cancelled_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status])
+  @@index([status, currentPeriodEnd])
+  @@map("subscriptions")
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+//  جداول المستأجر  —  RLS مُفعّلة  (انظر migrations/0002_rls_and_hardening)
+// ───────────────────────────────────────────────────────────────────────────
+
+/// المحل — الوحدة التجارية داخل المستأجر.
+model Store {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+
+  /// الرقم الظاهر في الشريط العلوي ("رقم المحل: 1001").
+  code String @db.VarChar(16)
+  name String @db.VarChar(120)
+
+  phone   String? @db.VarChar(32)
+  email   String? @db.VarChar(254)
+  address String? @db.VarChar(240)
+  city    String? @db.VarChar(80)
+  logoUrl String? @map("logo_url") @db.VarChar(512)
+
+  currency String @default("ILS") @db.VarChar(3)
+
+  /// إعدادات المحل — تبويبات شاشة الإعدادات السبعة.
+  /// JSONB لأن كل تبويب يتطور مستقلًا؛ التحقق من شكله بـ Zod في طبقة التطبيق
+  /// (قاعدة البيانات ليست مكان قواعد الأعمال — انظر ADR-0001).
+  settings Json @default("{}")
+
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branches Branch[]
+  users    User[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+  @@map("stores")
+}
+
+/// الفرع — تقسيم اختياري داخل المحل. لكل محل فرع رئيسي واحد على الأقل.
+model Branch {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  storeId  String @map("store_id") @db.Uuid
+
+  code String @db.VarChar(16)
+  name String @db.VarChar(120)
+
+  phone   String? @db.VarChar(32)
+  address String? @db.VarChar(240)
+  city    String? @db.VarChar(80)
+
+  isMain   Boolean @default(false) @map("is_main")
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  store Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  users User[]
+
+  @@unique([tenantId, storeId, code])
+  @@index([tenantId, storeId])
+  @@map("branches")
+}
+
+/// الدور — نظامي (OWNER/MANAGER/CASHIER/VIEWER) أو مخصّص لكل مستأجر.
+/// الأدوار النظامية تُزرع عند إنشاء المستأجر ولا تُحذف.
+model Role {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+
+  name        String  @db.VarChar(32)
+  description String? @db.VarChar(240)
+  isSystem    Boolean @default(false) @map("is_system")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  permissions RolePermission[]
+  users       User[]
+
+  @@unique([tenantId, name])
+  @@map("roles")
+}
+
+/// كتالوج الصلاحيات — عالمي، بلا مستأجر. مرآة لـ @oh/config/permissions.
+/// وجوده كجدول يسمح بمفاتيح أجنبية حقيقية بدل نصوص حرّة.
+model Permission {
+  key         String @id @db.VarChar(64)
+  label       String @db.VarChar(120)
+  category    String @db.VarChar(32)
+  isPlatform  Boolean @default(false) @map("is_platform")
+
+  roles RolePermission[]
+  users UserPermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId        String @map("role_id") @db.Uuid
+  permissionKey String @map("permission_key") @db.VarChar(64)
+  tenantId      String @map("tenant_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionKey], references: [key], onDelete: Cascade)
+
+  @@id([roleId, permissionKey])
+  @@index([tenantId])
+  @@map("role_permissions")
+}
+
+/// تجاوز صلاحية فردية فوق الدور.
+/// `granted = false` يسحب صلاحية يمنحها الدور — أقوى من مجرد الإضافة.
+model UserPermission {
+  userId        String  @map("user_id") @db.Uuid
+  permissionKey String  @map("permission_key") @db.VarChar(64)
+  tenantId      String  @map("tenant_id") @db.Uuid
+  granted       Boolean @default(true)
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionKey], references: [key], onDelete: Cascade)
+
+  @@id([userId, permissionKey])
+  @@index([tenantId])
+  @@map("user_permissions")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+/// المستخدم — صاحب المحل، الموظفون، والمدير العام.
+///
+/// `tenantId` يكون NULL للمدير العام حصرًا: هو لا ينتمي لأي مستأجر،
+/// وسياسة RLS تجعله غير مرئي تمامًا داخل أي سياق مستأجر (NULL = uuid → false).
+///
+/// `email` فريد **عالميًا** وليس لكل مستأجر: تسجيل الدخول يحدث قبل معرفة
+/// المستأجر، فبريد مكرر عبر محلين يجعل الدخول غامضًا (أيّ حساب نقصد؟).
+model User {
+  id       String  @id @default(uuid()) @db.Uuid
+  tenantId String? @map("tenant_id") @db.Uuid
+  storeId  String? @map("store_id") @db.Uuid
+  branchId String? @map("branch_id") @db.Uuid
+  roleId   String? @map("role_id") @db.Uuid
+
+  email String @unique @db.VarChar(254)
+  name  String @db.VarChar(120)
+  phone String? @db.VarChar(32)
+
+  /// Argon2id. لا يُعاد أبدًا من أي endpoint، ومُنقّح من كل السجلات.
+  passwordHash String @map("password_hash") @db.VarChar(255)
+
+  avatarUrl  String? @map("avatar_url") @db.VarChar(512)
+  jobTitle   String? @map("job_title") @db.VarChar(80)
+  department String? @db.VarChar(80)
+  locale     String  @default("ar") @db.VarChar(5)
+
+  isSuperAdmin Boolean    @default(false) @map("is_super_admin")
+  status       UserStatus @default(ACTIVE)
+
+  /// 2FA — السر مشفّر بمفتاح التطبيق قبل التخزين (ليس نصًا صريحًا).
+  totpSecret     String?  @map("totp_secret") @db.VarChar(255)
+  totpEnabled    Boolean  @default(false) @map("totp_enabled")
+  recoveryCodes  Json?    @map("recovery_codes")
+
+  /// حماية من التخمين: عدّاد + قفل زمني.
+  failedLoginCount Int       @default(0) @map("failed_login_count")
+  lockedUntil      DateTime? @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt      DateTime? @map("last_login_at") @db.Timestamptz(6)
+  passwordChangedAt DateTime? @map("password_changed_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant      Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store       Store?           @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  branch      Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  role        Role?            @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  permissions UserPermission[]
+  sessions    Session[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, roleId])
+  @@map("users")
+}
+
+/// الجلسة — رمز تجديد واحد.
+///
+/// نخزّن **هاش** الرمز لا الرمز نفسه: تسريب قاعدة البيانات لا يمنح المهاجم
+/// جلسات صالحة. `familyId` يجمع سلسلة التجديدات المتعاقبة، فإذا استُخدم رمز
+/// مُستهلك (علامة سرقة) نُبطل العائلة كلها. انظر ADR-0007.
+model Session {
+  id       String  @id @default(uuid()) @db.Uuid
+  tenantId String? @map("tenant_id") @db.Uuid
+  userId   String  @map("user_id") @db.Uuid
+
+  refreshTokenHash String @unique @map("refresh_token_hash") @db.VarChar(64)
+  familyId         String @map("family_id") @db.Uuid
+
+  userAgent String? @map("user_agent") @db.VarChar(512)
+  ipAddress String? @map("ip_address") @db.VarChar(64)
+
+  /// رمز CSRF المرافق — يُقارن بترويسة X-CSRF-Token (double-submit).
+  csrfTokenHash String @map("csrf_token_hash") @db.VarChar(64)
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedReason String? @map("revoked_reason") @db.VarChar(64)
+
+  /// الجلسة التي حلّت محل هذه عند التجديد — يبني السلسلة.
+  replacedById String? @unique @map("replaced_by_id") @db.Uuid
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([familyId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+/// سجل التدقيق — append-only + سلسلة هاش.
+///
+/// لا UPDATE ولا DELETE: الصلاحية مسحوبة من دور التطبيق، وTrigger يرفضهما.
+/// `hash = sha256(prevHash || tenant || actor || action || payload || ts)`
+/// تعديل صف قديم يكسر كل الهاشات بعده ويكشفه `audit:verify`. انظر ADR-0005.
+model AuditLog {
+  id       String  @id @default(uuid()) @db.Uuid
+  tenantId String? @map("tenant_id") @db.Uuid
+
+  /// BigInt — يُنقل عبر الـAPI كنص (يتجاوز حدود Number في JS).
+  seq BigInt @default(autoincrement())
+
+  action     String  @db.VarChar(64)
+  entityType String? @map("entity_type") @db.VarChar(64)
+  entityId   String? @map("entity_id") @db.VarChar(64)
+
+  actorId   String? @map("actor_id") @db.Uuid
+  actorName String? @map("actor_name") @db.VarChar(120)
+  actorIp   String? @map("actor_ip") @db.VarChar(64)
+  userAgent String? @map("user_agent") @db.VarChar(512)
+  requestId String? @map("request_id") @db.VarChar(64)
+
+  summary String @db.VarChar(500)
+
+  /// الحالة قبل/بعد — منقّحة من كلمات المرور والأسرار قبل الكتابة.
+  before Json?
+  after  Json?
+
+  prevHash String? @map("prev_hash") @db.Char(64)
+  hash     String  @db.Char(64)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, seq])
+  @@index([tenantId, action, createdAt])
+  @@index([actorId])
+  @@map("audit_logs")
+}
