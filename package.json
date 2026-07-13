@@ -1,0 +1,55 @@
+{
+  "name": "oh-finance",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SaaS متعدد المحلات لإدارة الزبائن والطلبات الآجلة والدفعات والديون",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build:packages": "npm run build -w @oh/money -w @oh/config -w @oh/contracts",
+    "build": "npm run build:packages && npm run build -w @oh/api && npm run build -w @oh/web",
+    "dev": "npm run build:packages && concurrently -n api,web -c green,blue \"npm run dev -w @oh/api\" \"npm run dev -w @oh/web\"",
+    "dev:api": "npm run dev -w @oh/api",
+    "dev:web": "npm run dev -w @oh/web",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run build:packages && tsc -b --pretty",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run --project money --project contracts --project config --project ui --project web",
+    "test:integration": "vitest run --project api-integration",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium",
+    "db:check": "node tooling/check-db-env.mjs",
+    "db:generate": "prisma generate --schema apps/api/prisma/schema.prisma",
+    "db:migrate": "node tooling/check-db-env.mjs migrate && prisma migrate deploy --schema apps/api/prisma/schema.prisma",
+    "db:migrate:dev": "node tooling/check-db-env.mjs migrate && prisma migrate dev --schema apps/api/prisma/schema.prisma",
+    "db:seed": "node tooling/check-db-env.mjs seed && npm run seed -w @oh/api",
+    "db:studio": "node tooling/check-db-env.mjs studio && prisma studio --schema apps/api/prisma/schema.prisma",
+    "db:gen-init-sql": "node tooling/gen-init-migration.mjs",
+    "security:audit": "npm audit --omit=dev --audit-level=high",
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "postinstall": "prisma generate --schema apps/api/prisma/schema.prisma || node tooling/prisma-generate-fallback.mjs"
+  },
+  "devDependencies": {
+    "@oh/eslint-config": "*",
+    "@oh/typescript-config": "*",
+    "@playwright/test": "^1.49.1",
+    "@types/node": "^22.10.5",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "prisma": "^6.2.1",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

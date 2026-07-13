@@ -1,0 +1,64 @@
+# ── Dependencies ─────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+
+# ── Build output ─────────────────────────────
+dist/
+build/
+out/
+*.tsbuildinfo
+.vite/
+apps/web/dist/
+apps/api/dist/
+
+# ── Environment & secrets  (NEVER commit) ────
+.env
+.env.*
+!.env.example
+!.env.development.example
+!.env.test.example
+*.pem
+*.key
+*.p12
+secrets/
+
+# ── Prisma ───────────────────────────────────
+apps/api/prisma/generated/
+apps/api/src/generated/
+
+# ── Testing ──────────────────────────────────
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# ── Logs ─────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── Caches ───────────────────────────────────
+.eslintcache
+.turbo/
+.cache/
+.temp/
+.tmp/
+
+# ── Editors / OS ─────────────────────────────
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+
+# ── Uploads (runtime tenant files) ───────────
+apps/api/storage/
+uploads/
