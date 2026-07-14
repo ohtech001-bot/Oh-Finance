@@ -10,8 +10,15 @@ import {
   type TenantListQuery,
   type UpdateTenantRequest,
 } from '@oh/contracts';
-import { ALL_PERMISSIONS, PERMISSION_LABELS, ROLES, ROLE_DESCRIPTIONS, TENANT_ROLES, permissionsForRole, type RoleName } from '@oh/config';
+import {
+  ROLES,
+  ROLE_DESCRIPTIONS,
+  TENANT_ROLES,
+  permissionsForRole,
+  type RoleName,
+} from '@oh/config';
 import { toMoneyString, sum, zero } from '@oh/money';
+import type { Prisma } from '@prisma/client';
 import { AppError } from '../../core/errors/app-error.js';
 import { AuditService } from '../../core/audit/audit.service.js';
 import { PrismaService, type TxClient } from '../../core/prisma/prisma.service.js';
@@ -208,18 +215,24 @@ export class TenantsService {
 
   async list(query: TenantListQuery): Promise<PaginatedResult<Tenant>> {
     return this.prisma.runAsPlatform(async (tx) => {
-      const where = {
+      // النوع صريح: بناء `where` بـspread يجعل TS يستنتج نوعًا واسعًا،
+      // فينكسر استنتاج نتيجة findMany ويختفي `_count` و`include` من النوع.
+      const where: Prisma.TenantWhereInput = {
         ...(query.status ? { status: query.status } : {}),
         ...(query.search
           ? {
               OR: [
-                { name: { contains: query.search, mode: 'insensitive' as const } },
-                { slug: { contains: query.search, mode: 'insensitive' as const } },
+                { name: { contains: query.search, mode: 'insensitive' } },
+                { slug: { contains: query.search, mode: 'insensitive' } },
               ],
             }
           : {}),
         ...(query.planId
-          ? { subscriptions: { some: { planId: query.planId, status: { in: ['ACTIVE', 'TRIALING'] as const } } } }
+          ? {
+              subscriptions: {
+                some: { planId: query.planId, status: { in: ['ACTIVE', 'TRIALING'] } },
+              },
+            }
           : {}),
       };
 
@@ -227,7 +240,7 @@ export class TenantsService {
         tx.tenant.count({ where }),
         tx.tenant.findMany({
           where,
-          orderBy: { [query.sortBy]: query.sortOrder },
+          orderBy: { [query.sortBy]: query.sortOrder } as Prisma.TenantOrderByWithRelationInput,
           skip: (query.page - 1) * query.pageSize,
           take: query.pageSize,
           include: {

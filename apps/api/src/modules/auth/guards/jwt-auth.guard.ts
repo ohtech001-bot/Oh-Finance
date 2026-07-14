@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { AppError } from '../../../core/errors/app-error.js';
@@ -20,8 +20,6 @@ import { COOKIE_NAMES, TokenService, type AccessTokenPayload } from '../token.se
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  private readonly logger = new Logger(JwtAuthGuard.name);
-
   constructor(
     private readonly reflector: Reflector,
     private readonly tokens: TokenService,

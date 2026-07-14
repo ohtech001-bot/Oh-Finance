@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import helmet from 'helmet';
@@ -9,7 +10,8 @@ import { AppModule } from './app.module.js';
 import { EnvService } from './core/config/env.service.js';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  // نوع Express صريح — `app.set('trust proxy')` غير موجود على الواجهة العامة.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
 
   app.useLogger(app.get(PinoLogger));
   const env = app.get(EnvService);
@@ -110,14 +112,10 @@ bootstrap().catch((error: unknown) => {
    * في الحالتين نخرج بكود 1: خادم مالي بإعداد ناقص **يجب ألا يعمل**.
    */
   if (error instanceof EnvValidationError) {
-    // eslint-disable-next-line no-console
     console.error(`\n\x1b[31m✗ ${error.message}\x1b[0m`);
-    // eslint-disable-next-line no-console
     console.error('  انسخ .env.development.example إلى .env.development واملأ القيم.\n');
     process.exit(1);
   }
-
-  // eslint-disable-next-line no-console
   console.error('\x1b[31m✗ فشل إقلاع الخادم:\x1b[0m', error);
   process.exit(1);
 });

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import type { Response } from 'express';
 import type { Permission } from '@oh/config';
 import { EnvService } from '../../core/config/env.service.js';
@@ -44,10 +44,19 @@ export class TokenService {
 
   // ── إصدار الرموز ──────────────────────────────────────────────────────────
 
+  /**
+   * `expiresIn` في jsonwebtoken نوعه template-literal مقيّد ("15m" | "1h" | …)
+   * لا `string` عام. قيمتنا تأتي من متغيّر بيئة، وZod يتحقق من صيغتها عند
+   * الإقلاع — فالتضييق هنا آمن ومبنيّ على تحقق سابق، لا تخمين.
+   */
+  private ttl(value: string): NonNullable<JwtSignOptions['expiresIn']> {
+    return value as NonNullable<JwtSignOptions['expiresIn']>;
+  }
+
   async signAccessToken(payload: AccessTokenPayload): Promise<string> {
     return this.jwt.signAsync(payload, {
       secret: this.env.get('JWT_ACCESS_SECRET'),
-      expiresIn: this.env.get('JWT_ACCESS_TTL'),
+      expiresIn: this.ttl(this.env.get('JWT_ACCESS_TTL')),
     });
   }
 

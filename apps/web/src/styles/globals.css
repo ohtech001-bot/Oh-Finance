@@ -1,0 +1,102 @@
+@import '@oh/ui/styles.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  الخطوط — مُستضافة ذاتيًا.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ *  لا نحمّل من Google Fonts CDN. ثلاثة أسباب:
+ *    1. الخصوصية: كل زيارة تُبلّغ Google بعنوان IP المستخدم (وهو انتهاك لـGDPR
+ *       بحكم محكمة ألمانية 2022).
+ *    2. الأمان: سياسة CSP صارمة تمنع النطاقات الخارجية. استثناء واحد يفتح ثغرة.
+ *    3. الموثوقية: المحل يجب أن يعمل على اتصال ضعيف أو خلف جدار ناري.
+ *
+ *  ⚠️ ملفات الخطوط ليست في المستودع بعد (تُضاف في المرحلة 6 مع قوالب PDF التي
+ *     تحتاجها أيضًا). حتى ذلك الحين، `font-family` يسقط إلى خط النظام —
+ *     وهو مقروء تمامًا بالعربية والعبرية على ويندوز وماك و iOS و Android.
+ *     لا نُحمّل خطًا من CDN «مؤقتًا» لأن المؤقت يصير دائمًا.
+ */
+
+@layer base {
+  html {
+    /* الاتجاه واللغة يضبطهما i18n على <html> — لا هنا. */
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-bg font-sans text-fg antialiased;
+    /* منع التمرير الأفقي للصفحة — الجداول تتمرّر داخل حاوياتها. */
+    overflow-x: hidden;
+  }
+
+  /*
+   * العبرية تحتاج خطًا مختلفًا — IBM Plex Sans Arabic لا يغطي الأبجدية العبرية.
+   *
+   * ⚠️ لا نستخدم `@apply font-he` هنا: الصنف المُحدِّد نفسه اسمه `.font-he`،
+   *    فيُنتج `@apply` تبعية دائرية (الصنف يستدعي نفسه) ويفشل بناء Tailwind.
+   *    الإسناد المباشر لمتغيّر الخط يتجنّبها ويؤدي نفس الغرض.
+   */
+  html.font-he body {
+    font-family: 'Noto Sans Hebrew', 'IBM Plex Sans Arabic', system-ui, sans-serif;
+  }
+
+  /* حلقة تركيز موحّدة — مرئية دائمًا لمستخدمي لوحة المفاتيح. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-bg;
+  }
+
+  /* كل المبالغ تستخدم أرقامًا جدولية — تمنع اهتزاز الأعمدة. */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  /* احترام تفضيل تقليل الحركة — إلزامي للوصول. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* مخفي بصريًا لكن مقروء لقارئ الشاشة. */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+}
+
+/*
+ * الطباعة — يُبنى بالكامل في المرحلة 6.
+ * القاعدة الأساسية الآن: لا نطبع عناصر التنقّل.
+ */
+@media print {
+  aside,
+  header,
+  nav,
+  [role='navigation'] {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+  }
+}

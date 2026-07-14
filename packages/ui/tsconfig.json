@@ -1,0 +1,13 @@
+{
+  "extends": "@oh/typescript-config/react.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "outDir": "./dist-types",
+    "rootDir": "./src",
+    "types": ["vite/client", "@testing-library/jest-dom"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["node_modules", "dist", "dist-types"],
+  "references": [{ "path": "../money" }]
+}

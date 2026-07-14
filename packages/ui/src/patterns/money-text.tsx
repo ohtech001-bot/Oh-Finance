@@ -1,0 +1,91 @@
+import { formatMoney, isMoneyString, type CurrencyCode, type MoneyString } from '@oh/money';
+import { cn } from '../lib/cn.js';
+
+export type MoneyTone = 'debit' | 'credit' | 'neutral' | 'auto' | 'plain';
+
+export interface MoneyTextProps {
+  /** المبلغ **كنص** — لا `number`. النوع نفسه يمنع الخطأ. */
+  value: MoneyString;
+  currency?: CurrencyCode;
+  /**
+   * الدلالة المالية:
+   *   debit   → أحمر (دَين، مدين، مستحق)
+   *   credit  → أخضر (مدفوع، مقبوض، دائن)
+   *   auto    → أحمر للسالب، أخضر للموجب، رمادي للصفر
+   *   neutral → رمادي
+   *   plain   → لون النص العادي (للمبالغ غير الدلالية: سعر باقة مثلًا)
+   */
+  tone?: MoneyTone;
+  size?: 'sm' | 'md' | 'lg' | 'kpi';
+  withSymbol?: boolean;
+  signDisplay?: boolean;
+  className?: string;
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  عرض مبلغ مالي — المكوّن الوحيد المسموح له بذلك.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ *  ثلاثة قرارات مقصودة:
+ *
+ *  1. `value: MoneyString` — النوع يرفض `number` وقت الترجمة. لا يمكن لمطوّر
+ *     أن يمرّر رقمًا عائمًا «بالخطأ»؛ البناء يفشل.
+ *
+ *  2. `tabular-nums` — بدونه تختلف عروض الأرقام (١ أضيق من ٠)، فتهتز الأعمدة
+ *     بين صفوف الجدول ويصعب المسح البصري لعمود مبالغ. في جدول حركات مالية
+ *     هذا فارق حقيقي في قابلية القراءة، لا تفصيل تجميلي.
+ *
+ *  3. `dir="ltr"` على الرقم نفسه — الأرقام تُقرأ من اليسار لليمين حتى داخل
+ *     نص عربي. بدونه ينكسر ترتيب "1,250.00" في بعض المتصفحات ويظهر "00.250,1".
+ */
+export function MoneyText({
+  value,
+  currency = 'ILS',
+  tone = 'plain',
+  size = 'md',
+  withSymbol = true,
+  signDisplay = false,
+  className,
+}: MoneyTextProps) {
+  // حارس وقت التشغيل: قيمة تالفة تُعرض كشرطة، لا تُسقط الصفحة.
+  // عرض "NaN" أو انهيار الشاشة في جدول مالي أسوأ من عرض «غير متاح».
+  if (!isMoneyString(value)) {
+    return (
+      <span className={cn('text-fg-subtle', className)} title="قيمة غير صالحة">
+        —
+      </span>
+    );
+  }
+
+  const isNegative = value.startsWith('-');
+  const isZeroValue = /^-?0+(\.0+)?$/.test(value);
+
+  const resolvedTone: Exclude<MoneyTone, 'auto'> =
+    tone === 'auto' ? (isZeroValue ? 'neutral' : isNegative ? 'debit' : 'credit') : tone;
+
+  const toneClass = {
+    debit: 'text-danger',
+    credit: 'text-success',
+    neutral: 'text-fg-muted',
+    plain: 'text-fg',
+  }[resolvedTone];
+
+  const sizeClass = {
+    sm: 'text-[13px] font-semibold',
+    md: 'text-sm font-semibold',
+    lg: 'text-lg font-bold',
+    kpi: 'text-kpi',
+  }[size];
+
+  const formatted = formatMoney(value, { currency, withSymbol, signDisplay });
+
+  return (
+    <span
+      dir="ltr"
+      className={cn('inline-block tabular-nums', toneClass, sizeClass, className)}
+    >
+      {formatted}
+    </span>
+  );
+}

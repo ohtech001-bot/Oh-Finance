@@ -1,0 +1,117 @@
+import { createContext, useCallback, useContext, useMemo } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { LoginRequest, LoginResponse, SessionUser } from '@oh/contracts';
+import type { Permission } from '@oh/config';
+import { ApiRequestError, api } from '@/lib/api';
+
+interface AuthContextValue {
+  user: SessionUser | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+
+  login: (credentials: LoginRequest) => Promise<LoginResponse>;
+  logout: () => Promise<void>;
+
+  /** هل يملك المستخدم الصلاحية؟ **للتجربة فقط** — لا يحل محل فحص الخادم. */
+  can: (permission: Permission) => boolean;
+  canAny: (...permissions: Permission[]) => boolean;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
+
+  /**
+   * الجلسة الحالية.
+   *
+   * ── لماذا نسأل الخادم بدل قراءة رمز محلي؟ ────────────────────────────────
+   * لا نملك الرمز أصلًا (كوكي HttpOnly). وهذا **ميزة** لا قيد: مصدر الحقيقة
+   * الوحيد لحالة الجلسة هو الخادم. لو أُبطلت الجلسة (خروج من جهاز آخر، كشف
+   * سرقة، تعطيل الحساب)، يعرف التطبيق فورًا عند أول طلب — لا يظل يعرض واجهة
+   * «مسجّل الدخول» بناءً على رمز في localStorage لم يعد صالحًا.
+   */
+  const {
+    data: user,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () => api.get<SessionUser>('/auth/me'),
+    // 401 متوقع تمامًا للزائر — ليس خطأً يستحق إعادة المحاولة.
+    retry: (failureCount, error) => {
+      if (error instanceof ApiRequestError && error.isUnauthenticated) return false;
+      return failureCount < 2;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const loginMutation = useMutation({
+    mutationFn: (credentials: LoginRequest) =>
+      api.post<LoginResponse>('/auth/login', credentials),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['auth', 'me'], data.user);
+    },
+  });
+
+  const logoutMutation = useMutation({
+    mutationFn: () => api.post<void>('/auth/logout'),
+    onSettled: () => {
+      // نمسح **كل** الذاكرة المؤقتة عند الخروج.
+      // ⚠️ لولا ذلك لبقيت بيانات المحل السابق في الذاكرة، وقد تومض على شاشة
+      //    المستخدم التالي على نفس الجهاز قبل وصول بياناته — تسرّب بصري حقيقي.
+      queryClient.clear();
+    },
+  });
+
+  const login = useCallback(
+    (credentials: LoginRequest) => loginMutation.mutateAsync(credentials),
+    [loginMutation],
+  );
+
+  const logout = useCallback(async () => {
+    await logoutMutation.mutateAsync();
+  }, [logoutMutation]);
+
+  const permissions = useMemo(() => new Set(user?.permissions ?? []), [user]);
+
+  /**
+   * فحص الصلاحية في الواجهة.
+   *
+   * ⚠️ هذا **تحسين تجربة** لا حماية. إخفاء زر لا يمنع أحدًا من استدعاء الـAPI
+   *    مباشرة. الحماية الحقيقية في `PermissionsGuard` على الخادم، ولا شيء
+   *    غيرها. لو حُذف هذا الملف كله، لظل النظام آمنًا — أقبح فقط.
+   */
+  const can = useCallback(
+    (permission: Permission) => permissions.has(permission),
+    [permissions],
+  );
+
+  const canAny = useCallback(
+    (...list: Permission[]) => list.some((p) => permissions.has(p)),
+    [permissions],
+  );
+
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user: isError ? null : (user ?? null),
+      isLoading,
+      isAuthenticated: !isError && Boolean(user),
+      login,
+      logout,
+      can,
+      canAny,
+    }),
+    [user, isLoading, isError, login, logout, can, canAny],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth(): AuthContextValue {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth يجب أن يُستخدم داخل <AuthProvider>.');
+  }
+  return context;
+}

@@ -1,0 +1,23 @@
+{
+  "extends": "@oh/typescript-config/react.json",
+  "compilerOptions": {
+    "outDir": "./dist-types",
+    "emitDeclarationOnly": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "types": ["vite/client", "@testing-library/jest-dom"]
+  },
+  // ملفات الترجمة JSON تُستورد مباشرة — يجب أن تكون ضمن المشروع.
+  // `vite.config.ts` مستثنى: Vite يترجمه بنفسه، وأنواع الإضافات لا تتوافق
+  // مع إعدادات المشروع الصارمة (نفس المشكلة في كل مشروع Vite + tsc -b).
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "exclude": ["node_modules", "dist", "dist-types", "e2e", "vite.config.ts", "vitest.config.ts"],
+  "references": [
+    { "path": "../../packages/money" },
+    { "path": "../../packages/config" },
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/ui" }
+  ]
+}
