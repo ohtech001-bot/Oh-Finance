@@ -72,6 +72,23 @@ export const AUDIT_ACTIONS = {
   USER_PERMISSIONS_CHANGED: 'user.permissions_changed',
 
   SETTINGS_UPDATED: 'settings.updated',
+
+  // ── المرحلة 2: النواة المالية ──
+  CUSTOMER_CREATED: 'customer.created',
+  CUSTOMER_UPDATED: 'customer.updated',
+  CUSTOMER_ARCHIVED: 'customer.archived',
+
+  ORDER_CREATED: 'order.created',
+  ORDER_UPDATED: 'order.updated',
+  ORDER_CONFIRMED: 'order.confirmed',
+  ORDER_CANCELLED: 'order.cancelled',
+  ORDER_CREDIT_LIMIT_OVERRIDDEN: 'order.credit_limit_overridden',
+
+  PAYMENT_CREATED: 'payment.created',
+  PAYMENT_REVERSED: 'payment.reversed',
+
+  LEDGER_ADJUSTMENT: 'ledger.adjustment',
+  LEDGER_ENTRY_REVERSED: 'ledger.entry_reversed',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
@@ -94,4 +111,20 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   'user.updated': 'تعديل مستخدم',
   'user.permissions_changed': 'تعديل صلاحيات',
   'settings.updated': 'تعديل إعدادات',
+
+  'customer.created': 'إضافة زبون',
+  'customer.updated': 'تعديل زبون',
+  'customer.archived': 'أرشفة زبون',
+
+  'order.created': 'إنشاء طلب',
+  'order.updated': 'تعديل طلب',
+  'order.confirmed': 'تأكيد طلب',
+  'order.cancelled': 'إلغاء طلب',
+  'order.credit_limit_overridden': '⚠ تجاوز حد الائتمان',
+
+  'payment.created': 'تسجيل دفعة',
+  'payment.reversed': '⚠ عكس دفعة',
+
+  'ledger.adjustment': '⚠ قيد تسوية يدوي',
+  'ledger.entry_reversed': '⚠ عكس قيد محاسبي',
 };

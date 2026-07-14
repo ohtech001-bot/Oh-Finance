@@ -11,6 +11,8 @@ import { AuditModule } from './core/audit/audit.module.js';
 import { AllExceptionsFilter } from './core/errors/all-exceptions.filter.js';
 import { buildLoggerConfig } from './core/logging/logger.config.js';
 import { RequestContextMiddleware } from './core/tenancy/request-context.middleware.js';
+import { NumberingModule } from './core/numbering/numbering.module.js';
+import { IdempotencyModule } from './core/idempotency/idempotency.module.js';
 
 import { AuthModule } from './modules/auth/auth.module.js';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard.js';
@@ -19,6 +21,12 @@ import { CsrfGuard } from './modules/auth/guards/csrf.guard.js';
 import { PlatformModule } from './modules/platform/platform.module.js';
 import { TenantModule } from './modules/tenant/tenant.module.js';
 import { HealthModule } from './modules/health/health.module.js';
+
+// ── المرحلة 2: النواة المالية ──
+import { LedgerModule } from './modules/ledger/ledger.module.js';
+import { CustomersModule } from './modules/customers/customers.module.js';
+import { OrdersModule } from './modules/orders/orders.module.js';
+import { PaymentsModule } from './modules/payments/payments.module.js';
 
 @Module({
   imports: [
@@ -56,6 +64,21 @@ import { HealthModule } from './modules/health/health.module.js';
     PlatformModule,
     TenantModule,
     HealthModule,
+
+    /**
+     * ── المرحلة 2: النواة المالية ──
+     *
+     * `LedgerModule` قبل الوحدات التي تعتمد عليه — وهو `@Global` فتُحقن
+     * `LedgerService` في الزبائن والطلبات والدفعات بلا استيراد صريح.
+     * كونه عامًا يجعل من الواضح أنه بنية تحتية: **الطريق الوحيد** لكتابة
+     * قيد محاسبي، لا وحدة أعمال عادية.
+     */
+    NumberingModule,
+    IdempotencyModule,
+    LedgerModule,
+    CustomersModule,
+    OrdersModule,
+    PaymentsModule,
   ],
   providers: [
     /**
