@@ -3,16 +3,23 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
+    "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo",
     "baseUrl": ".",
     "resolveJsonModule": true,
     "strictPropertyInitialization": false,
-    "noUnusedParameters": false
+    "noUnusedParameters": false,
+
+    "composite": false,
+    "incremental": true,
+    "declaration": false,
+    "declarationMap": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "test", "prisma/seed.ts", "src/**/*.test.ts"],
-  "references": [
-    { "path": "../../packages/money" },
-    { "path": "../../packages/config" },
-    { "path": "../../packages/contracts" }
+  "exclude": [
+    "node_modules",
+    "dist",
+    "test",
+    "prisma/seed.ts",
+    "src/**/*.test.ts"
   ]
 }

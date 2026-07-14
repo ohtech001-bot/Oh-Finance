@@ -1,15 +1,21 @@
 // ═══════════════════════════════════════════════════════════════════════════
-//  Oh-Finance — مخطط قاعدة البيانات (المرحلة 1: الجداول الإدارية فقط)
+//  Oh-Finance — مخطط قاعدة البيانات
 //
-//  ⛔ جداول Order / Payment / LedgerEntry / Customer ليست هنا عمدًا.
-//     مكانها المرحلتان 4 و5، ولن تُضاف قبل اكتمال أساس العزل والمصادقة.
+//  المرحلة 1: المستأجرون، المحلات، المستخدمون، الأدوار، الاشتراكات، التدقيق.
+//  المرحلة 2: النواة المالية — الزبائن، الطلبات، دفتر الحركات، الدفعات.
 //
 //  المزوّد PostgreSQL حصرًا. النظام يعتمد على:
 //    • RLS               — عزل المستأجرين على مستوى قاعدة البيانات
 //    • NUMERIC(18,4)     — دقة مالية بلا فاصلة عائمة
-//    • citext            — بريد إلكتروني غير حسّاس لحالة الأحرف
-//    • advisory locks    — تسلسل قيود دفتر الحركات (المرحلة 5)
+//    • advisory locks    — تسلسل قيود دفتر الحركات
+//    • partial unique    — قيود أعمال ذرّية (اشتراك نشط واحد، فرع رئيسي واحد)
 //  لا شيء من هذا متوفر في SQLite. لا يُستبدل المزوّد.
+//
+//  ⚠️ قاعدة مقاومة الانحراف (drift):
+//     كل ما يستطيع Prisma التعبير عنه (أعمدة، فهارس، تفرّد) **يجب** أن يكون
+//     في هذا الملف. `prisma migrate dev` يلغي أي شيء منها كتبناه بـSQL خام
+//     ويعتبره انحرافًا. أما ما لا يستطيع التعبير عنه — سياسات RLS، triggers،
+//     دوال، GRANT/REVOKE، قيود CHECK — فيبقى في SQL خام بأمان ولا يمسه.
 // ═══════════════════════════════════════════════════════════════════════════
 
 generator client {
@@ -83,8 +89,8 @@ model Tenant {
   currency String @default("ILS") @db.VarChar(3)
   timezone String @default("Asia/Jerusalem") @db.VarChar(48)
 
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   suspendedAt DateTime? @map("suspended_at") @db.Timestamptz(6)
 
   stores        Store[]
@@ -93,6 +99,12 @@ model Tenant {
   subscriptions Subscription[]
   auditLogs     AuditLog[]
   sessions      Session[]
+
+  // ── المرحلة 2 ──
+  customers     Customer[]
+  orders        Order[]
+  payments      Payment[]
+  ledgerEntries LedgerEntry[]
 
   @@index([status])
   @@map("tenants")
@@ -159,6 +171,11 @@ model Store {
   branches Branch[]
   users    User[]
 
+  // ── المرحلة 2 ──
+  customers Customer[]
+  orders    Order[]
+  payments  Payment[]
+
   @@unique([tenantId, code])
   @@index([tenantId, isActive])
   @@map("stores")
@@ -215,10 +232,10 @@ model Role {
 /// كتالوج الصلاحيات — عالمي، بلا مستأجر. مرآة لـ @oh/config/permissions.
 /// وجوده كجدول يسمح بمفاتيح أجنبية حقيقية بدل نصوص حرّة.
 model Permission {
-  key         String @id @db.VarChar(64)
-  label       String @db.VarChar(120)
-  category    String @db.VarChar(32)
-  isPlatform  Boolean @default(false) @map("is_platform")
+  key        String  @id @db.VarChar(64)
+  label      String  @db.VarChar(120)
+  category   String  @db.VarChar(32)
+  isPlatform Boolean @default(false) @map("is_platform")
 
   roles RolePermission[]
   users UserPermission[]
@@ -267,6 +284,14 @@ enum UserStatus {
 ///
 /// `email` فريد **عالميًا** وليس لكل مستأجر: تسجيل الدخول يحدث قبل معرفة
 /// المستأجر، فبريد مكرر عبر محلين يجعل الدخول غامضًا (أيّ حساب نقصد؟).
+///
+/// ⚠️ عدم الحساسية لحالة الأحرف مضمونة بـ**التطبيع لا بالنوع**:
+///    كان العمود `citext`، لكن `prisma migrate dev` أعاده إلى `varchar`
+///    لأن `schema.prisma` لا يستطيع التعبير عن citext (انحراف/drift).
+///    الحل المقاوم للانحراف: البريد يُخزَّن **بأحرف صغيرة دائمًا**
+///      • Zod يطبّعه (`.toLowerCase()`) قبل أن يصل للخدمة
+///      • قيد CHECK في القاعدة يرفض أي بريد غير مُصغَّر (وPrisma لا يمس CHECK)
+///    فيبقى `Owner@x.com` و`owner@x.com` نفس الحساب — بلا نوع مخصّص.
 model User {
   id       String  @id @default(uuid()) @db.Uuid
   tenantId String? @map("tenant_id") @db.Uuid
@@ -274,8 +299,8 @@ model User {
   branchId String? @map("branch_id") @db.Uuid
   roleId   String? @map("role_id") @db.Uuid
 
-  email String @unique @db.VarChar(254)
-  name  String @db.VarChar(120)
+  email String  @unique @db.VarChar(254)
+  name  String  @db.VarChar(120)
   phone String? @db.VarChar(32)
 
   /// Argon2id. لا يُعاد أبدًا من أي endpoint، ومُنقّح من كل السجلات.
@@ -290,14 +315,14 @@ model User {
   status       UserStatus @default(ACTIVE)
 
   /// 2FA — السر مشفّر بمفتاح التطبيق قبل التخزين (ليس نصًا صريحًا).
-  totpSecret     String?  @map("totp_secret") @db.VarChar(255)
-  totpEnabled    Boolean  @default(false) @map("totp_enabled")
-  recoveryCodes  Json?    @map("recovery_codes")
+  totpSecret    String? @map("totp_secret") @db.VarChar(255)
+  totpEnabled   Boolean @default(false) @map("totp_enabled")
+  recoveryCodes Json?   @map("recovery_codes")
 
   /// حماية من التخمين: عدّاد + قفل زمني.
-  failedLoginCount Int       @default(0) @map("failed_login_count")
-  lockedUntil      DateTime? @map("locked_until") @db.Timestamptz(6)
-  lastLoginAt      DateTime? @map("last_login_at") @db.Timestamptz(6)
+  failedLoginCount  Int       @default(0) @map("failed_login_count")
+  lockedUntil       DateTime? @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt       DateTime? @map("last_login_at") @db.Timestamptz(6)
   passwordChangedAt DateTime? @map("password_changed_at") @db.Timestamptz(6)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -334,11 +359,11 @@ model Session {
   /// رمز CSRF المرافق — يُقارن بترويسة X-CSRF-Token (double-submit).
   csrfTokenHash String @map("csrf_token_hash") @db.VarChar(64)
 
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
-  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
-  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
-  revokedReason String? @map("revoked_reason") @db.VarChar(64)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt    DateTime? @map("last_used_at") @db.Timestamptz(6)
+  expiresAt     DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedReason String?   @map("revoked_reason") @db.VarChar(64)
 
   /// الجلسة التي حلّت محل هذه عند التجديد — يبني السلسلة.
   replacedById String? @unique @map("replaced_by_id") @db.Uuid
@@ -387,8 +412,432 @@ model AuditLog {
 
   tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
-  @@index([tenantId, seq])
+  /// ⚠️ التفرّد **هنا** لا في SQL خام.
+  /// كان فهرسًا فريدًا في هجرة 0002، فأسقطه `prisma migrate dev` كانحراف.
+  /// كل ما يستطيع Prisma التعبير عنه يجب أن يعيش في هذا الملف، وإلا أُلغي.
+  @@unique([tenantId, seq])
   @@index([tenantId, action, createdAt])
   @@index([actorId])
   @@map("audit_logs")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  المرحلة 2 — النواة المالية
+//
+//  المبدأ الحاكم: **الرصيد لا يُخزَّن. الرصيد يُشتق من دفتر الحركات.**
+//
+//  لا يوجد حقل `balance` على `Customer`. البحث عنه في هذا الملف يعطي صفر
+//  نتائج — وهذا مقصود ومُختبَر. أي رصيد تراه في النظام هو نتيجة استعلام
+//  على `ledger_entries`، لا قيمة مكتوبة يستطيع أحد تعديلها.
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+/// الزبون.
+///
+/// لا حقل رصيد هنا. الرصيد = SUM(debit) - SUM(credit) من دفتر الحركات.
+/// «الرصيد الافتتاحي» ليس عمودًا أيضًا: يُدخَل عند الإنشاء فيولّد قيد
+/// OPENING_BALANCE في الدفتر. تخزينه هنا كان سيُنتج مصدرَي حقيقة متضاربين
+/// — وهو بالضبط ما يمنعه هذا التصميم.
+model Customer {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  storeId  String @map("store_id") @db.Uuid
+
+  /// رقم الزبون الظاهر: "CUST-0001". متسلسل لكل محل.
+  code String @db.VarChar(24)
+
+  name    String  @db.VarChar(160)
+  company String? @db.VarChar(160)
+
+  phone    String? @db.VarChar(32)
+  phoneAlt String? @map("phone_alt") @db.VarChar(32)
+  email    String? @db.VarChar(254)
+
+  address String? @db.VarChar(240)
+  city    String? @db.VarChar(80)
+
+  /// الرقم الضريبي (ח.פ / עוסק מורשה).
+  taxNumber String? @map("tax_number") @db.VarChar(32)
+
+  notes String? @db.Text
+
+  /// وسوم حرّة. مصفوفة نصية أصلية في Postgres — لا جدول وسيط.
+  /// جدول tags + جدول ربط كان سيضيف جدولين وjoin لكل استعلام، مقابل ميزة
+  /// لا نحتاجها (إعادة تسمية وسم عالميًا).
+  tags String[] @default([])
+
+  /// حد الائتمان: سقف الدَّين المسموح — يُفحص عند تأكيد الطلب.
+  /// هذا ليس رصيدًا، بل **قيد** على الرصيد المشتق.
+  creditLimit     Decimal @default(0) @map("credit_limit") @db.Decimal(18, 4)
+  paymentTermDays Int     @default(30) @map("payment_term_days")
+
+  status CustomerStatus @default(ACTIVE)
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy  String?   @map("created_by") @db.Uuid
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store         Store         @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  orders        Order[]
+  payments      Payment[]
+  ledgerEntries LedgerEntry[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, storeId, status])
+  @@index([tenantId, name])
+  @@index([tenantId, phone])
+  @@index([tenantId, createdAt])
+  @@map("customers")
+}
+
+enum OrderStatus {
+  DRAFT
+  QUOTE
+  CONFIRMED
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+/// الطلب — **حاوية فقط**.
+///
+/// المبالغ (subtotal/tax/total) مشتقة من البنود، محسوبة في طبقة الدومين
+/// بـDecimal، ومخزّنة كلقطة ثابتة. paidAmount مشتق من payment_allocations —
+/// لا يُكتب يدويًا أبدًا.
+///
+/// بعد التأكيد يُقفل الطلب (lockedAt): لا تعديل مباشر على مبالغه.
+/// التصحيح يتم بقيد تسوية في الدفتر — لا بتغيير الرقم.
+model Order {
+  id         String @id @default(uuid()) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  storeId    String @map("store_id") @db.Uuid
+  customerId String @map("customer_id") @db.Uuid
+
+  /// "ORD-00087". متسلسل لكل محل عبر tenant_counters.
+  number String @db.VarChar(24)
+
+  status OrderStatus @default(DRAFT)
+
+  issuedAt DateTime  @default(now()) @map("issued_at") @db.Timestamptz(6)
+  /// تاريخ الاستحقاق — يُحسب من paymentTermDays عند التأكيد.
+  dueAt    DateTime? @map("due_at") @db.Timestamptz(6)
+
+  subtotal       Decimal @default(0) @db.Decimal(18, 4)
+  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(18, 4)
+  taxAmount      Decimal @default(0) @map("tax_amount") @db.Decimal(18, 4)
+  total          Decimal @default(0) @db.Decimal(18, 4)
+
+  /// مشتق من مجموع التوزيعات. يُحدَّث داخل نفس معاملة الدفعة.
+  paidAmount Decimal @default(0) @map("paid_amount") @db.Decimal(18, 4)
+
+  notes String? @db.Text
+
+  lockedAt     DateTime? @map("locked_at") @db.Timestamptz(6)
+  confirmedAt  DateTime? @map("confirmed_at") @db.Timestamptz(6)
+  confirmedBy  String?   @map("confirmed_by") @db.Uuid
+  cancelledAt  DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancelledBy  String?   @map("cancelled_by") @db.Uuid
+  cancelReason String?   @map("cancel_reason") @db.VarChar(500)
+
+  /// قفل متفائل — يمنع تعديلين متزامنين من الكتابة فوق بعضهما.
+  version Int @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store       Store               @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  customer    Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  items       OrderItem[]
+  allocations PaymentAllocation[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, customerId, issuedAt])
+  @@index([tenantId, status])
+  @@index([tenantId, issuedAt])
+  @@index([tenantId, dueAt])
+  @@map("orders")
+}
+
+/// نوع بند الطلب.
+///
+/// المتطلب: «يدعم مستقبلاً منتجات وخدمات وعناصر يدوية **بدون تعديل قاعدة
+/// البيانات**». sourceType + sourceId يحققانه: البند اليوم يدوي (MANUAL،
+/// sourceId فارغ)؛ غدًا يشير إلى منتج (PRODUCT + معرّفه) أو خدمة (SERVICE).
+/// البنية جاهزة، ولا هجرة لاحقة.
+enum OrderItemSource {
+  MANUAL
+  PRODUCT
+  SERVICE
+}
+
+/// بند الطلب.
+///
+/// name و unitPrice منسوخان هنا **عمدًا** — وهذا ليس تكرارًا للبيانات:
+/// المستند المالي يُجمّد ما اتُّفق عليه. تغيير سعر منتج لاحقًا يجب ألا يغيّر
+/// مبلغ طلب مؤكد سابق. مبدأ محاسبي، لا تحسين أداء.
+model OrderItem {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  orderId  String @map("order_id") @db.Uuid
+
+  sourceType OrderItemSource @default(MANUAL) @map("source_type")
+  /// معرّف المنتج/الخدمة عند الربط. NULL للبند اليدوي.
+  sourceId   String?         @map("source_id") @db.Uuid
+
+  name        String  @db.VarChar(200)
+  description String? @db.Text
+
+  /// كمية عشرية — تدعم 1.5 كجم و 0.25 ساعة.
+  quantity  Decimal @db.Decimal(14, 4)
+  unitPrice Decimal @map("unit_price") @db.Decimal(18, 4)
+
+  /// خصم على السطر (مبلغ). النسبة تُحوَّل إلى مبلغ في الواجهة.
+  discount Decimal @default(0) @db.Decimal(18, 4)
+  /// نسبة الضريبة المئوية: "17" تعني 17%.
+  taxRate  Decimal @default(0) @map("tax_rate") @db.Decimal(6, 3)
+
+  /// (quantity × unitPrice − discount) + الضريبة. محسوب بـ@oh/money.
+  lineTotal Decimal @map("line_total") @db.Decimal(18, 4)
+
+  sortOrder Int @default(0) @map("sort_order")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, orderId])
+  @@map("order_items")
+}
+
+enum LedgerEntryType {
+  OPENING_BALANCE
+  ORDER_DEBIT
+  PAYMENT_CREDIT
+  ADJUSTMENT_DEBIT
+  ADJUSTMENT_CREDIT
+  REVERSAL
+  WRITE_OFF
+}
+
+enum LedgerRefType {
+  CUSTOMER
+  ORDER
+  PAYMENT
+  ADJUSTMENT
+}
+
+/// ═══════════════════════════════════════════════════════════════════════════
+///  دفتر الحركات — APPEND ONLY. قلب النظام.
+/// ═══════════════════════════════════════════════════════════════════════════
+///
+///  مصدر الحقيقة **الوحيد** للرصيد. لا رصيد مخزّن في أي مكان آخر.
+///
+///  كل قيد يحفظ ثلاثتها:
+///    openingBalance  — الرصيد قبل الحركة
+///    debit / credit  — المبلغ (أحدهما صفر دائمًا)
+///    runningBalance  — الرصيد بعد الحركة
+///
+///  لا UPDATE ولا DELETE. مفروض بطبقتين مستقلتين في الهجرة:
+///    1. REVOKE UPDATE, DELETE — دور التطبيق لا يملك الصلاحية أصلًا
+///    2. TRIGGER يرفع استثناءً — حتى لو مُنحت الصلاحية خطأً لاحقًا
+///
+///  التصحيح بقيد جديد (REVERSAL / ADJUSTMENT) يشير إلى الأصلي — لا بتعديله.
+model LedgerEntry {
+  id         String @id @default(uuid()) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  storeId    String @map("store_id") @db.Uuid
+  customerId String @map("customer_id") @db.Uuid
+
+  /// ترتيب مطلق داخل حساب الزبون، يبدأ من 1.
+  /// هو ما يجعل السلسلة قابلة للتحقق: القيد n يبني على n−1.
+  seq Int
+
+  entryType LedgerEntryType @map("entry_type")
+
+  /// الرصيد قبل الحركة. للقيد الأول = 0.
+  openingBalance Decimal @map("opening_balance") @db.Decimal(18, 4)
+
+  /// أحدهما صفر دائمًا — يفرضه CHECK في القاعدة.
+  /// عمودان منفصلان لا عمود واحد بإشارة: هكذا تعرضه شاشة «الحساب والحركات»
+  /// في المرجع البصري، وهكذا يُقرأ أي دفتر أستاذ.
+  debit  Decimal @default(0) @db.Decimal(18, 4)
+  credit Decimal @default(0) @db.Decimal(18, 4)
+
+  /// الرصيد بعد الحركة. CHECK يفرض: running = opening + debit − credit.
+  runningBalance Decimal @map("running_balance") @db.Decimal(18, 4)
+
+  refType LedgerRefType @map("ref_type")
+  refId   String?       @map("ref_id") @db.Uuid
+
+  /// القيد الذي يعكسه هذا القيد (لـREVERSAL).
+  reversesEntryId String? @map("reverses_entry_id") @db.Uuid
+
+  /// سبب القيد — إلزامي للتسويات والعكس (يفرضه Zod).
+  notes String? @db.Text
+
+  /// منع التسجيل المزدوج على مستوى القيد — خط دفاع أخير.
+  idempotencyKey String? @map("idempotency_key") @db.VarChar(64)
+
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy  String?  @map("created_by") @db.Uuid
+
+  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  customer   Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  reverses   LedgerEntry?  @relation("LedgerReversal", fields: [reversesEntryId], references: [id], onDelete: Restrict)
+  reversedBy LedgerEntry[] @relation("LedgerReversal")
+
+  /// تسلسل فريد لكل زبون — يمنع تفرّع السلسلة تحت التزامن.
+  @@unique([tenantId, customerId, seq])
+  /// خط دفاع ثانٍ ضد الدفعة المزدوجة.
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, customerId, seq(sort: Desc)])
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, refType, refId])
+  @@map("ledger_entries")
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CARD
+  CHECK
+}
+
+enum PaymentStatus {
+  POSTED
+  REVERSED
+}
+
+/// الدفعة.
+///
+/// **لا يوجد orderId هنا** — بقرار صريح.
+/// الدفعة الواحدة تُوزَّع على عدة طلبات عبر payment_allocations.
+/// مستخرج من المرجع البصري: PAY-00042 مربوطة بـORD-00084 و ORD-00083 معًا.
+/// ولو كان orderId عمودًا، لاستحال ذلك بلا هجرة مؤلمة لاحقًا.
+model Payment {
+  id         String @id @default(uuid()) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  storeId    String @map("store_id") @db.Uuid
+  customerId String @map("customer_id") @db.Uuid
+
+  /// "PAY-00045". متسلسل لكل محل.
+  number String @db.VarChar(24)
+
+  /// المبلغ الكلي. CHECK يفرض > 0.
+  amount Decimal @db.Decimal(18, 4)
+
+  method PaymentMethod
+  status PaymentStatus @default(POSTED)
+
+  /// تاريخ ووقت الدفعة — قد يختلف عن createdAt (دفعة مؤرَّخة بأثر رجعي).
+  paidAt DateTime @map("paid_at") @db.Timestamptz(6)
+
+  /// رقم الشيك / رقم الحوالة.
+  reference String? @db.VarChar(120)
+  notes     String? @db.Text
+
+  /// مفتاح منع التكرار — **إلزامي**، وفريد مع المستأجر.
+  /// طلبان متزامنان بنفس المفتاح ⇒ دفعة واحدة. القاعدة تضمنها، لا الكود.
+  idempotencyKey String @map("idempotency_key") @db.VarChar(64)
+
+  reversedAt    DateTime? @map("reversed_at") @db.Timestamptz(6)
+  reversedBy    String?   @map("reversed_by") @db.Uuid
+  reverseReason String?   @map("reverse_reason") @db.VarChar(500)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store       Store               @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  customer    Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  allocations PaymentAllocation[]
+
+  @@unique([tenantId, number])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, customerId, paidAt])
+  @@index([tenantId, paidAt])
+  @@index([tenantId, method])
+  @@map("payments")
+}
+
+/// توزيع دفعة على طلب — many-to-many بحمولة.
+///
+/// مجموع توزيعات الدفعة ≤ مبلغ الدفعة. الفرق (إن وُجد) يبقى رصيدًا دائنًا
+/// للزبون (دفعة مقدّمة). التوزيع نفسه يتم بـallocate() من @oh/money —
+/// خوارزمية أكبر البواقي: لا فلس يضيع ولا فلس يُخلق.
+model PaymentAllocation {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  paymentId String @map("payment_id") @db.Uuid
+  orderId   String @map("order_id") @db.Uuid
+
+  /// CHECK يفرض > 0. لا معنى لتوزيع صفر.
+  amount Decimal @db.Decimal(18, 4)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  /// دفعة واحدة تُوزَّع على الطلب مرة واحدة فقط.
+  @@unique([paymentId, orderId])
+  @@index([tenantId, orderId])
+  @@index([tenantId, paymentId])
+  @@map("payment_allocations")
+}
+
+/// عدّاد ترقيم لكل محل.
+///
+/// UPDATE ... RETURNING value + 1 داخل معاملة = ذرّي بلا سباق.
+/// لماذا لا SEQUENCE؟ لأن التسلسل عالمي لا لكل مستأجر — فيرى المحل الأول
+/// أرقامًا 1,5,9 بينما الثاني 2,6,10. مربك، ويسرّب حجم نشاط المنافسين.
+model TenantCounter {
+  tenantId String @map("tenant_id") @db.Uuid
+  storeId  String @map("store_id") @db.Uuid
+  /// 'customer' | 'order' | 'payment'
+  name     String @db.VarChar(24)
+  value    Int    @default(0)
+
+  @@id([tenantId, storeId, name])
+  @@map("tenant_counters")
+}
+
+enum IdempotencyStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+/// سجل مفاتيح منع التكرار.
+///
+/// UNIQUE(tenant, key) هو ما يجعل الحماية ذرّية: طلبان متزامنان — أحدهما
+/// يفوز بالإدراج والآخر يصطدم بالقيد فيقرأ الرد المخزَّن.
+/// «افحص ثم أدرج» كان سيترك نافذة سباق بين الفحص والإدراج.
+model IdempotencyKey {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+
+  key      String @db.VarChar(64)
+  endpoint String @db.VarChar(120)
+
+  /// هاش الحمولة — نفس المفتاح بحمولة مختلفة = خطأ عميل (422).
+  requestHash String @map("request_hash") @db.Char(64)
+
+  status         IdempotencyStatus @default(IN_PROGRESS)
+  responseStatus Int?              @map("response_status")
+  responseBody   Json?             @map("response_body")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, key])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
 }
