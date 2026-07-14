@@ -62,3 +62,6 @@ desktop.ini
 # ── Uploads (runtime tenant files) ───────────
 apps/api/storage/
 uploads/
+
+# لقطات المراجعة البصرية
+.screenshots/

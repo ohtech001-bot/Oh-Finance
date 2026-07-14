@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { LoginRequest, LoginResponse, SessionUser } from '@oh/contracts';
 import type { Permission } from '@oh/config';
-import { ApiRequestError, api } from '@/lib/api';
+import { api } from '@/lib/api';
 
 interface AuthContextValue {
   user: SessionUser | null;
@@ -38,12 +38,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   } = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: () => api.get<SessionUser>('/auth/me'),
-    // 401 متوقع تمامًا للزائر — ليس خطأً يستحق إعادة المحاولة.
-    retry: (failureCount, error) => {
-      if (error instanceof ApiRequestError && error.isUnauthenticated) return false;
-      return failureCount < 2;
-    },
+
+    /**
+     * ⚠️ لا إعادة محاولة إطلاقًا — وهذا مقصود.
+     *
+     * هذا استعلام **استطلاع جلسة**، لا جلب بيانات. فشله بأي سبب (401 لزائر،
+     * أو 500 لخادم متوقف، أو انقطاع شبكة) يعني عمليًا شيئًا واحدًا: «لا جلسة».
+     *
+     * لو أعدنا المحاولة، لظلت `isLoading` صادقة أثناء المحاولات — و`RequireAuth`
+     * يعرض دوّار «جارٍ التحقق من الجلسة» طوال تلك المدة. النتيجة: زائر يفتح
+     * الموقع بينما الخادم بطيء يحدّق في دوّار **قبل أن يرى شاشة الدخول أصلًا**.
+     *
+     * (كشفت هذا لقطةُ شاشة، لا الاختبارات: Playwright ينتظر `networkidle`
+     *  فيتجاوز فترة الانتظار تلقائيًا ولا «يرى» الدوّار.)
+     *
+     * الجلسة الحقيقية تُستعاد بمسار التجديد عند أول طلب موثّق، لا بإلحاح هنا.
+     */
+    retry: false,
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const loginMutation = useMutation({
