@@ -154,13 +154,13 @@ export function PaymentsPage() {
       header: 'الرصيد قبل',
       align: 'end',
       hideBelow: 'lg',
-      render: (row) => <MoneyText value={row.balanceBefore} currency={currency} tone="plain" withSymbol={false} />,
+      render: (row) => <MoneyText value={row.balanceBefore} currency={currency} tone="balance" withSymbol={false} />,
     },
     {
       header: 'الرصيد بعد',
       align: 'end',
       hideBelow: 'lg',
-      render: (row) => <MoneyText value={row.balanceAfter} currency={currency} tone="auto" withSymbol={false} />,
+      render: (row) => <MoneyText value={row.balanceAfter} currency={currency} tone="balance" withSymbol={false} />,
     },
     {
       header: 'مربوطة بـ',

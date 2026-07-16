@@ -155,7 +155,7 @@ export function CustomersPage() {
       key: 'balance',
       header: 'الرصيد الحالي',
       align: 'end',
-      render: (row) => <MoneyText value={row.balance} currency={currency} tone="auto" />,
+      render: (row) => <MoneyText value={row.balance} currency={currency} tone="balance" />,
     },
     {
       header: 'حالة الحساب',

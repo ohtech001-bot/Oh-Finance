@@ -7,7 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { ZodError } from 'zod';
+import { ZodError, type ZodIssue } from 'zod';
 import { ERROR_CODES, type ApiError } from '@oh/contracts';
 import type { Request, Response } from 'express';
 import { TenantContext } from '../tenancy/tenant-context.js';
@@ -74,9 +74,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     // ── أخطاء التحقق من المدخلات ────────────────────────────────────────
-    if (exception instanceof ZodError) {
+    // كشف بنيوي لا `instanceof` فقط: مخططات @oh/contracts قد تحمل نسخة zod
+    // مختلفة، فيفشل instanceof وتتسرّب أخطاء التحقق كـ500. نكشف بالبنية أيضًا.
+    const zodIssues = this.asZodIssues(exception);
+    if (zodIssues) {
       const fields: Record<string, string[]> = {};
-      for (const issue of exception.issues) {
+      for (const issue of zodIssues) {
         const key = issue.path.join('.') || '_root';
         (fields[key] ??= []).push(issue.message);
       }
@@ -204,5 +207,26 @@ export class AllExceptionsFilter implements ExceptionFilter {
   private extractMessage(exception: unknown): string {
     if (exception instanceof Error) return exception.message;
     return String(exception);
+  }
+
+  /**
+   * يكشف ZodError بنيويًا — يقاوم تعدّد نسخ zod.
+   *
+   * `instanceof` وحده يفشل إن جاء الخطأ من نسخة zod مختلفة (في @oh/contracts).
+   * نجرّب instanceof أولًا (الأسرع)، ثم البصمة: اسم الصنف + مصفوفة issues.
+   */
+  private asZodIssues(exception: unknown): ZodIssue[] | null {
+    if (exception instanceof ZodError) return exception.issues;
+
+    if (
+      exception !== null &&
+      typeof exception === 'object' &&
+      (exception as { name?: string }).name === 'ZodError' &&
+      Array.isArray((exception as { issues?: unknown }).issues)
+    ) {
+      return (exception as { issues: ZodIssue[] }).issues;
+    }
+
+    return null;
   }
 }

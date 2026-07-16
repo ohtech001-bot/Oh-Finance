@@ -155,7 +155,7 @@ export function LedgerPage() {
       align: 'end',
       render: (row) => (
         <span className={row.isReversed ? 'line-through opacity-50' : ''}>
-          <MoneyText value={row.runningBalance} currency={currency} tone="auto" withSymbol={false} />
+          <MoneyText value={row.runningBalance} currency={currency} tone="balance" withSymbol={false} />
         </span>
       ),
     },
@@ -274,7 +274,7 @@ function Totals({
   return (
     <div className="text-center">
       <p className="text-[13px] text-fg-muted">{label}</p>
-      <MoneyText value={value} currency={currency} tone={tone} size="lg" />
+      <MoneyText value={value} currency={currency} tone={tone === 'auto' ? 'balance' : tone} size="lg" />
     </div>
   );
 }

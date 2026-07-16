@@ -464,7 +464,9 @@ export class AuthService {
 
     await this.prisma.runUnscoped(
       (tx) =>
-        tx.$executeRaw`SELECT app_auth_record_attempt(${userId}::uuid, ${success}, ${threshold}, ${minutes})`,
+        // ⚠️ `::int` إلزامي: Prisma يمرّر أرقام JS كـbigint (int8)، والدالة
+        //    تتوقع integer (int4). بلا التحويل يفشل حلّ الدالة (42883).
+        tx.$executeRaw`SELECT app_auth_record_attempt(${userId}::uuid, ${success}, ${threshold}::int, ${minutes}::int)`,
     );
   }
 

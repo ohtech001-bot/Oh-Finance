@@ -124,7 +124,7 @@ export function CustomerDetailPage() {
     {
       header: 'الرصيد بعد',
       align: 'end',
-      render: (row) => <MoneyText value={row.runningBalance} currency={currency} tone="auto" withSymbol={false} />,
+      render: (row) => <MoneyText value={row.runningBalance} currency={currency} tone="balance" withSymbol={false} />,
     },
   ];
 
@@ -196,7 +196,7 @@ export function CustomerDetailPage() {
                 label="الرصيد الحالي"
                 money={customer.balance}
                 currency={currency}
-                moneyTone="auto"
+                moneyTone="balance"
                 icon={Wallet}
                 tone={customer.accountState === 'DEBIT' ? 'debit' : 'credit'}
                 sublabel={ACCOUNT_STATE_LABELS[customer.accountState]}

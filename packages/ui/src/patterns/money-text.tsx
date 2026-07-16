@@ -1,7 +1,7 @@
 import { formatMoney, isMoneyString, type CurrencyCode, type MoneyString } from '@oh/money';
 import { cn } from '../lib/cn.js';
 
-export type MoneyTone = 'debit' | 'credit' | 'neutral' | 'auto' | 'plain';
+export type MoneyTone = 'debit' | 'credit' | 'neutral' | 'auto' | 'balance' | 'plain';
 
 export interface MoneyTextProps {
   /** المبلغ **كنص** — لا `number`. النوع نفسه يمنع الخطأ. */
@@ -61,8 +61,26 @@ export function MoneyText({
   const isNegative = value.startsWith('-');
   const isZeroValue = /^-?0+(\.0+)?$/.test(value);
 
-  const resolvedTone: Exclude<MoneyTone, 'auto'> =
-    tone === 'auto' ? (isZeroValue ? 'neutral' : isNegative ? 'debit' : 'credit') : tone;
+  /**
+   * `auto`    : للمبالغ المُوقَّعة العامة (دلتا). موجب = خير = أخضر.
+   * `balance` : لرصيد حساب الزبون. موجب = **مدين لنا** = أحمر (دَين نُحصّله)،
+   *             سالب = نحن مدينون له (دائن) = أخضر. عكس `auto` عمدًا — وهو ما
+   *             يعرضه المرجع البصري لعمود «الرصيد الحالي».
+   */
+  const resolvedTone: Exclude<MoneyTone, 'auto' | 'balance'> =
+    tone === 'auto'
+      ? isZeroValue
+        ? 'neutral'
+        : isNegative
+          ? 'debit'
+          : 'credit'
+      : tone === 'balance'
+        ? isZeroValue
+          ? 'neutral'
+          : isNegative
+            ? 'credit'
+            : 'debit'
+        : tone;
 
   const toneClass = {
     debit: 'text-danger',

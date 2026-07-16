@@ -1,5 +1,5 @@
 import { type CurrencyCode, type MoneyString } from '@oh/money';
-export type MoneyTone = 'debit' | 'credit' | 'neutral' | 'auto' | 'plain';
+export type MoneyTone = 'debit' | 'credit' | 'neutral' | 'auto' | 'balance' | 'plain';
 export interface MoneyTextProps {
     /** المبلغ **كنص** — لا `number`. النوع نفسه يمنع الخطأ. */
     value: MoneyString;

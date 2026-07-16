@@ -1,5 +1,5 @@
 import { PipeTransform, Injectable, type ArgumentMetadata } from '@nestjs/common';
-import { ZodError, type ZodSchema } from 'zod';
+import { type ZodSchema } from 'zod';
 import { AppError } from '../errors/app-error.js';
 
 /**
@@ -20,19 +20,27 @@ export class ZodValidationPipe implements PipeTransform {
   constructor(private readonly schema: ZodSchema) {}
 
   transform(value: unknown, _metadata: ArgumentMetadata): unknown {
-    try {
-      return this.schema.parse(value);
-    } catch (error) {
-      if (error instanceof ZodError) {
-        const fields: Record<string, string[]> = {};
-        for (const issue of error.issues) {
-          const key = issue.path.join('.') || '_root';
-          (fields[key] ??= []).push(issue.message);
-        }
-        throw AppError.validation('تحقّق من البيانات المُدخلة.', fields);
-      }
-      throw error;
+    /**
+     * ⚠️ `safeParse` لا `parse`+`instanceof ZodError`.
+     *
+     * المخطط يأتي من `@oh/contracts` بنسخة zod الخاصة به. لو رمى `parse`،
+     * لكان الاستثناء من صنف ZodError الخاص بتلك النسخة — وقد يختلف عن نسخة
+     * zod في هذه الحزمة، فيفشل `instanceof` وتتسرّب أخطاء التحقق كـ500.
+     *
+     * `safeParse` يعيد `{ success, error }` بلا رمي، فلا نحتاج `instanceof`
+     * إطلاقًا — نتعامل مع النتيجة مباشرة. متين ضد تعدّد نسخ zod.
+     */
+    const result = this.schema.safeParse(value);
+    if (result.success) {
+      return result.data;
     }
+
+    const fields: Record<string, string[]> = {};
+    for (const issue of result.error.issues) {
+      const key = issue.path.join('.') || '_root';
+      (fields[key] ??= []).push(issue.message);
+    }
+    throw AppError.validation('تحقّق من البيانات المُدخلة.', fields);
   }
 }
 
