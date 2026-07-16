@@ -61,6 +61,7 @@ export interface FieldProps {
   error?: string;
   hint?: string;
   required?: boolean;
+  className?: string;
   children: (props: FieldRenderProps) => React.ReactNode;
 }
 
@@ -71,7 +72,7 @@ export interface FieldProps {
  * الخطأ عند الوصول للحقل. حقل أحمر بلا هذا الربط لا يعني شيئًا لمستخدم كفيف
  * — يسمع «حقل نصي» فقط، ولا يعرف لماذا رُفض نموذجه.
  */
-export function Field({ label, error, hint, required, children }: FieldProps) {
+export function Field({ label, error, hint, required, className, children }: FieldProps) {
   const id = useId();
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
@@ -79,7 +80,7 @@ export function Field({ label, error, hint, required, children }: FieldProps) {
   const describedBy = [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ');
 
   return (
-    <div className="space-y-1.5">
+    <div className={cn('space-y-1.5', className)}>
       <label htmlFor={id} className="block text-[13px] font-medium text-fg">
         {label}
         {/*

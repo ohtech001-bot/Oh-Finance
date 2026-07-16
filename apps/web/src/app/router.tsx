@@ -3,13 +3,10 @@ import {
   BarChart3,
   CreditCard,
   FileText,
-  ListOrdered,
   MessageCircle,
   Package,
   Settings,
-  ShoppingBag,
   Users,
-  Wallet,
 } from 'lucide-react';
 import { AppShell } from '@/components/layout/app-shell';
 import { RedirectIfAuthenticated, RequireAuth, RequireSuperAdmin, RequireTenant } from './guards';
@@ -23,6 +20,13 @@ import { TenantsListPage } from '@/features/platform/tenants-list-page';
 import { TenantFormPage } from '@/features/platform/tenant-form-page';
 import { PlaceholderPage } from '@/features/placeholder/placeholder-page';
 import { ForbiddenPage, NotFoundPage, RouteErrorPage } from '@/features/errors/error-pages';
+
+// ── المرحلة 2: النواة المالية ──
+import { CustomersPage } from '@/features/customers/customers-page';
+import { CustomerDetailPage } from '@/features/customers/customer-detail-page';
+import { OrdersPage } from '@/features/orders/orders-page';
+import { LedgerPage } from '@/features/ledger/ledger-page';
+import { PaymentsPage } from '@/features/payments/payments-page';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -67,50 +71,12 @@ export const router = createBrowserRouter([
               // ── أقسام المراحل القادمة ─────────────────────────────────
               // موجودة كمسارات حقيقية، بترويسات حقيقية، وحالة «قيد التطوير»
               // صريحة. لا بيانات وهمية ولا أزرار ميتة.
-              {
-                path: 'customers',
-                element: (
-                  <PlaceholderPage
-                    titleKey="nav.customers"
-                    icon={Users}
-                    description="إضافة الزبائن، ملفاتهم، أرصدتهم، وحدودهم الائتمانية."
-                    phase="المرحلة 4"
-                  />
-                ),
-              },
-              {
-                path: 'orders',
-                element: (
-                  <PlaceholderPage
-                    titleKey="nav.orders"
-                    icon={ShoppingBag}
-                    description="الطلبات: مسودة، عرض سعر، مؤكد. كل طلب مؤكد يولّد حركة مدينة."
-                    phase="المرحلة 4"
-                  />
-                ),
-              },
-              {
-                path: 'payments',
-                element: (
-                  <PlaceholderPage
-                    titleKey="nav.payments"
-                    icon={Wallet}
-                    description="الدفع الكامل والجزئي، توزيع الدفعة على عدة طلبات، ومنع التسجيل المزدوج."
-                    phase="المرحلة 5"
-                  />
-                ),
-              },
-              {
-                path: 'ledger',
-                element: (
-                  <PlaceholderPage
-                    titleKey="nav.ledger"
-                    icon={ListOrdered}
-                    description="دفتر الحركات المالية: الرصيد قبل، المبلغ، الرصيد بعد — بلا حذف ولا تعديل."
-                    phase="المرحلة 5"
-                  />
-                ),
-              },
+              // ── المرحلة 2: موصولة ببيانات حقيقية ──
+              { path: 'customers', element: <CustomersPage /> },
+              { path: 'customers/:id', element: <CustomerDetailPage /> },
+              { path: 'orders', element: <OrdersPage /> },
+              { path: 'payments', element: <PaymentsPage /> },
+              { path: 'ledger', element: <LedgerPage /> },
               {
                 path: 'reports',
                 element: (

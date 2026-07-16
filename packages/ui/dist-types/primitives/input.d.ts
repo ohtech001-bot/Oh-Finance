@@ -16,6 +16,7 @@ export interface FieldProps {
     error?: string;
     hint?: string;
     required?: boolean;
+    className?: string;
     children: (props: FieldRenderProps) => React.ReactNode;
 }
 /**
@@ -25,5 +26,5 @@ export interface FieldProps {
  * الخطأ عند الوصول للحقل. حقل أحمر بلا هذا الربط لا يعني شيئًا لمستخدم كفيف
  * — يسمع «حقل نصي» فقط، ولا يعرف لماذا رُفض نموذجه.
  */
-export declare function Field({ label, error, hint, required, children }: FieldProps): import("react").JSX.Element;
+export declare function Field({ label, error, hint, required, className, children }: FieldProps): import("react").JSX.Element;
 //# sourceMappingURL=input.d.ts.map
