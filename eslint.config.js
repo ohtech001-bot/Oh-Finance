@@ -15,13 +15,20 @@ export default [
       '**/*.config.ts',
       '**/*.config.js',
       'vitest.workspace.ts',
+      // اختبارات Playwright: تستخدم أنواع المتصفح وواجهة test الخاصة،
+      // ولم تكن ضمن نطاق الفحص في المرحلة 1. نُبقيها كذلك.
+      'apps/web/e2e/**',
     ],
   },
 
-  // الحزم المشتركة + الخادم
+  // الحزم المشتركة + الخادم (بما فيه اختبارات التكامل — تحتاج محلِّل TS)
   ...node.map((c) => ({
     ...c,
-    files: ['packages/{money,contracts,config}/src/**/*.ts', 'apps/api/src/**/*.ts'],
+    files: [
+      'packages/{money,contracts,config}/src/**/*.ts',
+      'apps/api/src/**/*.ts',
+      'apps/api/test/**/*.ts',
+    ],
   })),
 
   /**
@@ -92,5 +99,24 @@ export default [
   {
     files: ['packages/money/src/**/*.ts'],
     rules: { 'no-restricted-syntax': 'off' },
+  },
+
+  /**
+   * ملفات الاختبار.
+   *
+   * `.toFixed()` هنا يُستدعى على كائنات `Decimal` (من @oh/money) في
+   * التأكيدات — وهو دقيق وصحيح. القاعدة نحوية ولا تعرف نوع المستقبِل، فتُنذر
+   * كذبًا. التأكيدات تقارن نصوصًا صريحة، فخطر خطأ عائم صامت معدوم.
+   *
+   * `no-console` مُخفَّف لرسائل تخطّي الاختبارات، و`any` لبناء بيانات وهمية.
+   */
+  {
+    files: ['**/*.test.{ts,tsx}', 'apps/api/test/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': 'off',
+      'no-restricted-properties': 'off',
+      'no-console': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
   },
 ];

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { PrismaClient } from '@prisma/client';
+import { type PrismaClient } from '@prisma/client';
 import { HAS_TEST_DB, SKIP_REASON, closeTestDb, testDb } from './db.js';
 import {
   createTestCustomer,
@@ -23,7 +23,7 @@ import { OrderCalculator } from '../src/modules/orders/order-calculator.js';
  */
 
 if (!HAS_TEST_DB) {
-  // eslint-disable-next-line no-console
+   
   console.warn(`\n⚠  ${SKIP_REASON}\n`);
 }
 

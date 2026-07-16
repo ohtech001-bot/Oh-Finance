@@ -21,7 +21,7 @@ import {
  */
 
 if (!HAS_TEST_DB) {
-  // eslint-disable-next-line no-console
+   
   console.warn(`\n⚠  ${SKIP_REASON}\n`);
 }
 

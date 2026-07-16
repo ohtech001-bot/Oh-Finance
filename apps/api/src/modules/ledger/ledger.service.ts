@@ -329,8 +329,8 @@ export class LedgerService {
       // (2) الربط بالسابق
       if (!opening.equals(expectedOpening)) {
         errors.push(
-          `القيد ${entry.seq}: الرصيد الافتتاحي ${opening.toFixed(4)} ` +
-            `لا يطابق رصيد سابقه ${expectedOpening.toFixed(4)} — سلسلة مكسورة.`,
+          `القيد ${entry.seq}: الرصيد الافتتاحي ${toMoneyString(opening)} ` +
+            `لا يطابق رصيد سابقه ${toMoneyString(expectedOpening)} — سلسلة مكسورة.`,
         );
       }
 
@@ -339,8 +339,8 @@ export class LedgerService {
       if (!running.equals(expectedRunning)) {
         errors.push(
           `القيد ${entry.seq}: المعادلة مخروقة — ` +
-            `${opening.toFixed(4)} + ${debit.toFixed(4)} − ${credit.toFixed(4)} ` +
-            `= ${expectedRunning.toFixed(4)} ≠ ${running.toFixed(4)}`,
+            `${toMoneyString(opening)} + ${toMoneyString(debit)} − ${toMoneyString(credit)} ` +
+            `= ${toMoneyString(expectedRunning)} ≠ ${toMoneyString(running)}`,
         );
       }
 
@@ -356,8 +356,8 @@ export class LedgerService {
 
     if (!computed.equals(aggregate)) {
       errors.push(
-        `الرصيد النهائي ${computed.toFixed(4)} لا يساوي ` +
-          `SUM(debit) − SUM(credit) = ${aggregate.toFixed(4)}`,
+        `الرصيد النهائي ${toMoneyString(computed)} لا يساوي ` +
+          `SUM(debit) − SUM(credit) = ${toMoneyString(aggregate)}`,
       );
     }
 

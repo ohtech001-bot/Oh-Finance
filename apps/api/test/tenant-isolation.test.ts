@@ -17,7 +17,7 @@ import { HAS_TEST_DB, SKIP_REASON, asNobody, asPlatform, asTenant, closeTestDb, 
  */
 
 if (!HAS_TEST_DB) {
-  // eslint-disable-next-line no-console
+   
   console.warn(`\n⚠  ${SKIP_REASON}\n`);
 }
 
