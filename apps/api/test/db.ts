@@ -24,8 +24,16 @@ export function testDb(): PrismaClient {
   if (!HAS_TEST_DB) {
     throw new Error('testDb() استُدعيت بلا TEST_DATABASE_URL. استخدم describe.skipIf(!HAS_TEST_DB).');
   }
+
+  // حدّ اتصالات أوسع: اختبارات التزامن تُطلق ~20 معاملة تفاعلية معًا.
+  // بلا هذا تختنق على تجمّع Prisma الافتراضي (num_cpus×2+1) وتتجاوز maxWait.
+  const url = new URL(TEST_DATABASE_URL);
+  if (!url.searchParams.has('connection_limit')) {
+    url.searchParams.set('connection_limit', '25');
+  }
+
   client ??= new PrismaClient({
-    datasources: { db: { url: TEST_DATABASE_URL } },
+    datasources: { db: { url: url.toString() } },
   });
   return client;
 }
@@ -56,13 +64,20 @@ export async function resetDb(): Promise<void> {
   `);
 }
 
-/** ينفّذ استعلامًا ضمن سياق مستأجر — كما يفعل الخادم بالضبط. */
+/**
+ * ينفّذ استعلامًا ضمن سياق مستأجر — كما يفعل الخادم بالضبط.
+ *
+ * ⚠️ `SET LOCAL ROLE oh_app` إلزامي: نتصل كـ`postgres` (مستخدم فائق يتجاوز
+ *    RLS كليًا). بدون التحويل إلى دور التطبيق غير الفائق، لا تُطبَّق أي سياسة
+ *    عزل، فتمرّ اختبارات العزل كذبًا. يجب أن تعمل الاختبارات بدور التطبيق نفسه.
+ */
 export async function asTenant<T>(
   tenantId: string,
   fn: (tx: Omit<PrismaClient, '$transaction' | '$connect' | '$disconnect' | '$on' | '$use' | '$extends'>) => Promise<T>,
 ): Promise<T> {
   const db = testDb();
   return db.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe('SET LOCAL ROLE oh_app');
     await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}::text, true)`;
     return fn(tx);
   });
@@ -74,15 +89,25 @@ export async function asPlatform<T>(
 ): Promise<T> {
   const db = testDb();
   return db.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe('SET LOCAL ROLE oh_app');
     await tx.$executeRaw`SELECT set_config('app.is_platform', 'on', true)`;
     return fn(tx);
   });
 }
 
-/** ينفّذ استعلامًا بلا أي سياق — كما لو نسي المطوّر ضبط المستأجر. */
+/**
+ * ينفّذ استعلامًا بدور التطبيق **بلا** سياق مستأجر — محاكاة «نسي المطوّر
+ * ضبط المستأجر».
+ *
+ * `SET LOCAL ROLE oh_app` بلا `app.tenant_id`: RLS تُطبَّق، وبلا سياق تُرجع
+ * صفرًا. هذا هو **الفشل الآمن** — خطأ برمجي يعطي «لا شيء» لا «كل شيء».
+ */
 export async function asNobody<T>(
   fn: (tx: Omit<PrismaClient, '$transaction' | '$connect' | '$disconnect' | '$on' | '$use' | '$extends'>) => Promise<T>,
 ): Promise<T> {
   const db = testDb();
-  return db.$transaction(async (tx) => fn(tx));
+  return db.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe('SET LOCAL ROLE oh_app');
+    return fn(tx);
+  });
 }

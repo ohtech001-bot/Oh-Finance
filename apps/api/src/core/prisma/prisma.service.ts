@@ -56,9 +56,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   /**
    * ⚠️ للمصادقة والفحوص الصحية فقط.
    *
-   * لا يضبط سياق مستأجر — أي استعلام على جدول محمي بـRLS سيعيد **صفر صفوف**
-   * (لا خطأ، بل لا شيء). هذا مقصود: الفشل يكون صامتًا وآمنًا لا خطيرًا.
-   * الاستخدام الشرعي الوحيد: استدعاء `app_auth_lookup` (دالة SECURITY DEFINER).
+   * لا يحوّل الدور إلى `oh_app`، فيبقى الاتصال كـ`postgres` (مستخدم فائق
+   * **يتجاوز RLS**). أي استعلام هنا يرى بيانات كل المستأجرين — لا عزل.
+   *
+   * لذلك الاستخدام المشروع محصور بعمليات ما-قبل-المستأجر التي تبحث بمفتاح
+   * فريد: `app_auth_lookup` (بالبريد)، والتحقق من الجلسة (بهاش الرمز الفريد).
+   * **يُمنع** استخدامه لأي استعلام أعمال — تلك تمر عبر `runInTenant` حصرًا.
    */
   get raw(): PrismaClient {
     return this.client;
@@ -67,8 +70,19 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   /**
    * ينفّذ العمل داخل معاملة مقيّدة بمستأجر واحد.
    *
-   * `set_config('app.tenant_id', $1, true)` — المعامل الثالث `true` يعني
-   * نطاق المعاملة. هذا السطر هو ما يفعّل كل سياسات RLS.
+   * سطران يفعّلان العزل، والترتيب بينهما لا يهم لكن كلاهما إلزامي:
+   *
+   *   1. `SET LOCAL ROLE oh_app`
+   *      ⚠️ **هذا السطر هو ما يجعل RLS تعمل أصلًا.**
+   *      نتصل بقاعدة البيانات كـ`postgres` (مستخدم فائق)، والمستخدمون
+   *      الفائقون **يتجاوزون RLS كليًا** — فبدون هذا السطر تكون كل سياسات
+   *      العزل زينةً بلا أثر، ويرى كل استعلام بيانات كل المستأجرين.
+   *      `oh_app` دور غير فائق (NOBYPASSRLS)، فتُطبَّق عليه السياسات.
+   *      `SET LOCAL` مقيّد بالمعاملة، فلا يتسرّب الدور عبر الاتصالات المجمّعة.
+   *
+   *   2. `set_config('app.tenant_id', $1, true)`
+   *      يحدّد أي مستأجر. المعامل الثالث `true` = نطاق المعاملة، فيُمحى
+   *      تلقائيًا عند COMMIT ولا يتسرّب هو الآخر.
    */
   async runInTenant<T>(
     tenantId: string,
@@ -77,6 +91,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   ): Promise<T> {
     return this.client.$transaction(
       async (tx) => {
+        await tx.$executeRawUnsafe('SET LOCAL ROLE oh_app');
         await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}::text, true)`;
         return fn(tx);
       },
@@ -107,6 +122,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
     return this.client.$transaction(
       async (tx) => {
+        // نفس المنطق: SET LOCAL ROLE oh_app كي تُطبَّق RLS، ثم فتح سياق المنصة.
+        // سياسة `platform_access` على كل جدول تسمح لـoh_app بالمرور عندما
+        // يكون app.is_platform='on' — فيرى المدير العام كل المستأجرين.
+        await tx.$executeRawUnsafe('SET LOCAL ROLE oh_app');
         await tx.$executeRaw`SELECT set_config('app.is_platform', 'on', true)`;
         return fn(tx);
       },
@@ -118,10 +137,16 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * معاملة بلا أي سياق — للمصادقة حصرًا.
+   * معاملة بلا تحويل دور وبلا سياق — تبقى كـ`postgres` (تتجاوز RLS).
    *
-   * الجداول المحمية بـRLS تعيد صفرًا هنا. الاستخدام الوحيد المشروع:
-   * استدعاء `app_auth_lookup()` التي تتجاوز RLS بصلاحيات مالكها.
+   * ⚠️ ليست «بلا عزل بالصدفة» — بل **تتجاوز العزل عمدًا**. الاستخدام المشروع
+   *    الوحيد: عمليات ما-قبل-المستأجر التي تبحث بمفتاح فريد ولا يمكنها معرفة
+   *    المستأجر بعد:
+   *      • `app_auth_lookup()` — البحث بالبريد عند تسجيل الدخول
+   *      • التحقق من الجلسة / تدوير الرمز — البحث بهاش الرمز الفريد
+   *
+   *    كل هذه تبحث عن **صف واحد بمفتاح فريد**، فلا تسرّب — تجد ما تبحث عنه أو
+   *    لا شيء. **يُمنع** تمرير استعلام أعمال (زبائن/طلبات/دفعات) عبرها.
    */
   async runUnscoped<T>(fn: (tx: TxClient) => Promise<T>): Promise<T> {
     return this.client.$transaction(async (tx) => fn(tx), {
