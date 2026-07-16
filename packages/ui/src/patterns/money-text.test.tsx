@@ -36,6 +36,22 @@ describe('MoneyText', () => {
     expect(container.querySelector('span')).toHaveClass('text-danger');
   });
 
+  it('tone="balance": موجب أحمر (مدين لنا)، سالب أخضر (دائن) — عكس auto', () => {
+    // رصيد الزبون الموجب يعني «مدين لنا» = أحمر (دَين نُحصّله)، كما في المرجع.
+    const { container: debtor } = render(<MoneyText value="1250.00" tone="balance" />);
+    expect(debtor.querySelector('span')).toHaveClass('text-danger');
+
+    const { container: creditor } = render(<MoneyText value="-200.00" tone="balance" />);
+    expect(creditor.querySelector('span')).toHaveClass('text-success');
+
+    const { container: settled } = render(<MoneyText value="0.00" tone="balance" />);
+    expect(settled.querySelector('span')).toHaveClass('text-fg-muted');
+
+    // البرهان على أنها عكس auto: نفس القيمة الموجبة، لونان متعاكسان.
+    const { container: auto } = render(<MoneyText value="1250.00" tone="auto" />);
+    expect(auto.querySelector('span')).toHaveClass('text-success'); // auto: موجب أخضر
+  });
+
   it('قيمة تالفة تعرض شرطة ولا تُسقط الشاشة', () => {
     // انهيار جدول مالي كامل بسبب صف واحد تالف أسوأ من عرض «—».
     render(<MoneyText value={'not-a-number' as never} />);

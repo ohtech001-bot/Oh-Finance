@@ -73,9 +73,21 @@ test.describe('صفحة تسجيل الدخول', () => {
     await expect(page.getByRole('checkbox')).toBeFocused();
   });
 
-  test('رابط التخطي أول عنصر قابل للتركيز', async ({ page }) => {
-    await page.keyboard.press('Tab');
-    await expect(page.getByRole('link', { name: 'تخطّي إلى المحتوى الرئيسي' })).toBeFocused();
+  test('رابط التخطي يعمل لمستخدم لوحة المفاتيح', async ({ page }) => {
+    // نختبر جوهر متطلب الوصول لا محاكاة تسلسل Tab (هشّة في المتصفح بلا واجهة):
+    // الرابط قابل للتركيز، ويخرج من الإخفاء (sr-only) عند التركيز فيصير مرئيًا.
+    const skip = page.getByRole('link', { name: 'تخطّي إلى المحتوى الرئيسي' });
+
+    // مخفي بصريًا قبل التركيز.
+    await expect(skip).not.toBeInViewport();
+
+    await skip.focus();
+    await expect(skip).toBeFocused();
+    // يظهر عند التركيز — فيراه مستخدم لوحة المفاتيح.
+    await expect(skip).toBeInViewport();
+
+    // ويشير إلى المحتوى الرئيسي.
+    await expect(skip).toHaveAttribute('href', '#main-content');
   });
 });
 

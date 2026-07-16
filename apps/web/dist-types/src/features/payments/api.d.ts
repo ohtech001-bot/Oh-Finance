@@ -1,9 +1,9 @@
 import type { CreatePaymentRequest, PaginatedResult, PaymentListQuery } from '@oh/contracts';
 export declare function usePayments(query: Partial<PaymentListQuery>): import("@tanstack/react-query").UseQueryResult<NoInfer<PaginatedResult<{
     number: string;
+    status: "POSTED" | "REVERSED";
     id: string;
     createdAt: string;
-    status: "POSTED" | "REVERSED";
     notes: string | null;
     customerId: string;
     customerName: string;
@@ -51,9 +51,9 @@ export declare function usePaymentStats(query: Partial<PaymentListQuery>): impor
 }>, Error>;
 export declare function usePayment(id: string | undefined): import("@tanstack/react-query").UseQueryResult<NoInfer<{
     number: string;
+    status: "POSTED" | "REVERSED";
     id: string;
     createdAt: string;
-    status: "POSTED" | "REVERSED";
     notes: string | null;
     customerId: string;
     customerName: string;
@@ -78,8 +78,8 @@ export declare function usePayment(id: string | undefined): import("@tanstack/re
 }>, Error>;
 export declare function useOpenOrders(customerId: string | undefined): import("@tanstack/react-query").UseQueryResult<NoInfer<{
     number: string;
-    id: string;
     total: string;
+    id: string;
     issuedAt: string;
     dueAt: string | null;
     paidAmount: string;
@@ -95,9 +95,9 @@ export declare function useOpenOrders(customerId: string | undefined): import("@
  */
 export declare function useCreatePayment(): import("@tanstack/react-query").UseMutationResult<{
     number: string;
+    status: "POSTED" | "REVERSED";
     id: string;
     createdAt: string;
-    status: "POSTED" | "REVERSED";
     notes: string | null;
     customerId: string;
     customerName: string;
@@ -143,9 +143,9 @@ export declare function usePreviewAllocation(): import("@tanstack/react-query").
 }, unknown>;
 export declare function useReversePayment(id: string): import("@tanstack/react-query").UseMutationResult<{
     number: string;
+    status: "POSTED" | "REVERSED";
     id: string;
     createdAt: string;
-    status: "POSTED" | "REVERSED";
     notes: string | null;
     customerId: string;
     customerName: string;
