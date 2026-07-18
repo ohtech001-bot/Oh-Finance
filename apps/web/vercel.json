@@ -1,8 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "SKIP_PRISMA_GENERATE=1 npm install",
+  "installCommand": "SKIP_PRISMA_GENERATE=1 npm install --include=dev",
   "buildCommand": "cd ../.. && npm run build:web",
   "outputDirectory": "dist",
-  "framework": null,
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
