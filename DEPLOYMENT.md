@@ -20,6 +20,12 @@ changed.**
 - **`tsconfig.web.json`** — web-only solution project (libs + `apps/web`, **not**
   `apps/api`), so a web deploy never depends on Prisma/the server.
 - **`apps/api/vercel.json`**, **`apps/web/vercel.json`** — per-app build config.
+- **`postinstall` → `tooling/prisma-postinstall.mjs`** — generates Prisma Client
+  using only the **locally-installed pinned** Prisma (6.19.3), never `npx`-
+  downloads a newer version, and **skips entirely when `SKIP_PRISMA_GENERATE=1`**
+  (set by the web deploy). The old fallback that ran `npx prisma` (which pulled
+  `prisma@latest`) was removed. The API deploy's install runs it normally →
+  pinned 6.19.3.
 
 Internal package `main`/`types`/`exports`/`files` and tsconfig project
 references were already correct and were left unchanged.
@@ -31,8 +37,10 @@ Create a Vercel project pointed at this repo with:
   - `buildCommand`: `cd ../.. && npm run build:web`
   - `outputDirectory`: `dist`
   - SPA fallback rewrite to `/index.html`
-- Install runs at the workspace root automatically (npm workspaces). The root
-  `postinstall` (`prisma generate`) is harmless here (it has a fallback).
+- Install runs at the workspace root automatically (npm workspaces). The web
+  `installCommand` sets **`SKIP_PRISMA_GENERATE=1`**, so the root `postinstall`
+  **does not run Prisma at all** on the web deploy (no accidental download of a
+  newer Prisma).
 - Set any `VITE_*` runtime env vars (e.g. API base URL) in the Vercel project.
 
 Result: a static SPA — builds and serves correctly.

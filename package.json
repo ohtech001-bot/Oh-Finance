@@ -44,7 +44,7 @@
     "db:gen-init-sql": "node tooling/gen-init-migration.mjs",
     "security:audit": "npm audit --omit=dev --audit-level=high",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build",
-    "postinstall": "prisma generate --schema apps/api/prisma/schema.prisma || node tooling/prisma-generate-fallback.mjs"
+    "postinstall": "node tooling/prisma-postinstall.mjs"
   },
   "devDependencies": {
     "@oh/eslint-config": "*",
