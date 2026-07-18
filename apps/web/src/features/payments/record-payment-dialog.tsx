@@ -8,7 +8,7 @@ import {
   type PaginatedResult,
   type PaymentMethod,
 } from '@oh/contracts';
-import type { CurrencyCode } from '@oh/money';
+import { add, greaterThan, subtract, toMoneyString, type CurrencyCode } from '@oh/money';
 import {
   Button,
   Dialog,
@@ -26,7 +26,7 @@ import {
 } from '@oh/ui';
 import { ApiRequestError, api } from '@/lib/api';
 import { useAuth } from '@/app/auth-context';
-import { useCreatePayment, usePreviewAllocation } from './api';
+import { useCreatePayment, useOpenOrders, usePreviewAllocation } from './api';
 
 export interface RecordPaymentDialogProps {
   open: boolean;
@@ -54,12 +54,17 @@ export function RecordPaymentDialog({ open, onOpenChange, fixedCustomerId }: Rec
   const [strategy, setStrategy] = useState<AllocationStrategy>('AUTO_OLDEST_FIRST');
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
+  /** توزيع يدوي: orderId → المبلغ (نص). */
+  const [manualAlloc, setManualAlloc] = useState<Record<string, string>>({});
 
   // ⚠️ مفتاح واحد لكل فتح للنموذج — لا يتغيّر عبر إعادة الإرسال.
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
 
   const create = useCreatePayment();
   const preview = usePreviewAllocation();
+
+  // طلبات الزبون غير المسدَّدة — للتوزيع اليدوي فقط.
+  const openOrdersQuery = useOpenOrders(strategy === 'MANUAL' && customerId ? customerId : undefined);
 
   // قائمة زبائن للاختيار (عند عدم تثبيت الزبون).
   const customersQuery = useQuery({
@@ -77,6 +82,7 @@ export function RecordPaymentDialog({ open, onOpenChange, fixedCustomerId }: Rec
       setStrategy('AUTO_OLDEST_FIRST');
       setReference('');
       setNotes('');
+      setManualAlloc({});
       setIdempotencyKey(crypto.randomUUID());
       preview.reset();
     }
@@ -84,6 +90,21 @@ export function RecordPaymentDialog({ open, onOpenChange, fixedCustomerId }: Rec
   }, [open, fixedCustomerId]);
 
   const canPreview = customerId !== '' && /^\d+(\.\d{1,4})?$/.test(amount) && Number(amount) > 0;
+
+  const isManual = strategy === 'MANUAL';
+  const openOrders = openOrdersQuery.data ?? [];
+
+  // مجموع التوزيع اليدوي — بحساب مالي دقيق (@oh/money)، لا جمع أعداد عائمة.
+  const amountStr = /^\d+(\.\d{1,4})?$/.test(amount) ? amount : '0';
+  const manualTotalStr = Object.values(manualAlloc).reduce(
+    (acc, v) => (/^\d+(\.\d{1,4})?$/.test(v) && Number(v) > 0 ? toMoneyString(add(acc, v), 2) : acc),
+    '0.00',
+  );
+  const manualOverAllocated = isManual && greaterThan(manualTotalStr, amountStr);
+  const manualEmpty = isManual && !greaterThan(manualTotalStr, '0');
+  const unallocatedStr = greaterThan(amountStr, manualTotalStr)
+    ? toMoneyString(subtract(amountStr, manualTotalStr), 2)
+    : '0.00';
 
   const runPreview = () => {
     if (!canPreview) return;
@@ -98,6 +119,22 @@ export function RecordPaymentDialog({ open, onOpenChange, fixedCustomerId }: Rec
       toast.error('اختر الزبون وأدخل مبلغًا صحيحًا.');
       return;
     }
+    if (isManual && manualEmpty) {
+      toast.error('التوزيع اليدوي يتطلب تحديد مبلغ لطلب واحد على الأقل.');
+      return;
+    }
+    if (manualOverAllocated) {
+      toast.error('مجموع التوزيع يتجاوز مبلغ الدفعة.');
+      return;
+    }
+
+    // التوزيع اليدوي: نرسل البنود ذات المبلغ الموجب فقط.
+    const allocations = isManual
+      ? openOrders
+          .map((o) => ({ orderId: o.id, amount: manualAlloc[o.id] ?? '' }))
+          .filter((a) => Number(a.amount) > 0)
+      : undefined;
+
     create.mutate(
       {
         body: {
@@ -107,6 +144,7 @@ export function RecordPaymentDialog({ open, onOpenChange, fixedCustomerId }: Rec
           strategy,
           reference: reference || undefined,
           notes: notes || undefined,
+          ...(allocations ? { allocations } : {}),
         },
         idempotencyKey,
       },
@@ -205,17 +243,16 @@ export function RecordPaymentDialog({ open, onOpenChange, fixedCustomerId }: Rec
                   value={strategy}
                   onChange={(e) => {
                     setStrategy(e.target.value as AllocationStrategy);
+                    setManualAlloc({});
                     preview.reset();
                   }}
                   className={inputClass}
                 >
-                  {Object.entries(ALLOCATION_STRATEGY_LABELS)
-                    .filter(([v]) => v !== 'MANUAL') // التوزيع اليدوي: شاشة منفصلة (مرحلة لاحقة)
-                    .map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
+                  {Object.entries(ALLOCATION_STRATEGY_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
                 </select>
               )}
             </Field>
@@ -229,7 +266,74 @@ export function RecordPaymentDialog({ open, onOpenChange, fixedCustomerId }: Rec
             </Field>
           </div>
 
-          {/* معاينة التوزيع */}
+          {/* التوزيع اليدوي: جدول مبالغ قابل للتعديل قبل التأكيد */}
+          {isManual ? (
+            <div className="rounded-card border border-border bg-card-muted p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[13px] font-semibold text-fg">توزيع يدوي على الطلبات</h3>
+                <span className="text-xs text-fg-muted">
+                  الموزَّع:{' '}
+                  <MoneyText value={manualTotalStr} currency={currency} tone="plain" withSymbol={false} />{' '}
+                  / <MoneyText value={amountStr} currency={currency} tone="plain" withSymbol={false} />
+                </span>
+              </div>
+
+              {openOrdersQuery.isLoading ? (
+                <p className="mt-3 text-[13px] text-fg-muted">جارٍ تحميل الطلبات…</p>
+              ) : openOrders.length === 0 ? (
+                <p className="mt-3 text-[13px] text-fg-muted">
+                  لا طلبات غير مسدَّدة لهذا الزبون — اختر توزيعًا تلقائيًا أو دفعة مقدّمة.
+                </p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {openOrders.map((o) => (
+                    <div
+                      key={o.id}
+                      className="flex flex-wrap items-center gap-2 rounded-ctrl bg-card px-3 py-2 text-[13px]"
+                    >
+                      <span className="font-medium text-accent">{o.number}</span>
+                      {o.isOverdue ? <span className="text-xs font-semibold text-danger">متأخر</span> : null}
+                      <span className="text-fg-muted">
+                        المتبقي:{' '}
+                        <MoneyText value={o.remaining} currency={currency} tone="plain" withSymbol={false} />
+                      </span>
+                      <div className="ms-auto flex items-center gap-2">
+                        <Input
+                          value={manualAlloc[o.id] ?? ''}
+                          onChange={(e) => setManualAlloc((m) => ({ ...m, [o.id]: e.target.value }))}
+                          dir="ltr"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          className="h-9 w-28"
+                          aria-label={`مبلغ توزيع الطلب ${o.number}`}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setManualAlloc((m) => ({ ...m, [o.id]: o.remaining }))}
+                        >
+                          الكل
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {manualOverAllocated ? (
+                    <p className="text-xs font-semibold text-danger">
+                      مجموع التوزيع يتجاوز مبلغ الدفعة.
+                    </p>
+                  ) : greaterThan(unallocatedStr, '0') ? (
+                    <p className="flex items-center gap-1 text-xs text-warning">
+                      المتبقي غير موزَّع سيصبح دفعة مقدّمة (رصيد دائن):{' '}
+                      <MoneyText value={unallocatedStr} currency={currency} tone="plain" withSymbol={false} />
+                    </p>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          ) : (
+          /* معاينة التوزيع التلقائي */
           <div className="rounded-card border border-border bg-card-muted p-4">
             <div className="flex items-center justify-between">
               <h3 className="text-[13px] font-semibold text-fg">معاينة التوزيع</h3>
@@ -276,10 +380,11 @@ export function RecordPaymentDialog({ open, onOpenChange, fixedCustomerId }: Rec
               </p>
             )}
           </div>
+          )}
         </DialogBody>
 
         <DialogFooter>
-          <Button variant="brand" onClick={submit} loading={create.isPending}>
+          <Button variant="brand" onClick={submit} loading={create.isPending} disabled={manualOverAllocated}>
             تسجيل الدفعة
           </Button>
           <DialogClose asChild>

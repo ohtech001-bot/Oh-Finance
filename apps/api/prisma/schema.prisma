@@ -418,6 +418,8 @@ model AuditLog {
   @@unique([tenantId, seq])
   @@index([tenantId, action, createdAt])
   @@index([actorId])
+  /// موجز النشاط: بحث أحداث كيان محدد (Order/Payment/Customer) مرتّبة زمنيًا.
+  @@index([tenantId, entityType, entityId, seq])
   @@map("audit_logs")
 }
 
@@ -546,6 +548,9 @@ model Order {
   cancelledBy  String?   @map("cancelled_by") @db.Uuid
   cancelReason String?   @map("cancel_reason") @db.VarChar(500)
 
+  /// أرشفة — إخفاء من القوائم الافتراضية دون حذف. لا يؤثر على دفتر الحركات.
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+
   /// قفل متفائل — يمنع تعديلين متزامنين من الكتابة فوق بعضهما.
   version Int @default(0)
 
@@ -564,6 +569,8 @@ model Order {
   @@index([tenantId, status])
   @@index([tenantId, issuedAt])
   @@index([tenantId, dueAt])
+  // لوحة التحكم — تجميع الإيراد بتاريخ التأكيد (منحنيات لكل دلو).
+  @@index([tenantId, confirmedAt])
   @@map("orders")
 }
 

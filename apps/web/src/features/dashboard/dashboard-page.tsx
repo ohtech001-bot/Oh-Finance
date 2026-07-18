@@ -1,335 +1,306 @@
-import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  AlertTriangle,
   ArrowLeft,
-  CreditCard,
+  Info,
   LayoutDashboard,
-  Package,
-  ShoppingBag,
-  TrendingUp,
-  Users,
-  Wallet,
+  OctagonAlert,
 } from 'lucide-react';
-import type { Subscription } from '@oh/contracts';
-import type { CurrencyCode } from '@oh/money';
+import { PERMISSIONS } from '@oh/config';
 import {
+  PAYMENT_METHOD_LABELS,
+  type DashboardAlert,
+  type DashboardData,
+} from '@oh/contracts';
+import { formatMoney, type CurrencyCode } from '@oh/money';
+import {
+  Avatar,
   Card,
   CardBody,
   CardHeader,
-  CardSkeleton,
+  ErrorState,
   MoneyText,
   PageHeader,
-  StatCard,
+  StatCardsSkeleton,
   StatusBadge,
-  SUBSCRIPTION_STATUS_BADGE,
-  cn,
+  ORDER_STATUS_BADGE,
 } from '@oh/ui';
-import { api } from '@/lib/api';
-import { displayPercent } from '@/lib/percent';
+import { ApiRequestError } from '@/lib/api';
 import { useAuth } from '@/app/auth-context';
+import { ActivityFeed } from '@/features/activity/activity-feed';
+import { useStoreActivityFeed } from '@/features/activity/api';
+import { useDashboard } from './api';
+import { TrendChart } from './charts';
+import { KpiCard } from './kpi-card';
+import { RangePicker, type RangeValue } from './range-picker';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  لوحة صاحب المحل.
+ *  لوحة تحكم المحل — المرحلة 3.5 / Increment 3.
  * ═══════════════════════════════════════════════════════════════════════════
  *
- *  ── قرار حاسم: لا أرقام مخترعة ─────────────────────────────────────────────
- *
- *  المرجع البصري يعرض «إجمالي الديون 38,450 ر.س» و«الطلبات 87» و«المبيعات
- *  63,300». هذه بيانات موك‌أب. جداول `orders` و`payments` و`ledger_entries`
- *  **غير موجودة** في المرحلة 1 — تُبنى في المرحلتين 4 و5.
- *
- *  أمامي ثلاثة خيارات:
- *    (أ) عرض أرقام الموك‌أب      ← كذب. قد يبني عليه صاحب المحل قرارًا.
- *    (ب) عرض أصفار                ← كذب أيضًا، وأخبث: يبدو صحيحًا.
- *    (ج) عرض البطاقات بشكلها الكامل مع شارة «المرحلة 4» صريحة.  ← المختار.
- *
- *  البطاقات هنا **بتخطيطها النهائي بالضبط** — نفس الشبكة، نفس الألوان، نفس
- *  الأيقونات. ربطها بالبيانات في المرحلة 4 لن يغيّر سطر تخطيط واحد.
- *
- *  ما هو **حقيقي** الآن ويُعرض فعلًا: بيانات المحل، الباقة، حالة الاشتراك،
- *  وعدّادات الاستخدام (المحلات والمستخدمون) — كلها من الخادم.
+ *  ⚠️ كل رقم من الخادم (`GET /dashboard`) المشتق من قاعدة البيانات بمنطقة المحل.
+ *     لا Mock Data ولا حساب مالي في الواجهة. الأقسام تُرشَّح بالصلاحيات على
+ *     الخادم؛ الواجهة تعرض ما تستلمه فقط.
  */
 export function DashboardPage() {
-  const { t } = useTranslation();
-  const { user } = useAuth();
-
-  const {
-    data: subscription,
-    isLoading,
-    isError,
-  } = useQuery({
-    queryKey: ['subscription'],
-    queryFn: () => api.get<Subscription>('/subscription'),
-  });
-
+  const { user, can } = useAuth();
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
-  const storeName = user?.store?.name ?? user?.tenant?.name ?? '';
+  const canSeeActivity = can(PERMISSIONS.ACTIVITY_READ);
+
+  const [range, setRange] = useState<RangeValue>({ preset: 'this_month' });
+  // لا نطلق الاستعلام لفترة مخصّصة ناقصة التواريخ.
+  const ready = range.preset !== 'custom' || Boolean(range.from && range.to);
+
+  const { data, isLoading, isError, error, refetch } = useDashboard(ready ? range : { preset: 'this_month' });
+  const activityFeed = useStoreActivityFeed({ pageSize: 8 }, canSeeActivity);
+
+  const moneyTrends = data?.trends.filter((s) => s.unit === 'money') ?? [];
+  const countTrends = data?.trends.filter((s) => s.unit === 'count') ?? [];
+  const scope = data?.meta.scope;
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={t('dashboard.title')}
+        title="لوحة التحكم"
         icon={LayoutDashboard}
-        description={t('dashboard.welcome', { store: storeName })}
+        description={data ? `${data.meta.storeName} · ${data.meta.range.label}` : user?.store?.name}
       />
 
-      {/* ── بطاقات KPI — التخطيط النهائي، البيانات في المرحلة 4/5 ─────── */}
-      <section aria-labelledby="kpi-heading">
-        <h2 id="kpi-heading" className="sr-only">
-          المؤشرات المالية
-        </h2>
+      <Card>
+        <CardBody className="py-3">
+          <RangePicker value={range} onChange={setRange} />
+        </CardBody>
+      </Card>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            label={t('dashboard.totalDebt')}
-            icon={Wallet}
-            tone="debit"
-            pending="المرحلة 5"
+      {isLoading ? (
+        <StatCardsSkeleton count={4} />
+      ) : isError ? (
+        <Card>
+          <ErrorState
+            message={error instanceof ApiRequestError ? error.message : 'تعذّر تحميل لوحة التحكم.'}
+            requestId={error instanceof ApiRequestError ? error.requestId : undefined}
+            onRetry={() => void refetch()}
           />
-          <StatCard
-            label={t('dashboard.collectedThisMonth')}
-            icon={CreditCard}
-            tone="credit"
-            pending="المرحلة 5"
-          />
-          <StatCard
-            label={t('dashboard.ordersThisMonth')}
-            icon={ShoppingBag}
-            tone="accent"
-            pending="المرحلة 4"
-          />
-          <StatCard
-            label={t('dashboard.totalSales')}
-            icon={TrendingUp}
-            tone="purple"
-            pending="المرحلة 4"
-          />
-        </div>
+        </Card>
+      ) : data ? (
+        <>
+          {data.alerts.length > 0 ? <AlertsPanel alerts={data.alerts} currency={currency} /> : null}
 
-        <p className="mt-3 text-xs text-fg-subtle">
-          المؤشرات المالية تُربط بدفتر الحركات في المرحلتين 4 و5. لا تُعرض هنا
-          أرقام تقديرية.
-        </p>
-      </section>
+          {/* ── المؤشرات ─────────────────────────────────────────────── */}
+          {data.kpis.length > 0 ? (
+            <section aria-label="المؤشرات المالية">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                {data.kpis.map((m) => (
+                  <KpiCard key={m.id} metric={m} currency={currency} />
+                ))}
+              </div>
+            </section>
+          ) : null}
 
-      {/* ── ما هو حقيقي الآن: الاشتراك والاستخدام ─────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <section className="lg:col-span-2">
-          {isLoading ? (
-            <CardSkeleton />
-          ) : isError || !subscription ? (
+          {/* ── المنحنيات ────────────────────────────────────────────── */}
+          {moneyTrends.length > 0 || countTrends.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {moneyTrends.length > 0 ? (
+                <Card>
+                  <CardHeader title="اتجاه المبالغ" />
+                  <CardBody>
+                    <TrendChart series={moneyTrends} currency={currency} />
+                  </CardBody>
+                </Card>
+              ) : null}
+              {countTrends.length > 0 ? (
+                <Card>
+                  <CardHeader title="اتجاه الأعداد" />
+                  <CardBody>
+                    <TrendChart series={countTrends} currency={currency} />
+                  </CardBody>
+                </Card>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* ── القوائم المرتّبة ─────────────────────────────────────── */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4">
+            {scope?.lists.includes('recentOrders') ? (
+              <Card>
+                <CardHeader title="أحدث الطلبات" action={<ViewAll to="/orders" />} />
+                <CardBody className="space-y-1">
+                  {data.recentOrders.length === 0 ? (
+                    <Empty text="لا توجد طلبات في هذه الفترة." />
+                  ) : (
+                    data.recentOrders.map((o) => {
+                      const badge = ORDER_STATUS_BADGE[o.status];
+                      return (
+                        <Link
+                          key={o.id}
+                          to={`/orders/${o.id}`}
+                          className="flex items-center justify-between gap-2 rounded-ctrl px-2 py-2 hover:bg-card-muted"
+                        >
+                          <MoneyText value={o.total} currency={currency} tone="plain" size="sm" />
+                          <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
+                          <span className="flex-1 truncate text-end text-[13px] text-fg">{o.customerName}</span>
+                        </Link>
+                      );
+                    })
+                  )}
+                </CardBody>
+              </Card>
+            ) : null}
+
+            {scope?.lists.includes('recentPayments') ? (
+              <Card>
+                <CardHeader title="أحدث الدفعات" action={<ViewAll to="/payments" />} />
+                <CardBody className="space-y-1">
+                  {data.recentPayments.length === 0 ? (
+                    <Empty text="لا توجد دفعات في هذه الفترة." />
+                  ) : (
+                    data.recentPayments.map((p) => (
+                      <div key={p.id} className="flex items-center justify-between gap-2 rounded-ctrl px-2 py-2">
+                        <MoneyText value={p.amount} currency={currency} tone="credit" size="sm" />
+                        <span className="text-xs text-fg-muted">{PAYMENT_METHOD_LABELS[p.method]}</span>
+                        <div className="flex flex-1 flex-col items-end">
+                          <span className="truncate text-[13px] text-fg">{p.customerName}</span>
+                          {p.createdByName ? (
+                            <span className="text-[11px] text-fg-subtle">سجّلها: {p.createdByName}</span>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </CardBody>
+              </Card>
+            ) : null}
+
+            {scope?.lists.includes('topDebtors') ? (
+              <Card>
+                <CardHeader title="أعلى المدينين" action={<ViewAll to="/customers" />} />
+                <CardBody className="space-y-1">
+                  {data.topDebtors.length === 0 ? (
+                    <Empty text="لا يوجد زبائن مدينون." />
+                  ) : (
+                    data.topDebtors.map((c) => (
+                      <Link
+                        key={c.id}
+                        to={`/customers/${c.id}`}
+                        className="flex items-center justify-between gap-3 rounded-ctrl px-2 py-2 hover:bg-card-muted"
+                      >
+                        <MoneyText value={c.balance} currency={currency} tone="debit" size="sm" />
+                        <div className="flex flex-1 items-center justify-end gap-2.5">
+                          <div className="flex flex-col items-end">
+                            <span className="truncate text-[13px] font-medium text-fg">{c.name}</span>
+                            <span className="text-[11px] text-fg-subtle">
+                              {c.openOrders} طلب مفتوح
+                            </span>
+                          </div>
+                          <Avatar name={c.name} size="sm" />
+                        </div>
+                      </Link>
+                    ))
+                  )}
+                </CardBody>
+              </Card>
+            ) : null}
+
+            {scope?.lists.includes('topCustomers') ? (
+              <Card>
+                <CardHeader
+                  title={data.meta.topCustomersBasis === 'sales' ? 'أعلى الزبائن مبيعًا' : 'أعلى الزبائن تحصيلًا'}
+                  action={<ViewAll to="/customers" />}
+                />
+                <CardBody className="space-y-1">
+                  {data.topCustomers.length === 0 ? (
+                    <Empty text="لا توجد بيانات في هذه الفترة." />
+                  ) : (
+                    data.topCustomers.map((c) => (
+                      <Link
+                        key={c.id}
+                        to={`/customers/${c.id}`}
+                        className="flex items-center justify-between gap-3 rounded-ctrl px-2 py-2 hover:bg-card-muted"
+                      >
+                        <span className="tabular-nums text-[13px] text-fg" dir="ltr">
+                          {formatMoney(c.amount, { currency })}
+                        </span>
+                        <div className="flex flex-1 items-center justify-end gap-2.5">
+                          <span className="truncate text-[13px] font-medium text-fg">{c.name}</span>
+                          <Avatar name={c.name} size="sm" />
+                        </div>
+                      </Link>
+                    ))
+                  )}
+                </CardBody>
+              </Card>
+            ) : null}
+          </div>
+
+          {/* ── النشاط الأخير — يظهر فقط لمن يملك activity.read ─────────── */}
+          {canSeeActivity ? (
             <Card>
-              <CardHeader title={t('subscription.usage')} />
-              <CardBody>
-                <p className="text-sm text-fg-muted">تعذّر تحميل بيانات الاشتراك.</p>
+              <CardHeader title="النشاط الأخير" />
+              <CardBody className="pt-0">
+                <ActivityFeed
+                  items={activityFeed.data?.items ?? []}
+                  loading={activityFeed.isLoading}
+                  emptyText="لا يوجد نشاط في المحل بعد."
+                />
               </CardBody>
             </Card>
-          ) : (
-            <UsageCard subscription={subscription} />
-          )}
-        </section>
-
-        <section>
-          {isLoading ? (
-            <CardSkeleton />
-          ) : isError || !subscription ? null : (
-            <PlanCard subscription={subscription} currency={currency} />
-          )}
-        </section>
-      </div>
-
-      {/* ── الأقسام القادمة ───────────────────────────────────────────── */}
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <UpcomingCard
-          title={t('dashboard.recentOrders')}
-          description="آخر الطلبات مع حالاتها ومبالغها."
-          phase="المرحلة 4"
-          icon={ShoppingBag}
-        />
-        <UpcomingCard
-          title={t('dashboard.recentPayments')}
-          description="آخر الدفعات المستلمة وطرق الدفع."
-          phase="المرحلة 5"
-          icon={CreditCard}
-        />
-        <UpcomingCard
-          title={t('dashboard.topDebtors')}
-          description="الزبائن الأعلى مديونية ورصيد كل منهم."
-          phase="المرحلة 5"
-          icon={Users}
-        />
-      </section>
+          ) : null}
+        </>
+      ) : null}
     </div>
   );
 }
 
-// ── عدّادات استخدام الباقة ──────────────────────────────────────────────────
+// ── مكوّنات مساعدة ──────────────────────────────────────────────────────────
 
-function UsageCard({ subscription }: { subscription: Subscription }) {
-  const { t } = useTranslation();
-  const { usage } = subscription;
+const ALERT_STYLE = {
+  critical: { bg: 'bg-danger-soft', fg: 'text-danger', icon: OctagonAlert },
+  warning: { bg: 'bg-warning-soft', fg: 'text-warning', icon: AlertTriangle },
+  info: { bg: 'bg-accent-soft', fg: 'text-accent', icon: Info },
+} as const;
 
-  /**
-   * ⚠️ عدّادات الزبائن والطلبات = 0 وهذا **صحيح**، لا نائب:
-   *    لا يوجد زبون واحد في قاعدة البيانات لأن الجدول لم يُنشأ بعد.
-   *    نميّزها بصريًا كي لا يظنها المستخدم بيانات ناقصة.
-   */
-  const rows = [
-    { key: 'stores', label: t('subscription.stores'), data: usage.stores, live: true },
-    { key: 'users', label: t('subscription.users'), data: usage.users, live: true },
-    { key: 'customers', label: t('subscription.customers'), data: usage.customers, live: false },
-    { key: 'orders', label: t('subscription.orders'), data: usage.ordersThisMonth, live: false },
-  ];
-
+function AlertsPanel({ alerts, currency }: { alerts: DashboardAlert[]; currency: CurrencyCode }) {
   return (
-    <Card>
-      <CardHeader
-        title={t('subscription.usage')}
-        action={
-          <Link
-            to="/subscription"
-            className="flex items-center gap-1 text-[13px] font-medium text-accent hover:underline"
-          >
-            التفاصيل
-            <ArrowLeft className="size-3.5 rtl:rotate-0 ltr:rotate-180" aria-hidden />
+    <div className="space-y-2">
+      {alerts.map((a) => {
+        const s = ALERT_STYLE[a.severity];
+        const Icon = s.icon;
+        const body = (
+          <div className={`flex items-center gap-3 rounded-card px-4 py-3 text-[13px] ${s.bg} ${s.fg}`}>
+            <Icon className="size-4 shrink-0" aria-hidden />
+            <span className="flex-1">{a.message}</span>
+            {a.amount ? (
+              <span className="tabular-nums font-semibold" dir="ltr">
+                {formatMoney(a.amount, { currency, withSymbol: false })}
+              </span>
+            ) : null}
+          </div>
+        );
+        return a.actionHref ? (
+          <Link key={a.id} to={a.actionHref} className="block">
+            {body}
           </Link>
-        }
-      />
-
-      <CardBody className="space-y-5">
-        {rows.map((row) => {
-          const percent = displayPercent(row.data.used, row.data.limit);
-
-          // تحذير بصري عند اقتراب الحد — قبل أن يُرفض إنشاء زبون جديد فجأة.
-          const nearLimit = percent >= 80;
-
-          return (
-            <div key={row.key}>
-              <div className="flex items-center justify-between text-[13px]">
-                <span className="font-medium text-fg">
-                  {row.label}
-                  {!row.live ? (
-                    <span className="ms-2 rounded-pill bg-neutral-soft px-1.5 py-0.5 text-[10px] font-medium text-neutral">
-                      يُفعَّل في المرحلة 4
-                    </span>
-                  ) : null}
-                </span>
-                <span className="tabular-nums text-fg-muted" dir="ltr">
-                  {row.data.used} / {row.data.limit}
-                </span>
-              </div>
-
-              <div
-                className="mt-2 h-2 w-full overflow-hidden rounded-full bg-border-subtle"
-                role="progressbar"
-                aria-valuenow={percent}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-label={row.label}
-              >
-                <div
-                  className={cn(
-                    'h-full rounded-full transition-all',
-                    nearLimit ? 'bg-warning' : 'bg-brand',
-                  )}
-                  style={{ width: `${percent}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </CardBody>
-    </Card>
+        ) : (
+          <div key={a.id}>{body}</div>
+        );
+      })}
+    </div>
   );
 }
 
-// ── بطاقة الباقة ────────────────────────────────────────────────────────────
-
-function PlanCard({
-  subscription,
-  currency,
-}: {
-  subscription: Subscription;
-  currency: CurrencyCode;
-}) {
-  const { t } = useTranslation();
-  const badge = SUBSCRIPTION_STATUS_BADGE[subscription.status];
-
+function ViewAll({ to }: { to: string }) {
   return (
-    <Card>
-      <CardHeader title={t('subscription.currentPlan')} />
-
-      <CardBody className="space-y-4">
-        <div className="flex items-center justify-between">
-          <span className="text-lg font-bold text-fg">{subscription.plan.nameAr}</span>
-          <StatusBadge tone={badge.tone} withDot>
-            {badge.label}
-          </StatusBadge>
-        </div>
-
-        <div className="flex items-baseline gap-1.5">
-          <MoneyText
-            value={subscription.plan.priceMonthly}
-            currency={currency}
-            size="lg"
-            tone="plain"
-          />
-          <span className="text-sm text-fg-muted">/ شهريًا</span>
-        </div>
-
-        <dl className="space-y-2 border-t border-border pt-4 text-[13px]">
-          <div className="flex justify-between">
-            <dt className="text-fg-muted">{t('subscription.startDate')}</dt>
-            <dd className="tabular-nums text-fg" dir="ltr">
-              {formatDate(subscription.currentPeriodStart)}
-            </dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-fg-muted">{t('subscription.endDate')}</dt>
-            <dd className="tabular-nums text-fg" dir="ltr">
-              {formatDate(subscription.currentPeriodEnd)}
-            </dd>
-          </div>
-        </dl>
-      </CardBody>
-    </Card>
+    <Link to={to} className="flex items-center gap-1 text-[13px] font-medium text-accent hover:underline">
+      عرض الكل
+      <ArrowLeft className="size-3.5 ltr:rotate-180" aria-hidden />
+    </Link>
   );
 }
 
-// ── بطاقة «قادم» ────────────────────────────────────────────────────────────
-
-function UpcomingCard({
-  title,
-  description,
-  phase,
-  icon: Icon,
-}: {
-  title: string;
-  description: string;
-  phase: string;
-  icon: React.ComponentType<{ className?: string }>;
-}) {
-  return (
-    <Card className="border-dashed">
-      <CardHeader title={title} />
-      <CardBody>
-        <div className="flex flex-col items-center py-6 text-center">
-          <Icon className="size-8 text-fg-subtle" aria-hidden />
-          <p className="mt-3 text-[13px] text-fg-muted">{description}</p>
-          <span className="mt-3 rounded-pill bg-accent-soft px-2.5 py-1 text-[11px] font-semibold text-accent">
-            {phase}
-          </span>
-        </div>
-      </CardBody>
-    </Card>
-  );
+function Empty({ text }: { text: string }) {
+  return <p className="py-8 text-center text-[13px] text-fg-subtle">{text}</p>;
 }
 
-/** تنسيق تاريخ ISO → YYYY-MM-DD (مطابق للمرجع البصري). */
-function formatDate(iso: string): string {
-  return iso.slice(0, 10);
-}
-
-export { Package };
+export type { DashboardData };

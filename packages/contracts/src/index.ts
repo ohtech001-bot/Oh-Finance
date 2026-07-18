@@ -9,3 +9,15 @@ export * from './customer.js';
 export * from './order.js';
 export * from './ledger.js';
 export * from './payment.js';
+
+// ── المرحلة 3: لوحة التحكم ──
+export * from './dashboard.js';
+
+// ── المرحلة 3.5: موجز النشاط ──
+export * from './activity.js';
+
+// ── المرحلة 4: التقارير ──
+export * from './reports.js';
+
+// ── المرحلة 4: الإعدادات ──
+export * from './settings.js';

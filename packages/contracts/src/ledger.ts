@@ -91,6 +91,8 @@ export const ledgerListQuerySchema = paginationQuerySchema.extend({
   customerId: uuidSchema.optional(),
   entryType: ledgerEntryTypeSchema.optional(),
   refType: ledgerRefTypeSchema.optional(),
+  /** قيود مرجع محدد — لتفاصيل الطلب/الدفعة. */
+  refId: uuidSchema.optional(),
 
   from: isoDateSchema.optional(),
   to: isoDateSchema.optional(),

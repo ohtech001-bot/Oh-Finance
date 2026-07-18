@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ListOrdered } from 'lucide-react';
+import { Download, ListOrdered, Printer } from 'lucide-react';
 import {
   LEDGER_TYPE_LABELS,
   type LedgerEntry,
@@ -9,6 +9,7 @@ import {
 } from '@oh/contracts';
 import type { CurrencyCode } from '@oh/money';
 import {
+  Button,
   Card,
   CardBody,
   DataTable,
@@ -20,11 +21,13 @@ import {
   SearchFilter,
   SelectFilter,
   StatusBadge,
+  toast,
   type Column,
 } from '@oh/ui';
 import { ApiRequestError } from '@/lib/api';
 import { useAuth } from '@/app/auth-context';
-import { useLedger } from './api';
+import { fetchAllLedger, useLedger } from './api';
+import { exportLedgerCsv, printLedger } from './export';
 
 /** لون شارة نوع الحركة. */
 const TYPE_TONE: Record<string, 'debit' | 'credit' | 'partial' | 'info' | 'neutral' | 'purple'> = {
@@ -50,6 +53,9 @@ export function LedgerPage() {
   const { user } = useAuth();
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
 
+  const [searchParams] = useSearchParams();
+  const customerId = searchParams.get('customerId') ?? undefined;
+
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
@@ -60,6 +66,7 @@ export function LedgerPage() {
   const query: Partial<LedgerListQuery> = {
     page,
     pageSize,
+    customerId,
     search: search || undefined,
     entryType: (entryType || undefined) as LedgerListQuery['entryType'],
     from: from || undefined,
@@ -68,6 +75,27 @@ export function LedgerPage() {
 
   const list = useLedger(query);
   const totals = list.data?.totals;
+
+  const [busy, setBusy] = useState<'csv' | 'print' | null>(null);
+
+  const runExport = async (kind: 'csv' | 'print') => {
+    setBusy(kind);
+    try {
+      const rows = await fetchAllLedger(query);
+      if (rows.length === 0) {
+        toast.error('لا توجد حركات للتصدير.');
+        return;
+      }
+      const stamp = new Date().toISOString().slice(0, 10);
+      if (kind === 'csv') exportLedgerCsv(rows, `ledger-${stamp}.csv`);
+      else printLedger(rows, 'دفتر الحركات المالية');
+    } catch (e) {
+      if (e instanceof ApiRequestError) toast.apiError(e.message, e.requestId);
+      else toast.error('تعذّر التصدير.');
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const isFiltered = search !== '' || entryType !== '' || from !== '' || to !== '';
   const resetFilters = () => {
@@ -168,7 +196,41 @@ export function LedgerPage() {
         icon={ListOrdered}
         breadcrumbs={[{ label: t('nav.dashboard'), href: '/' }, { label: t('nav.ledger') }]}
         linkAs={Link}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => void runExport('csv')}
+              loading={busy === 'csv'}
+              disabled={busy !== null}
+            >
+              <Download aria-hidden />
+              تصدير CSV
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => void runExport('print')}
+              loading={busy === 'print'}
+              disabled={busy !== null}
+            >
+              <Printer aria-hidden />
+              طباعة
+            </Button>
+          </div>
+        }
       />
+
+      {customerId && list.data?.items[0] ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-accent/30 bg-accent-soft px-4 py-2.5">
+          <p className="text-sm text-fg">
+            كشف حساب: <span className="font-semibold">{list.data.items[0].customerName}</span>{' '}
+            <span className="text-fg-muted">({list.data.items[0].customerCode})</span>
+          </p>
+          <Link to="/ledger" className="text-[13px] font-medium text-accent hover:underline">
+            عرض كل الحركات
+          </Link>
+        </div>
+      ) : null}
 
       <FilterBar>
         <SearchFilter

@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle2, MoreHorizontal, Plus, ShoppingBag, XCircle } from 'lucide-react';
+import { Archive, ArchiveRestore, CheckCircle2, Copy, MoreHorizontal, Plus, ShoppingBag, Trash2, XCircle } from 'lucide-react';
 import { type Order, type OrderListQuery } from '@oh/contracts';
 import type { CurrencyCode } from '@oh/money';
 import {
   Button,
+  ConfirmDialog,
   DataTable,
   Dialog,
   DialogBody,
@@ -36,7 +37,15 @@ import {
 } from '@oh/ui';
 import { ApiRequestError } from '@/lib/api';
 import { useAuth } from '@/app/auth-context';
-import { useCancelOrder, useConfirmOrder, useOrderStats, useOrders } from './api';
+import {
+  useArchiveOrder,
+  useCancelOrder,
+  useConfirmOrder,
+  useDeleteOrder,
+  useDuplicateOrder,
+  useOrderStats,
+  useOrders,
+} from './api';
 import { CreateOrderDialog } from './create-order-dialog';
 
 export function OrdersPage() {
@@ -51,14 +60,30 @@ export function OrdersPage() {
   const [status, setStatus] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [archiveScope, setArchiveScope] = useState('');
   const [sort, setSort] = useState<{ key: string; order: 'asc' | 'desc' }>({
     key: 'issuedAt',
     order: 'desc',
   });
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
+
+  const duplicate = useDuplicateOrder();
+  const archive = useArchiveOrder();
+  const del = useDeleteOrder();
+
+  // اختصار Ctrl+N: يفتح حوار الإنشاء عبر ?new=1 ثم يمسح المَعلمة.
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      if (can('orders.create')) setCreateOpen(true);
+      searchParams.delete('new');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams, can]);
 
   const query: Partial<OrderListQuery> = {
     page,
@@ -67,6 +92,7 @@ export function OrdersPage() {
     status: (status || undefined) as OrderListQuery['status'],
     from: from || undefined,
     to: to || undefined,
+    includeArchived: archiveScope === 'all',
     sortBy: sort.key as OrderListQuery['sortBy'],
     sortOrder: sort.order,
   };
@@ -75,12 +101,13 @@ export function OrdersPage() {
   const stats = useOrderStats({});
   const cancel = useCancelOrder(cancelTarget?.id ?? '');
 
-  const isFiltered = search !== '' || status !== '' || from !== '' || to !== '';
+  const isFiltered = search !== '' || status !== '' || from !== '' || to !== '' || archiveScope !== '';
   const resetFilters = () => {
     setSearch('');
     setStatus('');
     setFrom('');
     setTo('');
+    setArchiveScope('');
     setPage(1);
   };
   const toggleSort = (key: string) =>
@@ -104,14 +131,63 @@ export function OrdersPage() {
     );
   };
 
+  const doDuplicate = (row: Order) =>
+    duplicate.mutate(row.id, {
+      onSuccess: (o) => {
+        toast.success(`نُسخ الطلب إلى مسودة ${o.number}`);
+        navigate(`/orders/${o.id}`);
+      },
+      onError: (e) => {
+        if (e instanceof ApiRequestError) toast.apiError(e.message, e.requestId);
+        else toast.error('تعذّرت النسخ.');
+      },
+    });
+
+  const doArchive = (row: Order, archived: boolean) =>
+    archive.mutate(
+      { id: row.id, version: row.version, archived },
+      {
+        onSuccess: () => toast.success(archived ? 'أُرشِف الطلب' : 'استُعيد الطلب'),
+        onError: (e) => {
+          if (e instanceof ApiRequestError) toast.apiError(e.message, e.requestId);
+          else toast.error('تعذّرت العملية.');
+        },
+      },
+    );
+
+  const doDelete = () => {
+    if (!deleteTarget) return;
+    del.mutate(
+      { id: deleteTarget.id, version: deleteTarget.version },
+      {
+        onSuccess: () => {
+          toast.success('حُذفت المسودة');
+          setDeleteTarget(null);
+        },
+        onError: (e) => {
+          if (e instanceof ApiRequestError) toast.apiError(e.message, e.requestId);
+          else toast.error('تعذّر الحذف.');
+        },
+      },
+    );
+  };
+
   const columns: Column<Order>[] = [
     {
       key: 'number',
       header: 'رقم الطلب',
       render: (row) => (
-        <Link to={`/orders/${row.id}`} className="font-semibold text-accent hover:underline">
-          {row.number}
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link to={`/orders/${row.id}`} className="font-semibold text-accent hover:underline">
+            {row.number}
+          </Link>
+          {row.isArchived ? (
+            <span className="inline-flex items-center gap-1 rounded-pill bg-neutral-soft px-1.5 py-0.5 text-[11px] text-neutral">
+              <Archive className="size-3" aria-hidden />
+              مؤرشف
+            </span>
+          ) : null}
+        </div>
       ),
     },
     {
@@ -179,9 +255,14 @@ export function OrdersPage() {
       align: 'end',
       width: '72px',
       render: (row) => {
-        const canConfirm = can('orders.confirm') && (row.status === 'DRAFT' || row.status === 'QUOTE');
+        const isDraft = row.status === 'DRAFT' || row.status === 'QUOTE';
+        const canConfirm = can('orders.confirm') && isDraft;
         const canCancel = can('orders.cancel') && row.status !== 'CANCELLED' && row.paidAmount === '0.00';
-        if (!canConfirm && !canCancel) return <span className="text-fg-subtle">—</span>;
+        const canDuplicate = can('orders.create');
+        const canDelete = can('orders.cancel') && isDraft;
+        // الأرشفة ممنوعة على الطلبات النشطة (مؤكد/مدفوع جزئيًا) — لأنها ذات قيود حيّة.
+        const isActive = row.status === 'CONFIRMED' || row.status === 'PARTIALLY_PAID';
+        const canArchive = can('orders.update') && !isActive;
 
         return (
           <DropdownMenu>
@@ -192,13 +273,29 @@ export function OrdersPage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => navigate(`/orders/${row.id}`)}>فتح الطلب</DropdownMenuItem>
-              {canConfirm ? (
-                <ConfirmMenuItem orderId={row.id} version={row.version} />
+              {canConfirm ? <ConfirmMenuItem orderId={row.id} version={row.version} /> : null}
+              {canDuplicate ? (
+                <DropdownMenuItem onClick={() => doDuplicate(row)}>
+                  <Copy />
+                  نسخ إلى مسودة
+                </DropdownMenuItem>
+              ) : null}
+              {canArchive ? (
+                <DropdownMenuItem onClick={() => doArchive(row, !row.isArchived)}>
+                  {row.isArchived ? <ArchiveRestore /> : <Archive />}
+                  {row.isArchived ? 'استعادة من الأرشيف' : 'أرشفة'}
+                </DropdownMenuItem>
               ) : null}
               {canCancel ? (
                 <DropdownMenuItem destructive onClick={() => setCancelTarget(row)}>
                   <XCircle />
                   إلغاء الطلب
+                </DropdownMenuItem>
+              ) : null}
+              {canDelete ? (
+                <DropdownMenuItem destructive onClick={() => setDeleteTarget(row)}>
+                  <Trash2 />
+                  حذف المسودة
                 </DropdownMenuItem>
               ) : null}
             </DropdownMenuContent>
@@ -278,6 +375,16 @@ export function OrdersPage() {
             setPage(1);
           }}
         />
+        <SelectFilter
+          value={archiveScope}
+          onChange={(v) => {
+            setArchiveScope(v);
+            setPage(1);
+          }}
+          allLabel="النشطة فقط"
+          label="الأرشيف"
+          options={[{ value: 'all', label: 'متضمّنة المؤرشفة' }]}
+        />
       </FilterBar>
 
       <div>
@@ -327,6 +434,17 @@ export function OrdersPage() {
       </div>
 
       <CreateOrderDialog open={createOpen} onOpenChange={setCreateOpen} />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title={`حذف المسودة ${deleteTarget?.number ?? ''}`}
+        description="تُحذف المسودة نهائيًا. لا يؤثر ذلك على أي قيود محاسبية لأن المسودات لا تولّد قيودًا."
+        confirmLabel="حذف نهائي"
+        variant="danger"
+        loading={del.isPending}
+        onConfirm={doDelete}
+      />
 
       <Dialog
         open={cancelTarget !== null}

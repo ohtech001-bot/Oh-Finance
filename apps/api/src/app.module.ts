@@ -28,6 +28,15 @@ import { CustomersModule } from './modules/customers/customers.module.js';
 import { OrdersModule } from './modules/orders/orders.module.js';
 import { PaymentsModule } from './modules/payments/payments.module.js';
 
+// ── المرحلة 3: لوحة التحكم وسجل النشاط ──
+import { DashboardModule } from './modules/dashboard/dashboard.module.js';
+import { AuditReadModule } from './modules/audit/audit-read.module.js';
+import { ActivityModule } from './modules/activity/activity.module.js';
+
+// ── المرحلة 4: التقارير والإعدادات ──
+import { ReportsModule } from './modules/reports/reports.module.js';
+import { SettingsModule } from './modules/settings/settings.module.js';
+
 @Module({
   imports: [
     AppConfigModule,
@@ -79,6 +88,13 @@ import { PaymentsModule } from './modules/payments/payments.module.js';
     CustomersModule,
     OrdersModule,
     PaymentsModule,
+
+    // ── المرحلة 3 ──
+    DashboardModule,
+    AuditReadModule,
+    ActivityModule,
+    ReportsModule,
+    SettingsModule,
   ],
   providers: [
     /**

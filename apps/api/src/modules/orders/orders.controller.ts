@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PERMISSIONS } from '@oh/config';
 import {
@@ -7,12 +19,14 @@ import {
   createOrderSchema,
   orderListQuerySchema,
   orderPreviewSchema,
+  orderVersionSchema,
   updateOrderSchema,
   type CancelOrderRequest,
   type ConfirmOrderRequest,
   type CreateOrderRequest,
   type OrderListQuery,
   type OrderPreviewRequest,
+  type OrderVersionRequest,
   type UpdateOrderRequest,
 } from '@oh/contracts';
 import { AppError } from '../../core/errors/app-error.js';
@@ -118,5 +132,59 @@ export class OrdersController {
     @Body(zodBody(cancelOrderSchema)) dto: CancelOrderRequest,
   ) {
     return this.orders.cancel(id, dto);
+  }
+
+  @Post(':id/duplicate')
+  @RequirePermissions(PERMISSIONS.ORDERS_CREATE)
+  @ApiOperation({ summary: 'نسخ الطلب كمسودة جديدة (بلا أثر مالي).' })
+  async duplicate(@Param('id', ParseUUIDPipe) id: string) {
+    return this.orders.duplicate(id);
+  }
+
+  @Post(':id/archive')
+  @RequirePermissions(PERMISSIONS.ORDERS_UPDATE)
+  @ApiOperation({ summary: 'أرشفة الطلب — إخفاء من القوائم دون حذف.' })
+  async archive(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(zodBody(orderVersionSchema)) dto: OrderVersionRequest,
+  ) {
+    return this.orders.setArchived(id, dto.version, true);
+  }
+
+  @Post(':id/unarchive')
+  @RequirePermissions(PERMISSIONS.ORDERS_UPDATE)
+  @ApiOperation({ summary: 'إلغاء أرشفة الطلب.' })
+  async unarchive(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(zodBody(orderVersionSchema)) dto: OrderVersionRequest,
+  ) {
+    return this.orders.setArchived(id, dto.version, false);
+  }
+
+  @Post(':id/revert-draft')
+  @RequirePermissions(PERMISSIONS.ORDERS_UPDATE)
+  @ApiOperation({ summary: 'إرجاع عرض السعر إلى مسودة (لعروض الأسعار فقط).' })
+  async revertDraft(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(zodBody(orderVersionSchema)) dto: OrderVersionRequest,
+  ) {
+    return this.orders.revertToDraft(id, dto.version);
+  }
+
+  /**
+   * حذف مسودة/عرض سعر.
+   *
+   * محصور بـ`orders.cancel` (لا `orders.create`): الحذف عملية إتلاف، فتتطلب
+   * صلاحية أعلى من الإنشاء. الطلب المؤكد لا يُحذف — يُرفض في الخدمة.
+   */
+  @Delete(':id')
+  @RequirePermissions(PERMISSIONS.ORDERS_CANCEL)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'حذف مسودة أو عرض سعر. الطلب المؤكد لا يُحذف.' })
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('version') version?: string,
+  ): Promise<void> {
+    await this.orders.remove(id, Number.parseInt(version ?? '0', 10) || 0);
   }
 }

@@ -554,6 +554,155 @@ export class OrdersService {
     return cancelled;
   }
 
+  /**
+   * نسخ طلب — يُنشئ **مسودة جديدة** بنفس الزبون والبنود.
+   *
+   * لا يُنسخ الرقم ولا الحالة ولا القيود: النسخة مسودة نظيفة بلا أثر مالي.
+   * تُعيد حساب المبالغ من البنود (لا تنسخ اللقطة المجمّدة) — فلو تغيّر شيء
+   * في منطق الحساب، النسخة الجديدة تتبعه.
+   */
+  async duplicate(id: string): Promise<OrderDetail> {
+    const source = await this.findOne(id);
+    if (!source) throw AppError.notFound('الطلب');
+
+    return this.create({
+      customerId: source.customerId,
+      status: 'DRAFT',
+      discountAmount: source.discountAmount,
+      notes: source.notes ?? undefined,
+      items: source.items.map((item) => ({
+        sourceType: item.sourceType,
+        sourceId: item.sourceId ?? undefined,
+        name: item.name,
+        description: item.description ?? undefined,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discount: item.discount,
+        taxRate: item.taxRate,
+      })),
+    });
+  }
+
+  /**
+   * حذف مسودة أو عرض سعر.
+   *
+   * ⛔ الطلب المؤكد لا يُحذف — له قيد محاسبي، وحذفه يترك القيد يتيمًا. القاعدة
+   *    تحرسه أيضًا: حذف طلب مقفل يُشغّل trigger بنوده فيُرفض. هنا نرفض مبكرًا
+   *    برسالة واضحة، ونوجّه إلى الإلغاء (الذي يولّد قيد عكس).
+   */
+  async remove(id: string, version: number): Promise<void> {
+    const { tenantId } = this.context();
+
+    await this.prisma.runInTenant(tenantId, async (tx) => {
+      const order = await tx.order.findFirst({ where: { id } });
+      if (!order) throw AppError.notFound('الطلب');
+
+      if (order.status !== 'DRAFT' && order.status !== 'QUOTE') {
+        throw AppError.conflict(
+          `الطلب ${order.number} (${order.status}) لا يُحذف — له أثر محاسبي. ` +
+            'استخدم الإلغاء بدلًا من الحذف.',
+        );
+      }
+      if (order.version !== version) {
+        throw AppError.conflict('عُدِّل هذا الطلب من جلسة أخرى. حدّث الصفحة.');
+      }
+
+      await this.audit.record(tx, {
+        action: AUDIT_ACTIONS.ORDER_DELETED,
+        summary: `حذف المسودة ${order.number}`,
+        entityType: 'Order',
+        entityId: id,
+        before: { number: order.number, status: order.status, total: order.total.toString() },
+      });
+
+      // البنود تُحذف تلقائيًا (onDelete Cascade). trigger القفل لا يعترض
+      // لأن المسودة غير مقفلة.
+      await tx.order.delete({ where: { id } });
+    });
+  }
+
+  /** أرشفة/إلغاء أرشفة طلب — إخفاء من القوائم دون حذف ولا أثر مالي. */
+  async setArchived(id: string, version: number, archived: boolean): Promise<OrderDetail> {
+    const { tenantId } = this.context();
+
+    await this.prisma.runInTenant(tenantId, async (tx) => {
+      const order = await tx.order.findFirst({ where: { id } });
+      if (!order) throw AppError.notFound('الطلب');
+      if (order.version !== version) {
+        throw AppError.conflict('عُدِّل هذا الطلب من جلسة أخرى. حدّث الصفحة.');
+      }
+
+      // نمنع أرشفة طلب نشط (مؤكد/مدفوع جزئيًا) — قد يُنسى وهو مستحق.
+      if (
+        archived &&
+        (order.status === 'CONFIRMED' || order.status === 'PARTIALLY_PAID')
+      ) {
+        throw AppError.conflict(
+          'لا تُؤرشف طلبًا نشطًا (مؤكد أو مدفوع جزئيًا). أغلقه أو ألغه أولًا.',
+        );
+      }
+
+      const result = await tx.order.updateMany({
+        where: { id, version },
+        data: { archivedAt: archived ? new Date() : null, version: { increment: 1 } },
+      });
+      if (result.count === 0) throw AppError.conflict('تغيّر الطلب. أعد المحاولة.');
+
+      await this.audit.record(tx, {
+        action: AUDIT_ACTIONS.ORDER_ARCHIVED,
+        summary: `${archived ? 'أرشفة' : 'إلغاء أرشفة'} الطلب ${order.number}`,
+        entityType: 'Order',
+        entityId: id,
+        after: { archived },
+      });
+    });
+
+    const updated = await this.findOne(id);
+    if (!updated) throw AppError.notFound('الطلب');
+    return updated;
+  }
+
+  /**
+   * إرجاع عرض سعر إلى مسودة.
+   *
+   * ⛔ **عرض السعر فقط** — لا الطلب المؤكد. عرض السعر لم يولّد قيدًا، فإرجاعه
+   *    آمن. إرجاع طلب مؤكد كان سيتطلب عكس قيده المدين، وهو تغيير خفي لحالة
+   *    مالية — نرفضه، والتصحيح الصحيح هو الإلغاء ثم إنشاء مسودة جديدة.
+   */
+  async revertToDraft(id: string, version: number): Promise<OrderDetail> {
+    const { tenantId } = this.context();
+
+    await this.prisma.runInTenant(tenantId, async (tx) => {
+      const order = await tx.order.findFirst({ where: { id } });
+      if (!order) throw AppError.notFound('الطلب');
+      if (order.version !== version) {
+        throw AppError.conflict('عُدِّل هذا الطلب من جلسة أخرى. حدّث الصفحة.');
+      }
+      if (order.status !== 'QUOTE') {
+        throw AppError.conflict(
+          'الإرجاع إلى مسودة متاح لعروض الأسعار فقط. الطلب المؤكد يُلغى ثم يُنشأ من جديد.',
+        );
+      }
+
+      const result = await tx.order.updateMany({
+        where: { id, version },
+        data: { status: 'DRAFT', version: { increment: 1 } },
+      });
+      if (result.count === 0) throw AppError.conflict('تغيّر الطلب. أعد المحاولة.');
+
+      await this.audit.record(tx, {
+        action: AUDIT_ACTIONS.ORDER_REVERTED_DRAFT,
+        summary: `إرجاع عرض السعر ${order.number} إلى مسودة`,
+        entityType: 'Order',
+        entityId: id,
+      });
+    });
+
+    const updated = await this.findOne(id);
+    if (!updated) throw AppError.notFound('الطلب');
+    return updated;
+  }
+
   async list(query: OrderListQuery): Promise<PaginatedResult<Order>> {
     const { tenantId } = this.context();
 
@@ -685,6 +834,8 @@ export class OrdersService {
     const now = new Date();
 
     return {
+      // المؤرشفة مخفية افتراضيًا.
+      ...(query.includeArchived ? {} : { archivedAt: null }),
       ...(query.status ? { status: query.status } : {}),
       ...(query.customerId ? { customerId: query.customerId } : {}),
       ...(query.search
@@ -745,6 +896,7 @@ export class OrdersService {
       notes: row.notes,
       isLocked: row.lockedAt !== null,
       isOverdue,
+      isArchived: row.archivedAt !== null,
 
       itemCount: row._count.items,
       version: row.version,

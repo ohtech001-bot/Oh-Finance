@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Banknote, Building2, CreditCard, MoreHorizontal, Plus, Undo2, Wallet } from 'lucide-react';
 import {
@@ -63,8 +63,18 @@ export function PaymentsPage() {
   const [to, setTo] = useState('');
 
   const [recordOpen, setRecordOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [reverseTarget, setReverseTarget] = useState<Payment | null>(null);
   const [reverseReason, setReverseReason] = useState('');
+
+  // اختصار Ctrl+P: يفتح حوار تسجيل الدفعة عبر ?new=1 ثم يمسح المَعلمة.
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      if (can('payments.create')) setRecordOpen(true);
+      searchParams.delete('new');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams, can]);
 
   const query: Partial<PaymentListQuery> = {
     page,

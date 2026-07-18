@@ -57,6 +57,13 @@ export const PERMISSIONS = {
   // التدقيق
   AUDIT_READ: 'audit.read',
 
+  // موجز نشاط المحل (store-wide) — صلاحية إشراف مستقلة عن قراءة الزبائن.
+  ACTIVITY_READ: 'activity.read',
+
+  // لوحة التحكم — بوابة فتح اللوحة (الصفحة الرئيسية). الأقسام تُرشَّح بصلاحيات
+  // القراءة التفصيلية (طلبات/دفعات/حركات) فوق هذه البوابة.
+  DASHBOARD_READ: 'dashboard.read',
+
   // ── المنصة (المدير العام حصرًا) ──────────────────────────────────────────
   PLATFORM_TENANTS_READ: 'platform.tenants.read',
   PLATFORM_TENANTS_MANAGE: 'platform.tenants.manage',
@@ -112,6 +119,8 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   'subscription.read': 'عرض الاشتراك',
   'subscription.manage': 'إدارة الاشتراك',
   'audit.read': 'عرض سجل النشاط',
+  'activity.read': 'عرض موجز نشاط المحل',
+  'dashboard.read': 'فتح لوحة التحكم',
   'platform.tenants.read': 'عرض المحلات',
   'platform.tenants.manage': 'إدارة المحلات',
   'platform.plans.read': 'عرض الباقات',

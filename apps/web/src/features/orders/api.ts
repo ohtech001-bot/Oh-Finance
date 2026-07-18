@@ -77,6 +77,51 @@ export function useCancelOrder(id: string) {
       void qc.invalidateQueries({ queryKey: [KEY] });
       void qc.invalidateQueries({ queryKey: ['customers'] });
       void qc.invalidateQueries({ queryKey: ['ledger'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
+  });
+}
+
+/** يُبطل كل الاستعلامات المتأثرة بتغيّر طلب. */
+function invalidateOrderScope(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: [KEY] });
+  void qc.invalidateQueries({ queryKey: ['customers'] });
+  void qc.invalidateQueries({ queryKey: ['ledger'] });
+  void qc.invalidateQueries({ queryKey: ['dashboard'] });
+  void qc.invalidateQueries({ queryKey: ['audit'] });
+}
+
+export function useDuplicateOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<OrderDetail>(`/orders/${id}/duplicate`),
+    onSuccess: () => invalidateOrderScope(qc),
+  });
+}
+
+export function useDeleteOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, version }: { id: string; version: number }) =>
+      api.delete<void>(`/orders/${id}?version=${version}`),
+    onSuccess: () => invalidateOrderScope(qc),
+  });
+}
+
+export function useArchiveOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, version, archived }: { id: string; version: number; archived: boolean }) =>
+      api.post<OrderDetail>(`/orders/${id}/${archived ? 'archive' : 'unarchive'}`, { version }),
+    onSuccess: () => invalidateOrderScope(qc),
+  });
+}
+
+export function useRevertToDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, version }: { id: string; version: number }) =>
+      api.post<OrderDetail>(`/orders/${id}/revert-draft`, { version }),
+    onSuccess: () => invalidateOrderScope(qc),
   });
 }

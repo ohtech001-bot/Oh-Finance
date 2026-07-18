@@ -134,6 +134,8 @@ export const orderSchema = z.object({
   isLocked: z.boolean(),
   /** الطلب مؤكد وتجاوز تاريخ استحقاقه ولم يُسدَّد. */
   isOverdue: z.boolean(),
+  /** مؤرشف — مخفي من القوائم الافتراضية. */
+  isArchived: z.boolean(),
 
   itemCount: z.number().int(),
   version: z.number().int(),
@@ -225,6 +227,15 @@ export const cancelOrderSchema = z.object({
 });
 export type CancelOrderRequest = z.infer<typeof cancelOrderSchema>;
 
+/**
+ * عمليات تحمل رقم النسخة فقط (قفل متفائل).
+ * تُستخدم للحذف والأرشفة والعودة إلى مسودة.
+ */
+export const orderVersionSchema = z.object({
+  version: z.number().int().min(0),
+});
+export type OrderVersionRequest = z.infer<typeof orderVersionSchema>;
+
 // ── الاستعلام ───────────────────────────────────────────────────────────────
 
 export const orderSortSchema = z.enum([
@@ -250,6 +261,9 @@ export const orderListQuerySchema = paginationQuerySchema.extend({
   overdueOnly: z.coerce.boolean().optional(),
   /** غير المسدَّدة بالكامل. */
   unpaidOnly: z.coerce.boolean().optional(),
+
+  /** إظهار المؤرشفة (مخفية افتراضيًا). */
+  includeArchived: z.coerce.boolean().default(false),
 
   sortBy: orderSortSchema.default('issuedAt'),
   sortOrder: sortOrderSchema,

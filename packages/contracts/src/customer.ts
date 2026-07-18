@@ -83,6 +83,24 @@ export const customerSchema = z.object({
 export type Customer = z.infer<typeof customerSchema>;
 
 /** ملف الزبون — بطاقات شاشة «صفحة كل زبون». */
+/**
+ * صحّة الزبون — تقدير سلوكه الائتماني.
+ *
+ *   EXCELLENT — لا دَين (مسدَّد أو دائن)
+ *   GOOD      — عليه دَين ضمن الحدود ولا متأخرات
+ *   WARNING   — قارب حد الائتمان أو يسدّد متأخرًا في المتوسط
+ *   AT_RISK   — عليه طلبات متأخرة أو تجاوز حد الائتمان
+ */
+export const customerHealthSchema = z.enum(['EXCELLENT', 'GOOD', 'WARNING', 'AT_RISK']);
+export type CustomerHealth = z.infer<typeof customerHealthSchema>;
+
+export const CUSTOMER_HEALTH_LABELS: Record<CustomerHealth, string> = {
+  EXCELLENT: 'ممتاز',
+  GOOD: 'جيد',
+  WARNING: 'تحذير',
+  AT_RISK: 'متعثّر',
+};
+
 export const customerSummarySchema = z.object({
   customer: customerSchema,
 
@@ -97,6 +115,14 @@ export const customerSummarySchema = z.object({
   /** عدد الطلبات المتأخرة عن تاريخ الاستحقاق. */
   overdueOrders: z.number().int(),
   overdueAmount: nonNegativeMoneySchema,
+
+  /** متوسط أيام السداد (من إصدار الطلب إلى استلام الدفعة). null إن لا دفعات. */
+  avgPaymentDays: z.number().int().nullable(),
+
+  /** نسبة استخدام حد الائتمان (%). null إن لم يُحدَّد حد. */
+  creditUsagePct: z.number().int().nullable(),
+
+  customerHealth: customerHealthSchema,
 });
 export type CustomerSummary = z.infer<typeof customerSummarySchema>;
 

@@ -84,6 +84,9 @@ export declare function useCustomerSummary(id: string | undefined): import("@tan
     lastPaymentAt: string | null;
     overdueOrders: number;
     overdueAmount: string;
+    avgPaymentDays: number | null;
+    creditUsagePct: number | null;
+    customerHealth: "EXCELLENT" | "GOOD" | "WARNING" | "AT_RISK";
 }>, Error>;
 export declare function useCreateCustomer(): import("@tanstack/react-query").UseMutationResult<{
     code: string;

@@ -17,14 +17,14 @@ export declare function usePayments(query: Partial<PaymentListQuery>): import("@
     paidAt: string;
     method: "CASH" | "BANK_TRANSFER" | "CARD" | "CHECK";
     amount: string;
-    createdBy: string | null;
-    createdByName: string | null;
     reference: string | null;
     balanceBefore: string;
     balanceAfter: string;
     unallocatedAmount: string;
     reversedAt: string | null;
     reverseReason: string | null;
+    createdBy: string | null;
+    createdByName: string | null;
 }>>, Error>;
 export declare function usePaymentStats(query: Partial<PaymentListQuery>): import("@tanstack/react-query").UseQueryResult<NoInfer<{
     totalAmount: string;
@@ -67,14 +67,14 @@ export declare function usePayment(id: string | undefined): import("@tanstack/re
     paidAt: string;
     method: "CASH" | "BANK_TRANSFER" | "CARD" | "CHECK";
     amount: string;
-    createdBy: string | null;
-    createdByName: string | null;
     reference: string | null;
     balanceBefore: string;
     balanceAfter: string;
     unallocatedAmount: string;
     reversedAt: string | null;
     reverseReason: string | null;
+    createdBy: string | null;
+    createdByName: string | null;
 }>, Error>;
 export declare function useOpenOrders(customerId: string | undefined): import("@tanstack/react-query").UseQueryResult<NoInfer<{
     number: string;
@@ -111,14 +111,14 @@ export declare function useCreatePayment(): import("@tanstack/react-query").UseM
     paidAt: string;
     method: "CASH" | "BANK_TRANSFER" | "CARD" | "CHECK";
     amount: string;
-    createdBy: string | null;
-    createdByName: string | null;
     reference: string | null;
     balanceBefore: string;
     balanceAfter: string;
     unallocatedAmount: string;
     reversedAt: string | null;
     reverseReason: string | null;
+    createdBy: string | null;
+    createdByName: string | null;
 }, Error, {
     body: CreatePaymentRequest;
     idempotencyKey: string;
@@ -159,14 +159,14 @@ export declare function useReversePayment(id: string): import("@tanstack/react-q
     paidAt: string;
     method: "CASH" | "BANK_TRANSFER" | "CARD" | "CHECK";
     amount: string;
-    createdBy: string | null;
-    createdByName: string | null;
     reference: string | null;
     balanceBefore: string;
     balanceAfter: string;
     unallocatedAmount: string;
     reversedAt: string | null;
     reverseReason: string | null;
+    createdBy: string | null;
+    createdByName: string | null;
 }, Error, {
     reason: string;
 }, unknown>;

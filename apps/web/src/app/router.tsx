@@ -1,6 +1,5 @@
 import { createBrowserRouter } from 'react-router-dom';
 import {
-  BarChart3,
   CreditCard,
   FileText,
   MessageCircle,
@@ -9,7 +8,10 @@ import {
   Users,
 } from 'lucide-react';
 import { AppShell } from '@/components/layout/app-shell';
-import { RedirectIfAuthenticated, RequireAuth, RequireSuperAdmin, RequireTenant } from './guards';
+import { RedirectIfAuthenticated, RequireAuth, RequirePermission, RequireSuperAdmin, RequireTenant } from './guards';
+import { ReportsPage } from '@/features/reports/reports-page';
+import { SettingsPage } from '@/features/settings/settings-page';
+import { ShortcutsLayout } from './shortcuts-layout';
 
 import { LoginPage } from '@/features/auth/login-page';
 import { ForgotPasswordPage } from '@/features/auth/forgot-password-page';
@@ -25,6 +27,7 @@ import { ForbiddenPage, NotFoundPage, RouteErrorPage } from '@/features/errors/e
 import { CustomersPage } from '@/features/customers/customers-page';
 import { CustomerDetailPage } from '@/features/customers/customer-detail-page';
 import { OrdersPage } from '@/features/orders/orders-page';
+import { OrderDetailsPage } from '@/features/orders/order-details-page';
 import { LedgerPage } from '@/features/ledger/ledger-page';
 import { PaymentsPage } from '@/features/payments/payments-page';
 
@@ -62,6 +65,9 @@ export const router = createBrowserRouter([
         element: <RequireTenant />,
         children: [
           {
+            element: <ShortcutsLayout />,
+            children: [
+          {
             element: <AppShell />,
             children: [
               { index: true, element: <DashboardPage /> },
@@ -75,18 +81,13 @@ export const router = createBrowserRouter([
               { path: 'customers', element: <CustomersPage /> },
               { path: 'customers/:id', element: <CustomerDetailPage /> },
               { path: 'orders', element: <OrdersPage /> },
+              { path: 'orders/:id', element: <OrderDetailsPage /> },
               { path: 'payments', element: <PaymentsPage /> },
               { path: 'ledger', element: <LedgerPage /> },
               {
                 path: 'reports',
-                element: (
-                  <PlaceholderPage
-                    titleKey="nav.reports"
-                    icon={BarChart3}
-                    description="تقارير مالية وتشغيلية مع رسوم بيانية وتصدير."
-                    phase="المرحلة 6"
-                  />
-                ),
+                element: <RequirePermission permission="reports.read" />,
+                children: [{ index: true, element: <ReportsPage /> }],
               },
               {
                 path: 'documents',
@@ -134,14 +135,8 @@ export const router = createBrowserRouter([
               },
               {
                 path: 'settings',
-                element: (
-                  <PlaceholderPage
-                    titleKey="nav.settings"
-                    icon={Settings}
-                    description="سبعة تبويبات: عام، المالية، الفواتير، الطباعة، الرسائل، سجل النشاط، الاشتراك."
-                    phase="المرحلة 8"
-                  />
-                ),
+                element: <RequirePermission permission="settings.read" />,
+                children: [{ index: true, element: <SettingsPage /> }],
               },
               {
                 path: 'profile',
@@ -154,6 +149,8 @@ export const router = createBrowserRouter([
                   />
                 ),
               },
+            ],
+          },
             ],
           },
         ],

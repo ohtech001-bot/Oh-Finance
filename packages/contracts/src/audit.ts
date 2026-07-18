@@ -83,6 +83,10 @@ export const AUDIT_ACTIONS = {
   ORDER_CONFIRMED: 'order.confirmed',
   ORDER_CANCELLED: 'order.cancelled',
   ORDER_CREDIT_LIMIT_OVERRIDDEN: 'order.credit_limit_overridden',
+  ORDER_DUPLICATED: 'order.duplicated',
+  ORDER_DELETED: 'order.deleted',
+  ORDER_ARCHIVED: 'order.archived',
+  ORDER_REVERTED_DRAFT: 'order.reverted_draft',
 
   PAYMENT_CREATED: 'payment.created',
   PAYMENT_REVERSED: 'payment.reversed',
@@ -121,6 +125,10 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   'order.confirmed': 'تأكيد طلب',
   'order.cancelled': 'إلغاء طلب',
   'order.credit_limit_overridden': '⚠ تجاوز حد الائتمان',
+  'order.duplicated': 'نسخ طلب',
+  'order.deleted': 'حذف مسودة',
+  'order.archived': 'أرشفة طلب',
+  'order.reverted_draft': 'إرجاع إلى مسودة',
 
   'payment.created': 'تسجيل دفعة',
   'payment.reversed': '⚠ عكس دفعة',

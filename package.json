@@ -33,6 +33,8 @@
     "db:generate": "prisma generate --schema apps/api/prisma/schema.prisma",
     "db:migrate": "node tooling/check-db-env.mjs migrate && prisma migrate deploy --schema apps/api/prisma/schema.prisma",
     "db:migrate:dev": "node tooling/check-db-env.mjs migrate && prisma migrate dev --schema apps/api/prisma/schema.prisma",
+    "db:migrate:test": "node tooling/prisma-test-db.mjs migrate deploy",
+    "db:status:test": "node tooling/prisma-test-db.mjs migrate status",
     "db:seed": "node tooling/check-db-env.mjs seed && npm run seed -w @oh/api",
     "db:studio": "node tooling/check-db-env.mjs studio && prisma studio --schema apps/api/prisma/schema.prisma",
     "db:gen-init-sql": "node tooling/gen-init-migration.mjs",

@@ -19,6 +19,28 @@ export function useLedger(query: Partial<LedgerListQuery>) {
   });
 }
 
+/**
+ * يجمع **كل** حركات المرشّح الحالي عبر ترقيم الصفحات — للتصدير والطباعة.
+ *
+ * الجدول يعرض صفحة واحدة فقط، لكن التصدير يجب أن يشمل المجموعة المُرشَّحة
+ * كاملة. نجمعها عند الطلب فقط (لا تُحمَّل مع كل عرض).
+ */
+export async function fetchAllLedger(query: Partial<LedgerListQuery>): Promise<LedgerEntry[]> {
+  const rows: LedgerEntry[] = [];
+  let page = 1;
+  for (;;) {
+    const pageQuery: Partial<LedgerListQuery> = { ...query, page, pageSize: 100 };
+    const res = await api.get<LedgerList>(
+      `/ledger${buildQuery(pageQuery as Record<string, string>)}`,
+    );
+    rows.push(...res.items);
+    if (page >= res.totalPages || res.items.length === 0) break;
+    page += 1;
+    if (page > 500) break; // حد أمان ضد الحلقة اللانهائية
+  }
+  return rows;
+}
+
 export function useStatement(
   customerId: string | undefined,
   range: { from?: string; to?: string } = {},

@@ -18,6 +18,7 @@ import {
   toast,
 } from '@oh/ui';
 import { ApiRequestError, api } from '@/lib/api';
+import { useUnsavedChangesWarning } from '@/lib/use-unsaved-changes';
 import { useAuth } from '@/app/auth-context';
 import { useCreateOrder, usePreviewOrder } from './api';
 
@@ -74,6 +75,14 @@ export function CreateOrderDialog({ open, onOpenChange, fixedCustomerId }: Creat
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, fixedCustomerId]);
+
+  // متسخ = المستخدم أدخل شيئًا ذا قيمة (زبون، بند مُسمّى، خصم، أو ملاحظة).
+  const isDirty =
+    (!fixedCustomerId && customerId !== '') ||
+    items.some((it) => it.name.trim() !== '') ||
+    discount !== '0' ||
+    notes.trim() !== '';
+  useUnsavedChangesWarning(open && isDirty && !create.isPending);
 
   const validItems: OrderItemInput[] = useMemo(
     () =>

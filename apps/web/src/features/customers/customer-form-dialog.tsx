@@ -16,6 +16,7 @@ import {
   toast,
 } from '@oh/ui';
 import { ApiRequestError } from '@/lib/api';
+import { useUnsavedChangesWarning } from '@/lib/use-unsaved-changes';
 import { useCreateCustomer, useUpdateCustomer } from './api';
 
 export interface CustomerFormDialogProps {
@@ -42,7 +43,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
     handleSubmit,
     reset,
     setError,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<CreateCustomerRequest>({
     resolver: zodResolver(createCustomerSchema),
     defaultValues: {
@@ -84,6 +85,9 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
       reset();
     }
   }, [open, customer, reset]);
+
+  // تحذير قبل مغادرة الصفحة بتغييرات غير محفوظة.
+  useUnsavedChangesWarning(open && isDirty && !isSubmitting);
 
   const onSubmit = handleSubmit(async (values) => {
     try {

@@ -337,6 +337,7 @@ export class LedgerQueryService {
       ...(query.customerId ? { customerId: query.customerId } : {}),
       ...(query.entryType ? { entryType: query.entryType } : {}),
       ...(query.refType ? { refType: query.refType } : {}),
+      ...(query.refId ? { refId: query.refId } : {}),
       ...(query.search
         ? {
             OR: [

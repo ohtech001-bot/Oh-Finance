@@ -5,6 +5,7 @@ import {
   type CreateCustomerRequest,
   type Customer,
   type CustomerListQuery,
+  type CustomerHealth,
   type CustomerStats,
   type CustomerSummary,
   type PaginatedResult,
@@ -252,7 +253,7 @@ export class CustomersService {
       const balance = await this.ledger.getBalance(tx, tenantId, id);
       const now = new Date();
 
-      const [orderAgg, paymentAgg, lastOrder, lastPayment, overdue] = await Promise.all([
+      const [orderAgg, paymentAgg, lastOrder, lastPayment, overdue, avgPay] = await Promise.all([
         tx.order.aggregate({
           where: { tenantId, customerId: id, status: { not: 'CANCELLED' } },
           _count: true,
@@ -282,6 +283,14 @@ export class CustomersService {
           },
           select: { total: true, paidAmount: true },
         }),
+        // متوسط أيام السداد: من إصدار الطلب إلى استلام الدفعة، عبر التوزيعات.
+        tx.$queryRaw<{ avg_days: number | null }[]>`
+          SELECT AVG(EXTRACT(EPOCH FROM (p.paid_at - o.issued_at)) / 86400.0)::float8 AS avg_days
+          FROM payment_allocations pa
+          JOIN payments p ON p.id = pa.payment_id AND p.status = 'POSTED'
+          JOIN orders o ON o.id = pa.order_id
+          WHERE pa.tenant_id = ${tenantId}::uuid AND o.customer_id = ${id}::uuid
+        `,
       ]);
 
       const overdueAmount = overdue.length
@@ -294,6 +303,36 @@ export class CustomersService {
           )
         : zero();
 
+      // ── مؤشرات مشتقة ──────────────────────────────────────────────────────
+      const rawAvg = avgPay[0]?.avg_days;
+      const avgPaymentDays =
+        rawAvg != null
+          ? // eslint-disable-next-line no-restricted-properties -- متوسط أيام للعرض، لا مبلغ.
+            Math.max(0, Math.round(rawAvg))
+          : null;
+
+      const limit = toMoney(row.creditLimit.toString());
+      const hasLimit = limit.greaterThan(0);
+      const creditUsagePct = hasLimit
+        ? balance.greaterThan(0)
+          ? // eslint-disable-next-line no-restricted-properties -- نسبة استخدام مئوية، لا مبلغ.
+            Math.round(balance.dividedBy(limit).times(100).toNumber())
+          : 0
+        : null;
+
+      const overLimit = hasLimit && balance.greaterThan(limit);
+      const paysLate = avgPaymentDays !== null && avgPaymentDays > row.paymentTermDays;
+      const nearLimit = creditUsagePct !== null && creditUsagePct >= 80;
+
+      const customerHealth: CustomerHealth =
+        overdue.length > 0 || overLimit
+          ? 'AT_RISK'
+          : nearLimit || paysLate
+            ? 'WARNING'
+            : balance.greaterThan(0)
+              ? 'GOOD'
+              : 'EXCELLENT';
+
       return {
         customer: this.toDto(row, balance),
         totalOrders: orderAgg._count,
@@ -304,6 +343,9 @@ export class CustomersService {
         lastPaymentAt: lastPayment?.paidAt.toISOString() ?? null,
         overdueOrders: overdue.length,
         overdueAmount: toMoneyString(overdueAmount, 2),
+        avgPaymentDays,
+        creditUsagePct,
+        customerHealth,
       } as CustomerSummary;
     });
   }
