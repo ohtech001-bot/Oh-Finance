@@ -4,29 +4,13 @@ import type { ReportsQuery } from '@oh/contracts';
  * المفتاح يشمل الفترة، فلكل فترة نسختها المخزّنة.
  */
 export declare function useReports(query: Partial<ReportsQuery>): import("@tanstack/react-query").UseQueryResult<NoInfer<{
-    meta: {
-        storeName: string;
-        currency: string;
-        timezone: string;
-        generatedAt: string;
-        range: {
-            preset: "today" | "yesterday" | "last_7_days" | "last_30_days" | "this_month" | "previous_month" | "this_year" | "custom";
-            from: string;
-            to: string;
-            granularity: "day" | "week" | "month";
-            label: string;
-            previousFrom: string;
-            previousTo: string;
-        };
-        scope: string[];
-    };
     kpis: {
-        sales: {
+        payments: {
             value: string;
             previous: string | null;
             deltaPct: number | null;
         };
-        payments: {
+        sales: {
             value: string;
             previous: string | null;
             deltaPct: number | null;
@@ -64,52 +48,68 @@ export declare function useReports(query: Partial<ReportsQuery>): import("@tanst
         };
         avgPaymentDurationDays: number | null;
     };
-    salesVsPayments: {
-        date: string;
-        sales: string;
-        payments: string;
-    }[];
-    ordersByWeekday: {
-        weekday: number;
-        label: string;
-        count: number;
-    }[];
-    ordersByStatus: {
-        status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
-        count: number;
-        amount: string;
-    }[];
-    paymentMethods: {
-        count: number;
-        amount: string;
-        method: "CASH" | "BANK_TRANSFER" | "CARD" | "CHECK";
-        pct: number;
-    }[];
     topCustomers: {
         code: string;
         id: string;
         name: string;
         purchases: string;
     }[];
-    topProducts: {
+    meta: {
+        currency: string;
+        storeName: string;
+        timezone: string;
+        generatedAt: string;
+        range: {
+            from: string;
+            to: string;
+            preset: "custom" | "today" | "yesterday" | "last_7_days" | "last_30_days" | "this_month" | "previous_month" | "this_year";
+            granularity: "day" | "week" | "month";
+            previousFrom: string;
+            previousTo: string;
+            label: string;
+        };
+        scope: string[];
+    };
+    salesVsPayments: {
+        date: string;
+        payments: string;
         sales: string;
+    }[];
+    ordersByWeekday: {
+        count: number;
+        label: string;
+        weekday: number;
+    }[];
+    ordersByStatus: {
+        status: "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID";
+        amount: string;
+        count: number;
+    }[];
+    paymentMethods: {
+        method: "CASH" | "BANK_TRANSFER" | "CARD" | "CHECK";
+        amount: string;
+        count: number;
+        pct: number;
+    }[];
+    topProducts: {
         name: string;
         quantity: string;
+        sales: string;
     }[];
     employeePerformance: {
-        sales: string;
-        payments: string;
         name: string;
-        userId: string | null;
+        payments: string;
         orders: number;
+        sales: string;
+        userId: string | null;
     }[];
     salesByCategory: {
-        available: boolean;
         reason: string;
+        available: boolean;
     };
     branchReports: {
-        available: boolean;
         reason: string;
+        available: boolean;
     };
 }>, Error>;
 //# sourceMappingURL=api.d.ts.map

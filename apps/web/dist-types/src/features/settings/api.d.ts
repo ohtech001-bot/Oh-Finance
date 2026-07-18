@@ -1,12 +1,12 @@
 import type { SettingsSection } from '@oh/contracts';
 export declare function useSettings(): import("@tanstack/react-query").UseQueryResult<NoInfer<{
     general: {
-        name: string;
         email: string | null;
-        address: string | null;
+        name: string;
         logoUrl: string | null;
-        language: "ar" | "he" | "en";
+        address: string | null;
         timezone: string;
+        language: "ar" | "he" | "en";
     };
     financial: {
         currency: string;
@@ -20,13 +20,13 @@ export declare function useSettings(): import("@tanstack/react-query").UseQueryR
         };
     };
     invoices: {
+        notes: string;
         numberFormat: string;
         startNumber: number;
         prefix: string;
         suffix: string;
         priceIncludesTax: boolean;
         showTaxColumn: boolean;
-        notes: string;
     };
     printing: {
         printer: string;
@@ -48,12 +48,12 @@ export declare function useSettings(): import("@tanstack/react-query").UseQueryR
 }>, Error>;
 export declare function useUpdateSettingsSection(): import("@tanstack/react-query").UseMutationResult<{
     general: {
-        name: string;
         email: string | null;
-        address: string | null;
+        name: string;
         logoUrl: string | null;
-        language: "ar" | "he" | "en";
+        address: string | null;
         timezone: string;
+        language: "ar" | "he" | "en";
     };
     financial: {
         currency: string;
@@ -67,13 +67,13 @@ export declare function useUpdateSettingsSection(): import("@tanstack/react-quer
         };
     };
     invoices: {
+        notes: string;
         numberFormat: string;
         startNumber: number;
         prefix: string;
         suffix: string;
         priceIncludesTax: boolean;
         showTaxColumn: boolean;
-        notes: string;
     };
     printing: {
         printer: string;

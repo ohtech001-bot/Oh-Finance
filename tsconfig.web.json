@@ -1,0 +1,11 @@
+{
+  "//": "حلّ بناء خاص بنشر الويب على Vercel: يبني مكتبات النوع (money/config/contracts/ui) + تطبيق الويب فقط — دون apps/api (فلا يعتمد نشرُ الويب على Prisma/الخادم). يجعل `tsc -b --noEmit` داخل بناء الويب عملية لا تفعل شيئًا (المشاريع محدّثة).",
+  "files": [],
+  "references": [
+    { "path": "./packages/money" },
+    { "path": "./packages/config" },
+    { "path": "./packages/contracts" },
+    { "path": "./packages/ui" },
+    { "path": "./apps/web" }
+  ]
+}

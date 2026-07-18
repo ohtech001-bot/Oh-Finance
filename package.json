@@ -14,7 +14,11 @@
   ],
   "scripts": {
     "build:packages": "npm run build -w @oh/money -w @oh/config -w @oh/contracts",
-    "build": "npm run build:packages && npm run build -w @oh/api && npm run build -w @oh/web",
+    "build:api": "npm run build:packages && npm run build -w @oh/api",
+    "build:web": "npm run build:packages && tsc -b tsconfig.web.json && npm run build -w @oh/web",
+    "build": "npm run build:api && npm run build:web",
+    "vercel:api": "npm run build:api",
+    "vercel:web": "npm run build:web",
     "dev": "npm run build:packages && concurrently -n api,web -c green,blue \"npm run dev -w @oh/api\" \"npm run dev -w @oh/web\"",
     "dev:api": "npm run dev -w @oh/api",
     "dev:web": "npm run dev -w @oh/web",
