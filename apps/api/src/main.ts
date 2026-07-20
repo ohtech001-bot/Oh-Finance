@@ -92,13 +92,18 @@ async function bootstrap(): Promise<void> {
     });
   }
 
-  const port = env.get('API_PORT');
-  const host = env.get('API_HOST');
+const port = process.env.PORT
+  ? Number(process.env.PORT)
+  : env.get('API_PORT');
 
-  await app.listen(port, host);
+const host = env.isProduction
+  ? '0.0.0.0'
+  : env.get('API_HOST');
 
-  const logger = app.get(PinoLogger);
-  logger.log(`الخادم يعمل على http://${host}:${port}/api`);
+await app.listen(port, host);
+
+const logger = app.get(PinoLogger);
+logger.log(`الخادم يعمل على http://${host}:${port}/api`);
   if (!env.isProduction) {
     logger.log(`توثيق الـAPI: http://${host}:${port}/api/docs`);
   }
