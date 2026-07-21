@@ -2,6 +2,7 @@ import {
   BarChart3,
   CreditCard,
   FileText,
+  History,
   LayoutDashboard,
   ListOrdered,
   MessageCircle,
@@ -12,6 +13,7 @@ import {
   Wallet,
   Building2,
   Layers,
+  UserCog,
   type LucideIcon,
 } from 'lucide-react';
 import { PERMISSIONS, type Permission } from '@oh/config';
@@ -26,6 +28,7 @@ export interface NavItem {
   phase?: string;
   /** يظهر في شريط التبويب السفلي على الموبايل. */
   mobile?: boolean;
+  children?: NavItem[];
 }
 
 /**
@@ -49,6 +52,12 @@ export const TENANT_NAV: NavItem[] = [
     permission: PERMISSIONS.CUSTOMERS_READ,
     phase: 'المرحلة 4',
     mobile: true,
+  },
+  {
+    to: '/activity',
+    labelKey: 'nav.activity',
+    icon: History,
+    permission: PERMISSIONS.ACTIVITY_READ,
   },
   {
     to: '/orders',
@@ -130,6 +139,26 @@ export const PLATFORM_NAV: NavItem[] = [
     icon: Building2,
     permission: PERMISSIONS.PLATFORM_TENANTS_READ,
     mobile: true,
+    children: [
+      {
+        to: '/platform/tenants',
+        labelKey: 'platform.tenantsList',
+        icon: Building2,
+        permission: PERMISSIONS.PLATFORM_TENANTS_READ,
+      },
+      {
+        to: '/platform/subscriptions',
+        labelKey: 'nav.subscriptions',
+        icon: CreditCard,
+        permission: PERMISSIONS.PLATFORM_SUBSCRIPTIONS_READ,
+      },
+    ],
+  },
+  {
+    to: '/platform/staff',
+    labelKey: 'nav.platformStaff',
+    icon: UserCog,
+    permission: PERMISSIONS.PLATFORM_STAFF_READ,
   },
   {
     to: '/platform/plans',

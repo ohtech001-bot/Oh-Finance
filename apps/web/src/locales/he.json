@@ -1,10 +1,11 @@
 {
   "app": {
-    "name": "אוה פייננס",
+    "name": "OH Finance",
     "tagline": "ניהול לקוחות, הזמנות אשראי ותשלומים"
   },
   "nav": {
     "dashboard": "לוח בקרה",
+    "activity": "יומן פעילות",
     "customers": "לקוחות",
     "orders": "הזמנות",
     "payments": "תשלומים",
@@ -21,6 +22,7 @@
     "tenants": "חנויות",
     "plans": "חבילות",
     "subscriptions": "מנויים",
+    "platformStaff": "מנהלים ועובדים",
     "more": "עוד"
   },
   "auth": {
@@ -32,6 +34,7 @@
     "forgotPassword": "שכחת סיסמה?",
     "login": "כניסה",
     "loggingIn": "מתחבר…",
+    "invalidCredentials": "הפרטים שהוזנו אינם נכונים.",
     "logout": "התנתקות",
     "twoFactorCode": "קוד אימות",
     "twoFactorHint": "הזן את הקוד בן 6 הספרות מאפליקציית האימות",
@@ -40,7 +43,48 @@
     "sendResetLink": "שלח קישור לשחזור",
     "backToLogin": "חזרה להתחברות",
     "resetSent": "נשלח",
-    "sessionExpired": "פג תוקף ההתחברות. התחבר שוב."
+    "sessionExpired": "פג תוקף ההתחברות. התחבר שוב.",
+    "changeTemporaryTitle": "שינוי סיסמה זמנית",
+    "changeTemporarySubtitle": "בחר סיסמה חדשה לפני המשך השימוש",
+    "temporaryPassword": "סיסמה זמנית",
+    "newPassword": "סיסמה חדשה",
+    "confirmPassword": "אימות סיסמה",
+    "changePassword": "שינוי סיסמה",
+    "passwordChanged": "הסיסמה שונתה. התחבר מחדש."
+  },
+  "legal": {
+    "privacyLink": "מדיניות פרטיות",
+    "sitePolicyLink": "מדיניות האתר",
+    "backToLogin": "חזרה להתחברות",
+    "support": "יצירת קשר ותמיכה:",
+    "privacy": {
+      "title": "מדיניות פרטיות",
+      "intro": "מדיניות זו מסבירה כיצד OH Finance מטפלת בנתוני משתמשים ומגינה עליהם.",
+      "informationTitle": "המידע שאנו אוספים",
+      "informationBody": "אנו אוספים את פרטי החשבון והעסק הדרושים להפעלת השירות, לרבות שם, פרטי קשר, נתוני שימוש ומידע שהוזן על ידי משתמשים מורשים.",
+      "useTitle": "כיצד נעשה שימוש במידע",
+      "useBody": "המידע משמש להפעלת השירות, אבטחת חשבונות, שיפור הביצועים ומתן תמיכה. לא נעשה בו שימוש למטרות שאינן קשורות לשירות ללא בסיס חוקי.",
+      "protectionTitle": "הגנת מידע",
+      "protectionBody": "אנו מפעילים אמצעים טכניים וארגוניים נגד גישה, שינוי או חשיפה ללא הרשאה, ומפרידים את נתוני כל חנות לפי הרשאות המשתמשים.",
+      "rightsTitle": "זכויות המשתמש",
+      "rightsBody": "משתמשים רשאים לבקש גישה, תיקון או מחיקה של נתוניהם כאשר החוק מאפשר זאת, ולפנות אלינו בכל שאלה בנושא פרטיות."
+    },
+    "sitePolicy": {
+      "title": "מדיניות השימוש באתר",
+      "intro": "מדיניות זו מסדירה את השימוש באתר, במערכת ובשירותי OH Finance.",
+      "useTitle": "שימוש מקובל",
+      "useBody": "יש להשתמש במערכת למטרות עסקיות חוקיות בלבד. חל איסור על שימוש לרעה, עקיפת הרשאות או פגיעה ביציבות השירות.",
+      "accountsTitle": "חשבונות ואחריות",
+      "accountsBody": "המשתמש אחראי לשמירת סודיות פרטי הכניסה ולדיוק המידע שהוזן. יש לדווח מיד על חשד לשימוש ללא הרשאה.",
+      "availabilityTitle": "זמינות השירות",
+      "availabilityBody": "אנו פועלים לשמירת זמינות ואבטחת השירות. ייתכנו פעולות תחזוקה או עדכונים נחוצים תוך צמצום ההפרעה ככל האפשר.",
+      "liabilityTitle": "הגבלת אחריות",
+      "liabilityBody": "דיוק הדוחות והתוצאות תלוי בנכונות הנתונים שהוזנו. יש לבדוק פעולות כספיות לפני אישורן או קבלת החלטות סופיות."
+    }
+  },
+  "loading": {
+    "counting": "מסדרים נכסים ומאבטחים את החשבון…",
+    "progress": "{{progress}} אחוז הושלמו"
   },
   "common": {
     "search": "חיפוש",
@@ -52,6 +96,7 @@
     "saveChanges": "שמור שינויים",
     "cancel": "ביטול",
     "confirm": "אישור",
+    "success": "הפעולה הושלמה בהצלחה",
     "delete": "מחיקה",
     "edit": "עריכה",
     "add": "הוספה",
@@ -131,11 +176,20 @@
     "createdAt": "תאריך יצירה",
     "suspend": "השעיה",
     "activate": "הפעלה",
+    "supportAccess": "כניסה לתמיכה",
+    "exitSupport": "חזרה לפלטפורמה",
+    "exitSupportFailed": "לא ניתן לסיים את מצב התמיכה.",
     "suspendReason": "סיבת ההשעיה",
     "noTenants": "אין חנויות עדיין",
     "noTenantsDescription": "התחל בהוספת החנות הראשונה לפלטפורמה.",
     "tenantCreated": "החנות נוצרה בהצלחה",
-    "tenantUpdated": "פרטי החנות עודכנו"
+    "tenantUpdated": "פרטי החנות עודכנו",
+    "addTenantDialogDescription": "הזן את פרטי החנות, הבעלים והמינוי בטופס אחד.",
+    "editTenantDialogDescription": "עדכן את פרטי החנות ובדוק אותם לפני השמירה.",
+    "addTenantConfirmTitle": "אישור הוספת החנות",
+    "addTenantConfirmDescription": "ליצור את החנות {{name}} ולשלוח את פרטיה?",
+    "editTenantConfirmTitle": "אישור עדכון החנות",
+    "editTenantConfirmDescription": "לשמור את השינויים בחנות {{name}}?"
   },
   "subscription": {
     "title": "מנוי וחשבוניות",
@@ -151,6 +205,61 @@
     "orders": "מספר הזמנות",
     "storage": "אחסון",
     "upgrade": "שדרוג חבילה",
-    "changePlan": "החלפת חבילה"
+    "changePlan": "החלפת חבילה",
+    "managementTitle": "ניהול מנויים",
+    "managementSubtitle": "מעקב אחר תקופות ותשלומים מוסכמים לכל חנות",
+    "period": "תקופת מנוי",
+    "agreedAmount": "סכום מוסכם",
+    "paidAmount": "סכום ששולם",
+    "remainingAmount": "יתרה",
+    "paymentStatus": "סטטוס תשלום",
+    "unpaid": "לא שולם",
+    "partial": "שולם חלקית",
+    "paid": "שולם",
+    "updated": "המנוי עודכן",
+    "editBilling": "עריכת תשלום",
+    "sendReminder": "שליחת תזכורת",
+    "whatsappReminderMessage": "שלום לצוות {{name}}, ברצוננו להזכיר בעדינות שהמינוי שלכם ל-OH Finance יסתיים בתאריך {{date}}. אנא צרו איתנו קשר לחידוש המינוי ולמניעת הפסקה בשירות. בברכה, צוות OH Finance.",
+    "paymentStatuses": { "UNPAID": "לא שולם", "PARTIAL": "שולם חלקית", "PAID": "שולם" }
+  },
+  "staff": {
+    "title": "מנהלים ועובדים",
+    "subtitle": "הוספת חשבונות לאחר אימות דואר אלקטרוני",
+    "add": "הוספת מנהל או עובד",
+    "name": "שם מלא",
+    "phone": "מספר טלפון",
+    "dateOfBirth": "תאריך לידה",
+    "identityNumber": "מספר זהות",
+    "jobTitle": "תפקיד",
+    "role": "סוג תפקיד",
+    "sendCode": "שליחת קוד אימות",
+    "codeSent": "קוד האימות נשלח",
+    "verifyTitle": "אימות דואר",
+    "verifyHint": "הזן את הקוד בן 6 הספרות שהתקבל.",
+    "verificationCode": "קוד אימות",
+    "created": "החשבון נוצר והסיסמה הזמנית נשלחה",
+    "empty": "אין חשבונות נוספים",
+    "active": "פעיל",
+    "inactive": "לא פעיל",
+    "deleted": "החשבון נמחק",
+    "edit": "עריכת מנהל או עובד",
+    "updated": "פרטי החשבון עודכנו",
+    "editConfirmTitle": "אישור עדכון החשבון",
+    "editConfirmDescription": "לשמור את השינויים בחשבון של {{name}}?",
+    "verifiedEmailHint": "כתובת הדואר מאומתת ולא ניתן לשנות אותה כאן.",
+    "deleteTitle": "מחיקת מנהל או עובד",
+    "deleteDescription": "החשבון של {{name}} וכל ההפעלות הפעילות יימחקו. לא ניתן לבטל פעולה זו.",
+    "disable": "השבתה",
+    "enable": "הפעלה",
+    "statusUpdated": "סטטוס החשבון עודכן",
+    "statusConfirm": "לשנות את סטטוס החשבון של {{name}}?",
+    "roles": { "GENERAL_MANAGER": "מנהל כללי", "MANAGER": "מנהל", "EMPLOYEE": "עובד" }
+  },
+  "support": {
+    "title": "עזרה ותמיכה",
+    "subtitle": "יצירת קשר ישיר עם צוות OH Tech",
+    "whatsappTitle": "תמיכה בוואטסאפ",
+    "whatsappDescription": "פתח שיחת וואטסאפ עם צוות התמיכה.",
+    "openWhatsapp": "פתיחת וואטסאפ"
   }
 }

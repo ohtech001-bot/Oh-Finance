@@ -1,18 +1,44 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   changeSubscriptionPlanSchema,
+  createPlatformStaffInviteSchema,
   createPlanSchema,
   createTenantSchema,
   setTenantStatusSchema,
+  setPlatformStaffStatusSchema,
   tenantListQuerySchema,
+  subscriptionListQuerySchema,
+  updateSubscriptionBillingSchema,
+  updatePlatformStaffSchema,
+  verifyPlatformStaffInviteSchema,
   updatePlanSchema,
   updateTenantSchema,
   type ChangeSubscriptionPlanRequest,
+  type CreatePlatformStaffInviteRequest,
   type CreatePlanRequest,
   type CreateTenantRequest,
   type SetTenantStatusRequest,
+  type SetPlatformStaffStatusRequest,
   type TenantListQuery,
+  type SubscriptionListQuery,
+  type UpdateSubscriptionBillingRequest,
+  type UpdatePlatformStaffRequest,
+  type VerifyPlatformStaffInviteRequest,
   type UpdatePlanRequest,
   type UpdateTenantRequest,
 } from '@oh/contracts';
@@ -21,9 +47,12 @@ import { zodBody, zodQuery } from '../../core/validation/zod.pipe.js';
 import { AppError } from '../../core/errors/app-error.js';
 import { CurrentUser, RequirePermissions, SuperAdminOnly } from '../auth/decorators.js';
 import type { AccessTokenPayload } from '../auth/token.service.js';
+import { AuthService } from '../auth/auth.service.js';
+import type { Request, Response } from 'express';
 import { PlansService } from './plans.service.js';
 import { SubscriptionsService } from './subscriptions.service.js';
 import { TenantsService } from './tenants.service.js';
+import { StaffService } from './staff.service.js';
 
 /**
  * لوحة المدير العام.
@@ -44,7 +73,84 @@ export class PlatformController {
     private readonly tenants: TenantsService,
     private readonly plans: PlansService,
     private readonly subscriptions: SubscriptionsService,
+    private readonly staff: StaffService,
+    private readonly auth: AuthService,
   ) {}
+
+  // ── مدراء وموظفو المنصة ─────────────────────────────────────────────────
+  @Get('staff')
+  @RequirePermissions(PERMISSIONS.PLATFORM_STAFF_READ)
+  async listStaff() {
+    return this.staff.list();
+  }
+
+  @Post('staff/invitations')
+  @RequirePermissions(PERMISSIONS.PLATFORM_STAFF_MANAGE)
+  async inviteStaff(
+    @Body(zodBody(createPlatformStaffInviteSchema)) dto: CreatePlatformStaffInviteRequest,
+    @CurrentUser() actor: AccessTokenPayload,
+  ) {
+    return this.staff.invite(dto, actor.sub);
+  }
+
+  @Post('staff/invitations/verify')
+  @RequirePermissions(PERMISSIONS.PLATFORM_STAFF_MANAGE)
+  async verifyStaff(
+    @Body(zodBody(verifyPlatformStaffInviteSchema)) dto: VerifyPlatformStaffInviteRequest,
+    @CurrentUser() actor: AccessTokenPayload,
+  ) {
+    return this.staff.verify(dto, actor.sub);
+  }
+
+  @Delete('staff/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermissions(PERMISSIONS.PLATFORM_STAFF_MANAGE)
+  async deleteStaff(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: AccessTokenPayload,
+  ): Promise<void> {
+    await this.staff.remove(id, actor.sub);
+  }
+
+  @Patch('staff/:id')
+  @RequirePermissions(PERMISSIONS.PLATFORM_STAFF_MANAGE)
+  async updateStaff(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(zodBody(updatePlatformStaffSchema)) dto: UpdatePlatformStaffRequest,
+    @CurrentUser() actor: AccessTokenPayload,
+  ) {
+    return this.staff.update(id, dto, actor.sub);
+  }
+
+  @Post('staff/:id/status')
+  @RequirePermissions(PERMISSIONS.PLATFORM_STAFF_MANAGE)
+  async setStaffStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(zodBody(setPlatformStaffStatusSchema)) dto: SetPlatformStaffStatusRequest,
+    @CurrentUser() actor: AccessTokenPayload,
+  ) {
+    return this.staff.setStatus(id, dto, actor.sub);
+  }
+
+  @Post('staff/:id/update-invitations')
+  @RequirePermissions(PERMISSIONS.PLATFORM_STAFF_MANAGE)
+  async inviteStaffUpdate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(zodBody(updatePlatformStaffSchema)) dto: UpdatePlatformStaffRequest,
+    @CurrentUser() actor: AccessTokenPayload,
+  ) {
+    return this.staff.inviteUpdate(id, dto, actor.sub);
+  }
+
+  @Post('staff/:id/update-invitations/verify')
+  @RequirePermissions(PERMISSIONS.PLATFORM_STAFF_MANAGE)
+  async verifyStaffUpdate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(zodBody(verifyPlatformStaffInviteSchema)) dto: VerifyPlatformStaffInviteRequest,
+    @CurrentUser() actor: AccessTokenPayload,
+  ) {
+    return this.staff.verifyUpdate(id, dto, actor.sub);
+  }
 
   // ── لوحة المعلومات ────────────────────────────────────────────────────────
   @Get('stats')
@@ -74,7 +180,8 @@ export class PlatformController {
   @Post('tenants')
   @RequirePermissions(PERMISSIONS.PLATFORM_TENANTS_MANAGE)
   @ApiOperation({
-    summary: 'إنشاء محل جديد — المستأجر والمحل والفرع والأدوار وصاحب المحل والاشتراك في معاملة واحدة.',
+    summary:
+      'إنشاء محل جديد — المستأجر والمحل والفرع والأدوار وصاحب المحل والاشتراك في معاملة واحدة.',
   })
   async createTenant(
     @Body(zodBody(createTenantSchema)) dto: CreateTenantRequest,
@@ -105,6 +212,21 @@ export class PlatformController {
     return this.tenants.setStatus(id, dto, actor.sub);
   }
 
+  @Post('tenants/:id/support-session')
+  @RequirePermissions(PERMISSIONS.PLATFORM_TENANTS_MANAGE)
+  @ApiOperation({ summary: 'بدء جلسة دعم مؤقتة ومُدققة داخل محل.' })
+  async startSupportSession(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: AccessTokenPayload,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.auth.startSupportSession(id, actor, res, {
+      ip: req.ip ?? null,
+      userAgent: req.headers['user-agent'] ?? null,
+    });
+  }
+
   // ── الباقات ───────────────────────────────────────────────────────────────
   @Get('plans')
   @RequirePermissions(PERMISSIONS.PLATFORM_PLANS_READ)
@@ -133,6 +255,24 @@ export class PlatformController {
   }
 
   // ── الاشتراكات ────────────────────────────────────────────────────────────
+  @Get('subscriptions')
+  @RequirePermissions(PERMISSIONS.PLATFORM_SUBSCRIPTIONS_READ)
+  async listSubscriptions(
+    @Query(zodQuery(subscriptionListQuerySchema)) query: SubscriptionListQuery,
+  ) {
+    return this.subscriptions.list(query);
+  }
+
+  @Patch('subscriptions/:id/billing')
+  @RequirePermissions(PERMISSIONS.PLATFORM_SUBSCRIPTIONS_MANAGE)
+  async updateSubscriptionBilling(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(zodBody(updateSubscriptionBillingSchema)) dto: UpdateSubscriptionBillingRequest,
+    @CurrentUser() actor: AccessTokenPayload,
+  ) {
+    return this.subscriptions.updateBilling(id, dto, actor.sub);
+  }
+
   @Get('tenants/:id/subscription')
   @RequirePermissions(PERMISSIONS.PLATFORM_SUBSCRIPTIONS_READ)
   @ApiOperation({ summary: 'تفاصيل اشتراك محل مع عدّادات الاستخدام.' })

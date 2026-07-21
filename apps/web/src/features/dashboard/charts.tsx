@@ -1,16 +1,20 @@
 import { useMemo } from 'react';
 import {
   CartesianGrid,
+  Cell,
   Legend,
   Line,
   LineChart,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 import { formatMoney, type CurrencyCode } from '@oh/money';
-import { TREND_META, type DashboardTrendId, type TrendSeries } from '@oh/contracts';
+import { TREND_META, type DashboardTrendId, type KpiMetric, type TrendSeries } from '@oh/contracts';
+import { currentLocale } from '@/lib/i18n';
 
 /**
  * منحنيات لوحة التحكم — Recharts، بيانات مجمّعة على الخادم (لا حساب هنا).
@@ -28,6 +32,62 @@ const SERIES_COLOR: Record<DashboardTrendId, string> = {
 
 const GRID = '#E2E8F0';
 const AXIS = '#94A3B8';
+
+const COLLECTION_LABELS = {
+  ar: { title: 'نسبة التحصيل', collected: 'تم تحصيله من المبالغ المستحقة' },
+  he: { title: 'שיעור הגבייה', collected: 'נגבה מתוך הסכומים לתשלום' },
+  en: { title: 'Collection rate', collected: 'Collected from amounts due' },
+} as const;
+
+export function CollectionRateChart({ metric }: { metric: KpiMetric }) {
+  const locale = currentLocale();
+  const value = Number(metric.value);
+  const displayed = Number.isFinite(value) ? value : 0;
+  const progress = Math.min(100, Math.max(0, displayed));
+  const formattedValue = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(
+    displayed,
+  );
+  const data = [
+    { name: 'collected', value: progress },
+    { name: 'remaining', value: 100 - progress },
+  ];
+
+  return (
+    <section
+      aria-label={COLLECTION_LABELS[locale].title}
+      className="rounded-card border-border bg-card shadow-card flex min-h-28 items-center justify-between gap-3 border px-4 py-3"
+    >
+      <div className="min-w-0 text-start">
+        <h2 className="text-fg-muted text-sm font-medium">{COLLECTION_LABELS[locale].title}</h2>
+        <p className="text-fg-subtle mt-2 text-xs leading-5">
+          {COLLECTION_LABELS[locale].collected}
+        </p>
+      </div>
+      <div className="relative size-24 shrink-0" dir="ltr">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              dataKey="value"
+              innerRadius={31}
+              outerRadius={43}
+              startAngle={90}
+              endAngle={-270}
+              stroke="none"
+              isAnimationActive
+            >
+              <Cell fill="#16A34A" />
+              <Cell fill="#E2E8F0" />
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <span className="text-fg text-lg font-bold tabular-nums">{formattedValue}%</span>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function shortNumber(v: number): string {
   // eslint-disable-next-line no-restricted-properties -- تقريب تسمية محور بصرية، لا مبلغ.
@@ -77,10 +137,7 @@ export function TrendChart({
 
   if (!hasData) {
     return (
-      <div
-        className="flex items-center justify-center text-sm text-fg-muted"
-        style={{ height }}
-      >
+      <div className="text-fg-muted flex items-center justify-center text-sm" style={{ height }}>
         {emptyText}
       </div>
     );

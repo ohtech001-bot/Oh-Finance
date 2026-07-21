@@ -14,6 +14,7 @@ import { AppErrorBoundary } from './features/errors/error-pages';
 import { ApiRequestError } from './lib/api';
 import { currentLocale } from './lib/i18n';
 import { LOCALES } from '@oh/config';
+import { StartupLoader } from './features/loading/startup-loader';
 
 /**
  * إعداد TanStack Query.
@@ -33,7 +34,7 @@ const queryClient = new QueryClient({
     queries: {
       retry: (failureCount, error) => {
         if (error instanceof ApiRequestError) {
-          if (error.isUnauthenticated || error.isForbidden || error.status === 404) {
+          if (error.status >= 400 && error.status < 500) {
             return false;
           }
         }
@@ -63,8 +64,10 @@ createRoot(root).render(
       <ThemeProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <RouterProvider router={router} />
-            <Toaster dir={LOCALES[currentLocale()].dir} />
+            <StartupLoader>
+              <RouterProvider router={router} />
+              <Toaster dir={LOCALES[currentLocale()].dir} />
+            </StartupLoader>
           </AuthProvider>
         </QueryClientProvider>
       </ThemeProvider>

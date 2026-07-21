@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, Lock, Mail, ShieldCheck, Store } from 'lucide-react';
+import { CircleAlert, Eye, EyeOff, Lock, Mail, ShieldCheck, Store } from 'lucide-react';
 import { loginRequestSchema, type LoginRequest } from '@oh/contracts';
 import { Button, Field, Input, cn, toast } from '@oh/ui';
 import { ApiRequestError } from '@/lib/api';
@@ -30,7 +30,7 @@ export function LoginPage() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [needsTwoFactor, setNeedsTwoFactor] = useState(false);
-  const [formError, setFormError] = useState<{ message: string; requestId?: string } | null>(null);
+  const [formError, setFormError] = useState<{ message: string } | null>(null);
 
   const {
     register,
@@ -47,7 +47,7 @@ export function LoginPage() {
     try {
       const response = await login(values);
       const from = (location.state as { from?: string } | null)?.from;
-      const fallback = response.user.isSuperAdmin ? '/platform' : '/';
+      const fallback = response.user.mustChangePassword ? '/change-initial-password' : response.user.isSuperAdmin ? '/platform' : '/';
       navigate(from ?? fallback, { replace: true });
       toast.success(`أهلًا ${response.user.name}`);
     } catch (error) {
@@ -57,7 +57,7 @@ export function LoginPage() {
           setFormError(null);
           return;
         }
-        setFormError({ message: error.message, requestId: error.requestId });
+        setFormError({ message: t('auth.invalidCredentials') });
         return;
       }
       setFormError({ message: t('errors.network') });
@@ -78,14 +78,12 @@ export function LoginPage() {
         {formError ? (
           <div
             role="alert"
-            className="rounded-ctrl border border-danger/30 bg-danger-soft px-4 py-3"
+            className="flex items-start gap-3 rounded-ctrl border border-red-400/45 bg-red-950/80 px-4 py-3 shadow-sm"
           >
-            <p className="text-sm font-medium text-danger">{formError.message}</p>
-            {formError.requestId ? (
-              <p className="mt-1 font-mono text-[11px] text-danger/70" dir="ltr">
-                {formError.requestId}
-              </p>
-            ) : null}
+            <CircleAlert className="mt-0.5 size-5 shrink-0 text-red-300" aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="!text-sm !font-medium !leading-6 !text-red-100">{formError.message}</p>
+            </div>
           </div>
         ) : null}
 

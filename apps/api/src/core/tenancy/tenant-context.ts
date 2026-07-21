@@ -21,7 +21,9 @@ export interface RequestContext {
   readonly userId: string | null;
   readonly storeId: string | null;
   readonly isSuperAdmin: boolean;
+  readonly supportMode: boolean;
   readonly permissions: readonly Permission[];
+  readonly mustChangePassword: boolean;
 
   readonly ip: string | null;
   readonly userAgent: string | null;
@@ -33,7 +35,9 @@ export interface AuthenticatedIdentity {
   readonly userId: string;
   readonly storeId: string | null;
   readonly isSuperAdmin: boolean;
+  readonly supportMode: boolean;
   readonly permissions: readonly Permission[];
+  readonly mustChangePassword: boolean;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -70,7 +74,9 @@ export const TenantContext = {
     mutable.userId = identity.userId;
     mutable.storeId = identity.storeId;
     mutable.isSuperAdmin = identity.isSuperAdmin;
+    mutable.supportMode = identity.supportMode;
     mutable.permissions = identity.permissions;
+    mutable.mustChangePassword = identity.mustChangePassword;
   },
 
   /** السياق الحالي، أو undefined خارج دورة طلب (مهام خلفية، سكربتات). */

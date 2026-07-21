@@ -74,6 +74,15 @@ export const envSchema = z
     FEATURE_2FA: boolish.default('false'),
     FEATURE_MESSAGING: boolish.default('false'),
     FEATURE_PRODUCTS: boolish.default('false'),
+
+    // البريد الصادر — اختياري عند الإقلاع، وتتعطل ميزة الدعوات بوضوح إن غاب.
+    SMTP_HOST: z.string().min(1).optional(),
+    SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+    SMTP_SECURE: boolish.default('false'),
+    SMTP_USER: z.string().min(1).optional(),
+    SMTP_PASSWORD: z.string().min(1).optional(),
+    SMTP_FROM_EMAIL: z.string().email().default('info@oh-tech.co'),
+    SMTP_FROM_NAME: z.string().default('OH Finance'),
   })
   .superRefine((env, ctx) => {
     // ── قيود الإنتاج: لا تنازل ─────────────────────────────────────────────
@@ -165,4 +174,5 @@ export const REDACTED_KEYS = [
   'DATABASE_URL',
   'DIRECT_DATABASE_URL',
   'REDIS_URL',
+  'SMTP_PASSWORD',
 ] as const;

@@ -143,15 +143,15 @@ export const createCustomerSchema = z.object({
 
   tags: z.array(z.string().trim().min(1).max(32)).max(20).default([]),
 
-  creditLimit: nonNegativeMoneySchema.default('0'),
+  creditLimit: nonNegativeMoneySchema.default('1500'),
   paymentTermDays: z.number().int().min(0).max(365).default(30),
   status: customerStatusSchema.default('ACTIVE'),
 
   /**
    * الرصيد الافتتاحي — **عند الإنشاء فقط**.
    *
-   * موجب = الزبون مدين لنا مسبقًا (دَين قديم مُرحَّل).
-   * سالب = لديه رصيد دائن عندنا.
+   * موجب = للزبون رصيد دائن عندنا (יתרה).
+   * سالب = الزبون مدين لنا مسبقًا (دَين قديم مُرحَّل).
    *
    * لا يُخزَّن كعمود: يولّد قيد `OPENING_BALANCE` في الدفتر. هذا يجعله
    * جزءًا من التاريخ المحاسبي المُدقَّق، لا رقمًا معلّقًا يمكن تغييره.

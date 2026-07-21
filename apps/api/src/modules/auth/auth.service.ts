@@ -5,6 +5,7 @@ import {
   type LoginRequest,
   type LoginResponse,
   type SessionUser,
+  type ChangePasswordRequest,
 } from '@oh/contracts';
 import { ROLES, permissionsForRole, type Permission, type RoleName } from '@oh/config';
 import { EnvService } from '../../core/config/env.service.js';
@@ -69,8 +70,7 @@ export class AuthService {
     context: { ip: string | null; userAgent: string | null },
   ): Promise<LoginResponse> {
     const rows = await this.prisma.runUnscoped(
-      (tx) =>
-        tx.$queryRaw<AuthLookupRow[]>`SELECT * FROM app_auth_lookup(${dto.email}::citext)`,
+      (tx) => tx.$queryRaw<AuthLookupRow[]>`SELECT * FROM app_auth_lookup(${dto.email}::citext)`,
     );
     const found = rows[0] ?? null;
 
@@ -118,7 +118,14 @@ export class AuthService {
     }
 
     // ── إصدار الجلسة ─────────────────────────────────────────────────────
-    const permissions = await this.resolvePermissions(found);
+    const authState = await this.prisma.runUnscoped((tx) =>
+      tx.user.findUnique({
+        where: { id: found.id },
+        select: { platformRole: true, mustChangePassword: true },
+      }),
+    );
+    if (!authState) throw AppError.invalidCredentials();
+    const permissions = await this.resolvePermissions(found, authState.platformRole);
 
     const { accessToken, csrfToken } = await this.prisma.runUnscoped(async (tx) => {
       const session = await this.tokens.createSession(tx, {
@@ -136,6 +143,7 @@ export class AuthService {
         sa: found.is_super_admin,
         st: found.store_id,
         perms: permissions,
+        pc: authState.mustChangePassword,
       };
 
       const access = await this.tokens.signAccessToken(payload);
@@ -188,11 +196,7 @@ export class AuthService {
       if (rotation.outcome === 'REUSE_DETECTED') {
         // ⚠️ رمز مُبطل استُخدم مجددًا. لا يحدث في الاستخدام الطبيعي.
         // نُبطل العائلة كلها ونسجّل الحادثة.
-        const revoked = await this.tokens.revokeFamily(
-          tx,
-          rotation.familyId,
-          'REUSE_DETECTED',
-        );
+        const revoked = await this.tokens.revokeFamily(tx, rotation.familyId, 'REUSE_DETECTED');
 
         const user = await tx.user.findUnique({
           where: { id: rotation.userId },
@@ -224,6 +228,8 @@ export class AuthService {
           roleId: true,
           status: true,
           isSuperAdmin: true,
+          platformRole: true,
+          mustChangePassword: true,
         },
       });
 
@@ -231,15 +237,28 @@ export class AuthService {
         return { kind: 'INVALID' as const };
       }
 
-      const permissions = await this.resolvePermissionsForUser(tx, user.id, user.isSuperAdmin);
+      const supportMode = user.isSuperAdmin && rotation.tenantId !== null;
+      const supportStore = supportMode
+        ? await tx.store.findFirst({
+            where: { tenantId: rotation.tenantId!, isActive: true },
+            orderBy: { createdAt: 'asc' },
+            select: { id: true },
+          })
+        : null;
+      const permissions = supportMode
+        ? permissionsForRole(ROLES.OWNER)
+        : await this.resolvePermissionsForUser(tx, user.id, user.isSuperAdmin, user.platformRole);
+      const effectiveTenantId = supportMode ? rotation.tenantId : user.tenantId;
 
       const payload: AccessTokenPayload = {
         sub: user.id,
-        tid: user.tenantId,
+        tid: effectiveTenantId,
         sid: rotation.sessionId,
-        sa: user.isSuperAdmin,
-        st: user.storeId,
+        sa: supportMode ? false : user.isSuperAdmin,
+        st: supportStore?.id ?? user.storeId,
         perms: permissions,
+        pc: user.mustChangePassword,
+        sup: supportMode,
       };
 
       const access = await this.tokens.signAccessToken(payload);
@@ -257,9 +276,10 @@ export class AuthService {
       return {
         kind: 'OK' as const,
         userId: user.id,
-        tenantId: user.tenantId,
+        tenantId: effectiveTenantId,
         permissions,
         csrfToken: rotation.csrfToken,
+        supportMode,
       };
     });
 
@@ -272,7 +292,12 @@ export class AuthService {
       throw AppError.tokenExpired();
     }
 
-    const user = await this.buildSessionUser(result.userId, result.tenantId, result.permissions);
+    const user = await this.buildSessionUser(
+      result.userId,
+      result.tenantId,
+      result.permissions,
+      result.supportMode,
+    );
     return { user, csrfToken: result.csrfToken };
   }
 
@@ -325,7 +350,195 @@ export class AuthService {
     const ctx = TenantContext.get();
     if (!ctx?.userId) throw AppError.unauthenticated();
 
-    return this.buildSessionUser(ctx.userId, ctx.tenantId, [...ctx.permissions]);
+    return this.buildSessionUser(ctx.userId, ctx.tenantId, [...ctx.permissions], ctx.supportMode);
+  }
+
+  async startSupportSession(
+    tenantId: string,
+    actor: AccessTokenPayload,
+    res: Response,
+    context: { ip: string | null; userAgent: string | null },
+  ): Promise<LoginResponse> {
+    const permissions = permissionsForRole(ROLES.OWNER);
+    const result = await this.prisma.runAsPlatform(async (tx) => {
+      const [admin, tenant] = await Promise.all([
+        tx.user.findUnique({
+          where: { id: actor.sub },
+          select: { isSuperAdmin: true, platformRole: true, mustChangePassword: true },
+        }),
+        tx.tenant.findUnique({
+          where: { id: tenantId },
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            stores: {
+              where: { isActive: true },
+              orderBy: { createdAt: 'asc' },
+              take: 1,
+              select: { id: true },
+            },
+          },
+        }),
+      ]);
+
+      if (
+        !admin?.isSuperAdmin ||
+        (admin.platformRole !== 'GENERAL_MANAGER' && admin.platformRole !== 'MANAGER')
+      ) {
+        throw AppError.forbidden('جلسة الدعم متاحة للمدير العام والمدير فقط.');
+      }
+      if (!tenant) throw AppError.notFound('المحل');
+      if (tenant.status === 'CANCELLED') throw AppError.conflict('لا يمكن فتح محل ملغى.');
+      const store = tenant.stores[0];
+      if (!store) throw AppError.conflict('لا يوجد محل نشط مرتبط بهذا الحساب.');
+
+      await this.tokens.revokeSession(tx, actor.sid, 'SUPPORT_SWITCH');
+      const session = await this.tokens.createSession(tx, {
+        userId: actor.sub,
+        tenantId,
+        userAgent: context.userAgent,
+        ipAddress: context.ip,
+        rememberMe: false,
+      });
+      const accessToken = await this.tokens.signAccessToken({
+        sub: actor.sub,
+        tid: tenantId,
+        sid: session.sessionId,
+        sa: false,
+        st: store.id,
+        perms: permissions,
+        pc: admin.mustChangePassword,
+        sup: true,
+      });
+      await this.audit.record(tx, {
+        action: AUDIT_ACTIONS.PLATFORM_SUPPORT_STARTED,
+        summary: `بدء جلسة دعم للمحل: ${tenant.name}`,
+        entityType: 'Tenant',
+        entityId: tenant.id,
+        tenantId: null,
+        actor: { id: actor.sub, name: null },
+      });
+      return { session, accessToken };
+    });
+
+    this.tokens.setAuthCookies(
+      res,
+      {
+        accessToken: result.accessToken,
+        refreshToken: result.session.refreshToken,
+        csrfToken: result.session.csrfToken,
+      },
+      false,
+    );
+
+    return {
+      user: await this.buildSessionUser(actor.sub, tenantId, permissions, true),
+      csrfToken: result.session.csrfToken,
+    };
+  }
+
+  async exitSupportSession(
+    actor: AccessTokenPayload,
+    res: Response,
+    context: { ip: string | null; userAgent: string | null },
+  ): Promise<LoginResponse> {
+    if (!actor.sup || !actor.tid) throw AppError.forbidden('لا توجد جلسة دعم نشطة.');
+    const supportTenantId = actor.tid;
+
+    // هذه عملية انتقال مصادقة من جلسة دعم (sa=false) إلى جلسة منصة.
+    // الاستعلامات مقيّدة بمعرّفات موقعة من رمز الوصول، لذلك لا نستخدم
+    // runAsPlatform الذي يرفض جلسة الدعم عمدًا.
+    const result = await this.prisma.runUnscoped(async (tx) => {
+      const admin = await tx.user.findUnique({
+        where: { id: actor.sub },
+        select: { isSuperAdmin: true, platformRole: true, mustChangePassword: true },
+      });
+      if (
+        !admin?.isSuperAdmin ||
+        (admin.platformRole !== 'GENERAL_MANAGER' && admin.platformRole !== 'MANAGER')
+      ) {
+        throw AppError.forbidden('جلسة الدعم غير صالحة.');
+      }
+      const permissions = permissionsForRole(this.platformRoleName(admin.platformRole));
+      await this.tokens.revokeSession(tx, actor.sid, 'SUPPORT_EXIT');
+      const session = await this.tokens.createSession(tx, {
+        userId: actor.sub,
+        tenantId: null,
+        userAgent: context.userAgent,
+        ipAddress: context.ip,
+        rememberMe: false,
+      });
+      const accessToken = await this.tokens.signAccessToken({
+        sub: actor.sub,
+        tid: null,
+        sid: session.sessionId,
+        sa: true,
+        st: null,
+        perms: permissions,
+        pc: admin.mustChangePassword,
+        sup: false,
+      });
+      await this.audit.record(tx, {
+        action: AUDIT_ACTIONS.PLATFORM_SUPPORT_ENDED,
+        summary: 'إنهاء جلسة دعم والعودة إلى لوحة المنصة.',
+        entityType: 'Tenant',
+        entityId: supportTenantId,
+        tenantId: null,
+        actor: { id: actor.sub, name: null },
+      });
+      return { session, accessToken, permissions };
+    });
+
+    this.tokens.setAuthCookies(
+      res,
+      {
+        accessToken: result.accessToken,
+        refreshToken: result.session.refreshToken,
+        csrfToken: result.session.csrfToken,
+      },
+      false,
+    );
+    return {
+      user: await this.buildSessionUser(actor.sub, null, result.permissions),
+      csrfToken: result.session.csrfToken,
+    };
+  }
+
+  async changeInitialPassword(
+    userId: string,
+    sessionId: string,
+    dto: ChangePasswordRequest,
+    res: Response,
+  ): Promise<void> {
+    const user = await this.prisma.runUnscoped((tx) =>
+      tx.user.findUnique({
+        where: { id: userId },
+        select: { passwordHash: true, mustChangePassword: true },
+      }),
+    );
+    if (!user || !user.mustChangePassword)
+      throw AppError.validation('لا توجد كلمة مرور مؤقتة لهذا الحساب.');
+    if (!(await this.passwords.verify(user.passwordHash, dto.currentPassword))) {
+      throw AppError.validation('كلمة المرور المؤقتة غير صحيحة.');
+    }
+    const passwordHash = await this.passwords.hash(dto.newPassword);
+    await this.prisma.runUnscoped(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          passwordHash,
+          mustChangePassword: false,
+          passwordChangedAt: new Date(),
+        },
+      });
+      await tx.session.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date(), revokedReason: 'INITIAL_PASSWORD_CHANGED' },
+      });
+    });
+    void sessionId;
+    this.tokens.clearAuthCookies(res);
   }
 
   // ── مساعدات ────────────────────────────────────────────────────────────────
@@ -338,9 +551,12 @@ export class AuthService {
    * مقبول: تغييرات الصلاحيات نادرة، والفارق 15 دقيقة. الإبطال الفوري متاح
    * دائمًا بإنهاء جلسات المستخدم (وهو ما نفعله عند تعطيل الحساب).
    */
-  private async resolvePermissions(user: AuthLookupRow): Promise<Permission[]> {
+  private async resolvePermissions(
+    user: AuthLookupRow,
+    platformRole: 'GENERAL_MANAGER' | 'MANAGER' | 'EMPLOYEE' | null,
+  ): Promise<Permission[]> {
     if (user.is_super_admin) {
-      return permissionsForRole(ROLES.SUPER_ADMIN);
+      return permissionsForRole(this.platformRoleName(platformRole));
     }
     if (!user.tenant_id) return [];
 
@@ -353,9 +569,10 @@ export class AuthService {
     tx: TxClient,
     userId: string,
     isSuperAdmin: boolean,
+    platformRole: 'GENERAL_MANAGER' | 'MANAGER' | 'EMPLOYEE' | null = null,
   ): Promise<Permission[]> {
     if (isSuperAdmin) {
-      return permissionsForRole(ROLES.SUPER_ADMIN);
+      return permissionsForRole(this.platformRoleName(platformRole));
     }
 
     const user = await tx.user.findUnique({
@@ -386,7 +603,11 @@ export class AuthService {
     userId: string,
     tenantId: string | null,
     permissions: Permission[],
+    supportMode = false,
   ): Promise<SessionUser> {
+    if (supportMode && tenantId) {
+      return this.buildSupportSessionUser(userId, tenantId, permissions);
+    }
     // المدير العام: لا مستأجر ولا محل.
     if (!tenantId) {
       const admin = await this.prisma.runUnscoped((tx) =>
@@ -399,6 +620,8 @@ export class AuthService {
             avatarUrl: true,
             locale: true,
             isSuperAdmin: true,
+            platformRole: true,
+            mustChangePassword: true,
             totpEnabled: true,
           },
         }),
@@ -410,10 +633,12 @@ export class AuthService {
         email: admin.email,
         name: admin.name,
         avatarUrl: admin.avatarUrl,
-        role: ROLES.SUPER_ADMIN,
+        role: this.platformRoleName(admin.platformRole),
         permissions,
         locale: admin.locale,
         isSuperAdmin: true,
+        supportMode: false,
+        mustChangePassword: admin.mustChangePassword,
         twoFactorEnabled: admin.totpEnabled,
         tenant: null,
         store: null,
@@ -430,6 +655,7 @@ export class AuthService {
           avatarUrl: true,
           locale: true,
           isSuperAdmin: true,
+          mustChangePassword: true,
           totpEnabled: true,
           role: { select: { name: true } },
           tenant: { select: { id: true, name: true, slug: true, status: true } },
@@ -451,10 +677,78 @@ export class AuthService {
       permissions,
       locale: user.locale,
       isSuperAdmin: user.isSuperAdmin,
+      supportMode: false,
+      mustChangePassword: user.mustChangePassword,
       twoFactorEnabled: user.totpEnabled,
       tenant: user.tenant,
       store: user.store,
     } as SessionUser;
+  }
+
+  private async buildSupportSessionUser(
+    adminId: string,
+    tenantId: string,
+    permissions: Permission[],
+  ): Promise<SessionUser> {
+    const [admin, tenant] = await Promise.all([
+      this.prisma.runUnscoped((tx) =>
+        tx.user.findUnique({
+          where: { id: adminId },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            avatarUrl: true,
+            locale: true,
+            platformRole: true,
+            mustChangePassword: true,
+            totpEnabled: true,
+          },
+        }),
+      ),
+      this.prisma.runInTenant(tenantId, (tx) =>
+        tx.tenant.findUnique({
+          where: { id: tenantId },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            status: true,
+            stores: {
+              where: { isActive: true },
+              orderBy: { createdAt: 'asc' },
+              take: 1,
+              select: { id: true, code: true, name: true, currency: true, logoUrl: true },
+            },
+          },
+        }),
+      ),
+    ]);
+    if (!admin || !tenant || !tenant.stores[0])
+      throw AppError.unauthenticated();
+
+    const { stores, ...tenantInfo } = tenant;
+    return {
+      id: admin.id,
+      email: admin.email,
+      name: admin.name,
+      avatarUrl: admin.avatarUrl,
+      role: this.platformRoleName(admin.platformRole),
+      permissions,
+      locale: admin.locale,
+      isSuperAdmin: false,
+      supportMode: true,
+      mustChangePassword: admin.mustChangePassword,
+      twoFactorEnabled: admin.totpEnabled,
+      tenant: tenantInfo,
+      store: stores[0],
+    } as SessionUser;
+  }
+
+  private platformRoleName(role: 'GENERAL_MANAGER' | 'MANAGER' | 'EMPLOYEE' | null): RoleName {
+    if (role === 'MANAGER') return ROLES.PLATFORM_MANAGER;
+    if (role === 'EMPLOYEE') return ROLES.PLATFORM_EMPLOYEE;
+    return ROLES.SUPER_ADMIN;
   }
 
   /** عدّاد المحاولات + القفل — عبر دالة SECURITY DEFINER (RLS لا تسمح بغيرها). */

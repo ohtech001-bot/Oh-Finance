@@ -79,7 +79,7 @@ export class CustomersService {
       // ── الرصيد الافتتاحي → قيد محاسبي ──────────────────────────────────
       const opening = toMoney(dto.openingBalance);
       if (!isZero(opening)) {
-        const isDebit = !isNegative(opening);
+        const isDebit = isNegative(opening);
 
         await this.ledger.append(tx, {
           tenantId,

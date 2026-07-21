@@ -36,12 +36,14 @@ import { ActivityModule } from './modules/activity/activity.module.js';
 // ── المرحلة 4: التقارير والإعدادات ──
 import { ReportsModule } from './modules/reports/reports.module.js';
 import { SettingsModule } from './modules/settings/settings.module.js';
+import { MailModule } from './core/mail/mail.module.js';
 
 @Module({
   imports: [
     AppConfigModule,
     PrismaModule,
     AuditModule,
+    MailModule,
 
     LoggerModule.forRoot(buildLoggerConfig(parseEnv(process.env))),
 

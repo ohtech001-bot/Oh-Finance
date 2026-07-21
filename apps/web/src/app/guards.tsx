@@ -32,6 +32,7 @@ export function RequireTenant() {
 
   if (isLoading) return <FullPageLoader />;
   if (!user) return <Navigate to="/login" replace />;
+  if (user.mustChangePassword) return <Navigate to="/change-initial-password" replace />;
 
   // المدير العام لا مكان له هنا — نوجّهه للوحته بدل عرض 403 مربك.
   if (user.isSuperAdmin) return <Navigate to="/platform" replace />;
@@ -47,6 +48,7 @@ export function RequireSuperAdmin() {
 
   if (isLoading) return <FullPageLoader />;
   if (!user) return <Navigate to="/login" replace />;
+  if (user.mustChangePassword) return <Navigate to="/change-initial-password" replace />;
 
   if (!user.isSuperAdmin) return <Navigate to="/403" replace />;
 
@@ -71,8 +73,15 @@ export function RedirectIfAuthenticated() {
   if (isLoading) return <FullPageLoader />;
 
   if (user) {
-    return <Navigate to={user.isSuperAdmin ? '/platform' : '/'} replace />;
+    return <Navigate to={user.mustChangePassword ? '/change-initial-password' : user.isSuperAdmin ? '/platform' : '/'} replace />;
   }
 
+  return <Outlet />;
+}
+
+export function RequireNotGeneralManager() {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'SUPER_ADMIN') return <Navigate to="/403" replace />;
   return <Outlet />;
 }

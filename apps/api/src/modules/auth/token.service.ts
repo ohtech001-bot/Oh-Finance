@@ -20,6 +20,8 @@ export interface AccessTokenPayload {
   sa: boolean; // isSuperAdmin
   st: string | null; // storeId
   perms: Permission[];
+  pc: boolean; // mustChangePassword
+  sup?: boolean; // جلسة دعم مؤقتة داخل محل، صادرة للمدير العام
 }
 
 export const COOKIE_NAMES = {
@@ -132,7 +134,14 @@ export class TokenService {
     refreshToken: string,
     context: { userAgent: string | null; ipAddress: string | null },
   ): Promise<
-    | { outcome: 'ROTATED'; sessionId: string; userId: string; tenantId: string | null; refreshToken: string; csrfToken: string }
+    | {
+        outcome: 'ROTATED';
+        sessionId: string;
+        userId: string;
+        tenantId: string | null;
+        refreshToken: string;
+        csrfToken: string;
+      }
     | { outcome: 'REUSE_DETECTED'; userId: string; familyId: string }
     | { outcome: 'INVALID' }
   > {
@@ -239,10 +248,7 @@ export class TokenService {
       select: { csrfTokenHash: true },
     });
     if (!session) return false;
-    return this.passwords.compareTokens(
-      session.csrfTokenHash,
-      this.passwords.hashToken(csrfToken),
-    );
+    return this.passwords.compareTokens(session.csrfTokenHash, this.passwords.hashToken(csrfToken));
   }
 
   // ── الكوكيز ───────────────────────────────────────────────────────────────

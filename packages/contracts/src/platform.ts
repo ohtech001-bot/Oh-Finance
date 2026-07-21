@@ -80,7 +80,11 @@ export const storeSummarySchema = z.object({
   code: z.string(),
   name: z.string(),
   phone: z.string().nullable(),
+  email: z.string().nullable(),
+  address: z.string().nullable(),
   city: z.string().nullable(),
+  logoUrl: z.string().nullable(),
+  websiteUrl: z.string().nullable(),
   currency: currencySchema,
   isActive: z.boolean(),
   branchCount: z.number().int(),
@@ -118,37 +122,62 @@ export type TenantDetail = z.infer<typeof tenantDetailSchema>;
  * النظامية + مستخدم صاحب المحل + الاشتراك. كلها داخل معاملة واحدة:
  * فشل أي خطوة يُلغي الكل — لا مستأجر بلا صاحب، ولا اشتراك بلا محل.
  */
-export const createTenantSchema = z.object({
-  // المستأجر
-  name: z.string().trim().min(2, 'اسم المحل مطلوب.').max(120),
-  slug: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .min(2)
-    .max(48)
-    .regex(/^[a-z0-9-]+$/, 'المعرّف: حروف إنجليزية صغيرة وأرقام وشرطات فقط.'),
-  locale: localeSchema.default('ar'),
-  currency: currencySchema.default('ILS'),
-  timezone: z.string().default('Asia/Jerusalem'),
+export const createTenantSchema = z
+  .object({
+    // المستأجر
+    name: z.string().trim().min(2, 'اسم المحل مطلوب.').max(120),
+    locale: localeSchema.default('ar'),
+    currency: currencySchema.default('ILS'),
+    timezone: z.string().default('Asia/Jerusalem'),
 
-  // المحل الأول
-  storeName: z.string().trim().min(2, 'اسم المحل مطلوب.').max(120),
-  storePhone: phoneSchema.optional().or(z.literal('')),
-  storeEmail: emailSchema.optional().or(z.literal('')),
-  storeAddress: z.string().trim().max(240).optional().or(z.literal('')),
-  storeCity: z.string().trim().max(80).optional().or(z.literal('')),
+    // المحل الأول
+    storePhone: phoneSchema.optional().or(z.literal('')),
+    storeEmail: emailSchema.optional().or(z.literal('')),
+    storeAddress: z.string().trim().max(240).optional().or(z.literal('')),
+    storeCity: z.string().trim().max(80).optional().or(z.literal('')),
+    websiteUrl: z.string().trim().url('رابط الموقع غير صحيح.').max(512).optional().or(z.literal('')),
+    logoDataUrl: z
+      .string()
+      .max(7_000_000, 'حجم الشعار كبير جدًا.')
+      .regex(/^data:image\/(png|jpeg|webp);base64,/, 'صيغة الشعار غير مدعومة.')
+      .optional()
+      .or(z.literal('')),
 
-  // صاحب المحل
-  ownerName: z.string().trim().min(2, 'اسم صاحب المحل مطلوب.').max(120),
-  ownerEmail: emailSchema,
-  ownerPassword: passwordSchema,
-  ownerPhone: phoneSchema.optional().or(z.literal('')),
+    // صاحب المحل
+    ownerName: z.string().trim().min(2, 'اسم صاحب المحل مطلوب.').max(120),
+    ownerEmail: emailSchema,
+    ownerPassword: passwordSchema,
+    ownerPhone: phoneSchema.optional().or(z.literal('')),
 
-  // الاشتراك
-  planId: uuidSchema,
-  trialDays: z.number().int().min(0).max(365).default(0),
-});
+    // الاشتراك
+    planId: uuidSchema,
+    subscriptionStartDate: isoDateSchema,
+    subscriptionEndDate: isoDateSchema,
+    agreedMonthlyAmount: nonNegativeMoneySchema,
+    paymentStatus: z.enum(['UNPAID', 'PARTIAL', 'PAID']).default('UNPAID'),
+    paidAmount: nonNegativeMoneySchema.default('0.00'),
+  })
+  .superRefine((data, ctx) => {
+    if (data.subscriptionEndDate <= data.subscriptionStartDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['subscriptionEndDate'],
+        message: 'تاريخ النهاية يجب أن يكون بعد تاريخ البداية.',
+      });
+    }
+    const agreed = Number(data.agreedMonthlyAmount);
+    const paid = Number(data.paidAmount);
+    const valid =
+      (data.paymentStatus === 'UNPAID' && paid === 0) ||
+      (data.paymentStatus === 'PAID' && paid === agreed) ||
+      (data.paymentStatus === 'PARTIAL' && paid > 0 && paid < agreed);
+    if (!valid)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['paidAmount'],
+        message: 'المبلغ المدفوع لا يطابق حالة السداد.',
+      });
+  });
 export type CreateTenantRequest = z.infer<typeof createTenantSchema>;
 
 export const updateTenantSchema = z.object({
@@ -157,6 +186,17 @@ export const updateTenantSchema = z.object({
   locale: localeSchema.optional(),
   currency: currencySchema.optional(),
   timezone: z.string().optional(),
+  storePhone: phoneSchema.optional().or(z.literal('')),
+  storeEmail: emailSchema.optional().or(z.literal('')),
+  storeAddress: z.string().trim().max(240).optional().or(z.literal('')),
+  storeCity: z.string().trim().max(80).optional().or(z.literal('')),
+  websiteUrl: z.string().trim().url('رابط الموقع غير صحيح.').max(512).optional().or(z.literal('')),
+  logoDataUrl: z
+    .string()
+    .max(7_000_000, 'حجم الشعار كبير جدًا.')
+    .regex(/^data:image\/(png|jpeg|webp);base64,/, 'صيغة الشعار غير مدعومة.')
+    .optional()
+    .or(z.literal('')),
 });
 export type UpdateTenantRequest = z.infer<typeof updateTenantSchema>;
 
@@ -201,6 +241,7 @@ export const subscriptionSchema = z.object({
   id: uuidSchema,
   tenantId: uuidSchema,
   tenantName: z.string(),
+  contactPhone: z.string().nullable(),
   plan: planSchema,
   status: subscriptionStatusSchema,
   startedAt: z.string(),
@@ -208,6 +249,10 @@ export const subscriptionSchema = z.object({
   currentPeriodEnd: z.string(),
   trialEndsAt: z.string().nullable(),
   cancelledAt: z.string().nullable(),
+  agreedMonthlyAmount: nonNegativeMoneySchema,
+  paidAmount: nonNegativeMoneySchema,
+  remainingAmount: nonNegativeMoneySchema,
+  paymentStatus: z.enum(['UNPAID', 'PARTIAL', 'PAID']),
   usage: subscriptionUsageSchema,
 });
 export type Subscription = z.infer<typeof subscriptionSchema>;
@@ -218,6 +263,89 @@ export const changeSubscriptionPlanSchema = z.object({
   effective: z.enum(['IMMEDIATE', 'NEXT_PERIOD']).default('NEXT_PERIOD'),
 });
 export type ChangeSubscriptionPlanRequest = z.infer<typeof changeSubscriptionPlanSchema>;
+
+export const subscriptionListQuerySchema = paginationQuerySchema.extend({
+  search: z.string().trim().max(120).optional(),
+  paymentStatus: z.enum(['UNPAID', 'PARTIAL', 'PAID']).optional(),
+});
+export type SubscriptionListQuery = z.infer<typeof subscriptionListQuerySchema>;
+
+export const updateSubscriptionBillingSchema = z
+  .object({
+    currentPeriodStart: isoDateSchema,
+    currentPeriodEnd: isoDateSchema,
+    agreedMonthlyAmount: nonNegativeMoneySchema,
+    paymentStatus: z.enum(['UNPAID', 'PARTIAL', 'PAID']),
+    paidAmount: nonNegativeMoneySchema,
+  })
+  .superRefine((data, ctx) => {
+    if (data.currentPeriodEnd <= data.currentPeriodStart) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['currentPeriodEnd'],
+        message: 'تاريخ النهاية يجب أن يكون بعد تاريخ البداية.',
+      });
+    }
+    const agreed = Number(data.agreedMonthlyAmount);
+    const paid = Number(data.paidAmount);
+    const valid =
+      (data.paymentStatus === 'UNPAID' && paid === 0) ||
+      (data.paymentStatus === 'PAID' && paid === agreed) ||
+      (data.paymentStatus === 'PARTIAL' && paid > 0 && paid < agreed);
+    if (!valid)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['paidAmount'],
+        message: 'المبلغ المدفوع لا يطابق حالة السداد.',
+      });
+  });
+export type UpdateSubscriptionBillingRequest = z.infer<typeof updateSubscriptionBillingSchema>;
+
+export const platformRoleSchema = z.enum(['GENERAL_MANAGER', 'MANAGER', 'EMPLOYEE']);
+export type PlatformRole = z.infer<typeof platformRoleSchema>;
+
+export const createPlatformStaffInviteSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  email: emailSchema,
+  phone: z.string().regex(/^05\d{8}$/, 'رقم الهاتف يجب أن يتكون من 10 أرقام ويبدأ بـ05.'),
+  dateOfBirth: isoDateSchema,
+  identityNumber: z.string().trim().min(1).max(32),
+  jobTitle: z.string().trim().min(2).max(80),
+  platformRole: platformRoleSchema,
+  locale: localeSchema.default('ar'),
+});
+export type CreatePlatformStaffInviteRequest = z.infer<typeof createPlatformStaffInviteSchema>;
+
+export const updatePlatformStaffSchema = createPlatformStaffInviteSchema;
+export type UpdatePlatformStaffRequest = z.infer<typeof updatePlatformStaffSchema>;
+
+export const setPlatformStaffStatusSchema = z.object({
+  status: z.enum(['ACTIVE', 'INACTIVE']),
+});
+export type SetPlatformStaffStatusRequest = z.infer<typeof setPlatformStaffStatusSchema>;
+
+export const verifyPlatformStaffInviteSchema = z.object({
+  inviteId: uuidSchema,
+  code: z.string().regex(/^\d{6}$/, 'رمز التحقق يتكون من 6 أرقام.'),
+});
+export type VerifyPlatformStaffInviteRequest = z.infer<typeof verifyPlatformStaffInviteSchema>;
+
+export const platformStaffSchema = z.object({
+  id: uuidSchema,
+  name: z.string(),
+  email: emailSchema,
+  phone: z.string(),
+  dateOfBirth: z.string(),
+  identityNumber: z.string(),
+  jobTitle: z.string(),
+  locale: localeSchema,
+  platformRole: z.enum(['GENERAL_MANAGER', 'MANAGER', 'EMPLOYEE']),
+  status: z.enum(['ACTIVE', 'INACTIVE']),
+  emailVerifiedAt: z.string().nullable(),
+  mustChangePassword: z.boolean(),
+  createdAt: z.string(),
+});
+export type PlatformStaff = z.infer<typeof platformStaffSchema>;
 
 export const setTenantStatusSchema = z.object({
   status: tenantStatusSchema,

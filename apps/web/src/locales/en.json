@@ -1,10 +1,11 @@
 {
   "app": {
-    "name": "Oh Finance",
+    "name": "OH Finance",
     "tagline": "Customers, credit orders and payments"
   },
   "nav": {
     "dashboard": "Dashboard",
+    "activity": "Activity log",
     "customers": "Customers",
     "orders": "Orders",
     "payments": "Payments",
@@ -21,6 +22,7 @@
     "tenants": "Stores",
     "plans": "Plans",
     "subscriptions": "Subscriptions",
+    "platformStaff": "Managers & Staff",
     "more": "More"
   },
   "auth": {
@@ -32,6 +34,7 @@
     "forgotPassword": "Forgot password?",
     "login": "Sign in",
     "loggingIn": "Signing in…",
+    "invalidCredentials": "The entered information is incorrect.",
     "logout": "Sign out",
     "twoFactorCode": "Verification code",
     "twoFactorHint": "Enter the 6-digit code from your authenticator app",
@@ -40,7 +43,48 @@
     "sendResetLink": "Send reset link",
     "backToLogin": "Back to sign in",
     "resetSent": "Sent",
-    "sessionExpired": "Your session expired. Please sign in again."
+    "sessionExpired": "Your session expired. Please sign in again.",
+    "changeTemporaryTitle": "Change temporary password",
+    "changeTemporarySubtitle": "Choose a new password before continuing",
+    "temporaryPassword": "Temporary password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm password",
+    "changePassword": "Change password",
+    "passwordChanged": "Password changed. Please sign in again."
+  },
+  "legal": {
+    "privacyLink": "Privacy Policy",
+    "sitePolicyLink": "Site Policy",
+    "backToLogin": "Back to sign in",
+    "support": "Contact and support:",
+    "privacy": {
+      "title": "Privacy Policy",
+      "intro": "This policy explains how OH Finance handles and protects user data.",
+      "informationTitle": "Information we collect",
+      "informationBody": "We collect the account and business information required to operate the service, including names, contact details, usage records and data entered by authorized users.",
+      "useTitle": "How information is used",
+      "useBody": "We use information to provide the service, secure accounts, improve performance and deliver support. We do not use it for unrelated purposes without a lawful basis.",
+      "protectionTitle": "Data protection",
+      "protectionBody": "We apply technical and organizational safeguards against unauthorized access, alteration or disclosure, and isolate each store's data according to user permissions.",
+      "rightsTitle": "Your rights",
+      "rightsBody": "Users may request access, correction or deletion of their data where permitted by law and may contact us with any privacy-related question."
+    },
+    "sitePolicy": {
+      "title": "Site Use Policy",
+      "intro": "This policy governs use of the OH Finance website, system and available services.",
+      "useTitle": "Acceptable use",
+      "useBody": "The system must be used only for lawful business purposes. Misuse, attempts to bypass permissions or actions that affect service stability are prohibited.",
+      "accountsTitle": "Accounts and responsibility",
+      "accountsBody": "Users are responsible for protecting their credentials and for the accuracy of submitted information. Suspected unauthorized use must be reported immediately.",
+      "availabilityTitle": "Service availability",
+      "availabilityBody": "We work to keep the service available and secure. Necessary maintenance or updates may occur while we minimize disruption wherever possible.",
+      "liabilityTitle": "Limitation of responsibility",
+      "liabilityBody": "Reports and results depend on the accuracy of submitted data. Financial transactions should be reviewed before approval or final decisions are made."
+    }
+  },
+  "loading": {
+    "counting": "Securing assets and preparing your account…",
+    "progress": "{{progress}} percent complete"
   },
   "common": {
     "search": "Search",
@@ -52,6 +96,7 @@
     "saveChanges": "Save changes",
     "cancel": "Cancel",
     "confirm": "Confirm",
+    "success": "Operation completed successfully",
     "delete": "Delete",
     "edit": "Edit",
     "add": "Add",
@@ -131,11 +176,20 @@
     "createdAt": "Created",
     "suspend": "Suspend",
     "activate": "Activate",
+    "supportAccess": "Support access",
+    "exitSupport": "Return to platform",
+    "exitSupportFailed": "Could not end the support session.",
     "suspendReason": "Suspension reason",
     "noTenants": "No stores yet",
     "noTenantsDescription": "Start by adding the first store to the platform.",
     "tenantCreated": "Store created",
-    "tenantUpdated": "Store updated"
+    "tenantUpdated": "Store updated",
+    "addTenantDialogDescription": "Enter the store, owner, and subscription details in one form.",
+    "editTenantDialogDescription": "Update the store details and review them before saving.",
+    "addTenantConfirmTitle": "Confirm store creation",
+    "addTenantConfirmDescription": "Create {{name}} and submit its details?",
+    "editTenantConfirmTitle": "Confirm store update",
+    "editTenantConfirmDescription": "Save the changes to {{name}}?"
   },
   "subscription": {
     "title": "Subscription & Invoices",
@@ -151,6 +205,61 @@
     "orders": "Orders",
     "storage": "Storage",
     "upgrade": "Upgrade plan",
-    "changePlan": "Change plan"
+    "changePlan": "Change plan",
+    "managementTitle": "Subscription management",
+    "managementSubtitle": "Track subscription periods and agreed payments for every store",
+    "period": "Subscription period",
+    "agreedAmount": "Agreed amount",
+    "paidAmount": "Paid amount",
+    "remainingAmount": "Remaining amount",
+    "paymentStatus": "Payment status",
+    "unpaid": "Unpaid",
+    "partial": "Partially paid",
+    "paid": "Paid",
+    "updated": "Subscription updated",
+    "editBilling": "Edit billing",
+    "sendReminder": "Send reminder",
+    "whatsappReminderMessage": "Hello {{name}} team. This is a friendly reminder that your OH Finance subscription will expire on {{date}}. Please contact us to renew and avoid any interruption. Kind regards, OH Finance team.",
+    "paymentStatuses": { "UNPAID": "Unpaid", "PARTIAL": "Partially paid", "PAID": "Paid" }
+  },
+  "staff": {
+    "title": "Managers & staff",
+    "subtitle": "Add platform accounts after email verification",
+    "add": "Add manager or employee",
+    "name": "Full name",
+    "phone": "Phone number",
+    "dateOfBirth": "Date of birth",
+    "identityNumber": "ID number",
+    "jobTitle": "Job title",
+    "role": "Job type",
+    "sendCode": "Send verification code",
+    "codeSent": "Verification code sent",
+    "verifyTitle": "Verify email",
+    "verifyHint": "Enter the 6-digit code received by the employee.",
+    "verificationCode": "Verification code",
+    "created": "Account created and temporary password sent",
+    "empty": "No additional accounts",
+    "active": "Active",
+    "inactive": "Inactive",
+    "deleted": "Account deleted",
+    "edit": "Edit manager or employee",
+    "updated": "Account details updated",
+    "editConfirmTitle": "Confirm account update",
+    "editConfirmDescription": "Save the changes to {{name}}'s account?",
+    "verifiedEmailHint": "This email is verified and cannot be changed here.",
+    "deleteTitle": "Delete manager or employee",
+    "deleteDescription": "The account for {{name}} and all active sessions will be deleted. This action cannot be undone.",
+    "disable": "Disable",
+    "enable": "Enable",
+    "statusUpdated": "Account status updated",
+    "statusConfirm": "Change the status of {{name}}'s account?",
+    "roles": { "GENERAL_MANAGER": "General manager", "MANAGER": "Manager", "EMPLOYEE": "Employee" }
+  },
+  "support": {
+    "title": "Help & support",
+    "subtitle": "Contact the OH Tech team directly",
+    "whatsappTitle": "WhatsApp support",
+    "whatsappDescription": "Open a WhatsApp conversation with our support team.",
+    "openWhatsapp": "Open WhatsApp"
   }
 }

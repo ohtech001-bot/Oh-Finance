@@ -4,7 +4,6 @@ import { BarChart3, CreditCard, Download, Printer, ShoppingBag, TrendingUp, User
 import { PAYMENT_METHOD_LABELS } from '@oh/contracts';
 import { formatMoney, type CurrencyCode } from '@oh/money';
 import {
-  Avatar,
   Button,
   Card,
   CardBody,
@@ -126,7 +125,6 @@ export function ReportsPage() {
                           <MoneyText value={c.purchases} currency={currency} tone="plain" size="sm" />
                           <div className="flex flex-1 items-center justify-end gap-2.5">
                             <span className="truncate text-[13px] font-medium text-fg">{c.name}</span>
-                            <Avatar name={c.name} size="sm" />
                             <span className="w-4 text-center text-xs text-fg-subtle">{i + 1}</span>
                           </div>
                         </Link>

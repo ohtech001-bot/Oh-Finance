@@ -4,15 +4,17 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import {
   forgotPasswordRequestSchema,
+  changePasswordRequestSchema,
   loginRequestSchema,
   type ForgotPasswordRequest,
   type LoginRequest,
+  type ChangePasswordRequest,
 } from '@oh/contracts';
 import { zodBody } from '../../core/validation/zod.pipe.js';
 import { AppError } from '../../core/errors/app-error.js';
 import { AuthService } from './auth.service.js';
 import { COOKIE_NAMES, type AccessTokenPayload } from './token.service.js';
-import { CurrentUser, Public, SkipCsrf } from './decorators.js';
+import { AllowPendingPasswordChange, CurrentUser, Public, SkipCsrf } from './decorators.js';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -71,6 +73,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @AllowPendingPasswordChange()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'إنهاء الجلسة الحالية ومسح الكوكيز.' })
   async logout(
@@ -81,9 +84,35 @@ export class AuthController {
   }
 
   @Get('me')
+  @AllowPendingPasswordChange()
   @ApiOperation({ summary: 'المستخدم الحالي وصلاحياته.' })
   async me() {
     return this.auth.me();
+  }
+
+  @Post('support/exit')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'إنهاء جلسة دعم المدير العام والعودة إلى لوحة المنصة.' })
+  async exitSupport(
+    @CurrentUser() user: AccessTokenPayload,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.auth.exitSupportSession(user, res, {
+      ip: req.ip ?? null,
+      userAgent: req.headers['user-agent'] ?? null,
+    });
+  }
+
+  @Post('change-initial-password')
+  @AllowPendingPasswordChange()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async changeInitialPassword(
+    @Body(zodBody(changePasswordRequestSchema)) dto: ChangePasswordRequest,
+    @CurrentUser() user: AccessTokenPayload,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
+    await this.auth.changeInitialPassword(user.sub, user.sid, dto, res);
   }
 
   /**
@@ -99,9 +128,7 @@ export class AuthController {
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'طلب استعادة كلمة المرور — رد موحّد لمنع تعداد المستخدمين.' })
-  async forgotPassword(
-    @Body(zodBody(forgotPasswordRequestSchema)) dto: ForgotPasswordRequest,
-  ) {
+  async forgotPassword(@Body(zodBody(forgotPasswordRequestSchema)) dto: ForgotPasswordRequest) {
     return this.auth.forgotPassword(dto.email);
   }
 }

@@ -116,11 +116,23 @@ export function SubscriptionPage() {
 
               <Row label={t('subscription.monthlyPrice')}>
                 <MoneyText
-                  value={subscription.plan.priceMonthly}
+                  value={subscription.agreedMonthlyAmount}
                   currency={currency}
                   tone="plain"
                   size="md"
                 />
+              </Row>
+
+              <Row label={t('subscription.paymentStatus')}>
+                <span className="font-medium text-fg">{t(`subscription.paymentStatuses.${subscription.paymentStatus}`)}</span>
+              </Row>
+
+              <Row label={t('subscription.paidAmount')}>
+                <MoneyText value={subscription.paidAmount} currency={currency} tone="credit" size="md" />
+              </Row>
+
+              <Row label={t('subscription.remainingAmount')}>
+                <MoneyText value={subscription.remainingAmount} currency={currency} tone="debit" size="md" />
               </Row>
 
               {subscription.trialEndsAt ? (

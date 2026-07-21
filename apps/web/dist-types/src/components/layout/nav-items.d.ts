@@ -10,6 +10,7 @@ export interface NavItem {
     phase?: string;
     /** يظهر في شريط التبويب السفلي على الموبايل. */
     mobile?: boolean;
+    children?: NavItem[];
 }
 /**
  * عناصر الشريط الجانبي — بالترتيب الظاهر في المرجع البصري.

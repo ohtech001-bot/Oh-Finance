@@ -69,7 +69,9 @@ export class JwtAuthGuard implements CanActivate {
       userId: payload.sub,
       storeId: payload.st,
       isSuperAdmin: payload.sa,
+      supportMode: payload.sup ?? false,
       permissions: payload.perms ?? [],
+      mustChangePassword: payload.pc ?? false,
     });
 
     return true;

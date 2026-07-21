@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import { join } from 'node:path';
 import { EnvValidationError } from '@oh/config';
 import { AppModule } from './app.module.js';
 import { EnvService } from './core/config/env.service.js';
@@ -17,6 +18,7 @@ async function bootstrap(): Promise<void> {
   const env = app.get(EnvService);
 
   app.setGlobalPrefix('api');
+  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/api/uploads/' });
 
   /**
    * ترويسات الأمان.

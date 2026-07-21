@@ -20,7 +20,9 @@ export class RequestContextMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction): void {
     const headerId = req.headers['x-request-id'];
     const requestId =
-      (Array.isArray(headerId) ? headerId[0] : headerId) ?? (req as { id?: string }).id ?? randomUUID();
+      (Array.isArray(headerId) ? headerId[0] : headerId) ??
+      (req as { id?: string }).id ??
+      randomUUID();
 
     res.setHeader('X-Request-Id', requestId);
 
@@ -30,7 +32,9 @@ export class RequestContextMiddleware implements NestMiddleware {
       userId: null,
       storeId: null,
       isSuperAdmin: false,
+      supportMode: false,
       permissions: [],
+      mustChangePassword: false,
       ip: req.ip ?? null,
       userAgent: req.headers['user-agent'] ?? null,
     };

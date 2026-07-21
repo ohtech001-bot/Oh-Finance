@@ -1,21 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { MoreHorizontal, Pencil, Plus, Trash2, User, Users, Wallet } from 'lucide-react';
-import {
-  CUSTOMER_STATUS_LABELS,
-  type Customer,
-  type CustomerListQuery,
-} from '@oh/contracts';
-import type { CurrencyCode } from '@oh/money';
+import { Pencil, Plus, Trash2, Users, Wallet } from 'lucide-react';
+import { type Customer, type CustomerListQuery } from '@oh/contracts';
+import { negate, toMoneyString, type CurrencyCode } from '@oh/money';
 import {
   Button,
   ConfirmDialog,
   DataTable,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   FilterBar,
   MoneyText,
   PageHeader,
@@ -24,8 +16,6 @@ import {
   SelectFilter,
   StatCard,
   StatCardsSkeleton,
-  StatusBadge,
-  ACCOUNT_STATUS_BADGE,
   toast,
   type Column,
 } from '@oh/ui';
@@ -44,14 +34,12 @@ import { CustomerFormDialog } from './customer-form-dialog';
 export function CustomersPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { can } = useAuth();
-  const { user } = useAuth();
+  const { can, user } = useAuth();
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
   const [accountState, setAccountState] = useState('');
   const [sort, setSort] = useState<{ key: string; order: 'asc' | 'desc' }>({
     key: 'createdAt',
@@ -66,7 +54,6 @@ export function CustomersPage() {
     page,
     pageSize,
     search: search || undefined,
-    status: (status || undefined) as CustomerListQuery['status'],
     accountState: (accountState || undefined) as CustomerListQuery['accountState'],
     sortBy: sort.key as CustomerListQuery['sortBy'],
     sortOrder: sort.order,
@@ -76,16 +63,17 @@ export function CustomersPage() {
   const stats = useCustomerStats();
   const archive = useArchiveCustomer();
 
-  const isFiltered = search !== '' || status !== '' || accountState !== '';
+  const isFiltered = search !== '' || accountState !== '';
   const resetFilters = () => {
     setSearch('');
-    setStatus('');
     setAccountState('');
     setPage(1);
   };
 
   const toggleSort = (key: string) =>
-    setSort((c) => (c.key === key ? { key, order: c.order === 'asc' ? 'desc' : 'asc' } : { key, order: 'desc' }));
+    setSort((c) =>
+      c.key === key ? { key, order: c.order === 'asc' ? 'desc' : 'asc' } : { key, order: 'desc' },
+    );
 
   const openAdd = () => {
     setEditing(undefined);
@@ -112,25 +100,12 @@ export function CustomersPage() {
 
   const columns: Column<Customer>[] = [
     {
-      key: 'code',
-      header: 'رقم الزبون',
-      render: (row) => (
-        <Link
-          to={`/customers/${row.id}`}
-          className="inline-flex items-center gap-2 font-semibold text-accent hover:underline"
-        >
-          <User className="size-3.5" aria-hidden />
-          {row.code}
-        </Link>
-      ),
-    },
-    {
       key: 'name',
       header: 'الاسم',
       render: (row) => (
         <div className="min-w-0">
-          <p className="truncate font-medium text-fg">{row.name}</p>
-          {row.company ? <p className="truncate text-xs text-fg-muted">{row.company}</p> : null}
+          <p className="text-fg truncate font-medium">{row.name}</p>
+          {row.company ? <p className="text-fg-muted truncate text-xs">{row.company}</p> : null}
         </div>
       ),
     },
@@ -139,7 +114,7 @@ export function CustomersPage() {
       hideBelow: 'md',
       render: (row) =>
         row.phone ? (
-          <span className="tabular-nums text-fg" dir="ltr">
+          <span className="text-fg tabular-nums" dir="ltr">
             {row.phone}
           </span>
         ) : (
@@ -155,54 +130,42 @@ export function CustomersPage() {
       key: 'balance',
       header: 'الرصيد الحالي',
       align: 'end',
-      render: (row) => <MoneyText value={row.balance} currency={currency} tone="balance" />,
-    },
-    {
-      header: 'حالة الحساب',
-      align: 'center',
-      render: (row) => {
-        const badge = ACCOUNT_STATUS_BADGE[row.accountState];
-        return <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>;
-      },
-    },
-    {
-      header: t('common.status'),
-      align: 'center',
-      hideBelow: 'xl',
       render: (row) => (
-        <span className="text-[13px] text-fg-muted">{CUSTOMER_STATUS_LABELS[row.status]}</span>
+        <MoneyText value={toMoneyString(negate(row.balance), 2)} currency={currency} tone="auto" />
       ),
     },
     {
       header: t('common.actions'),
       align: 'end',
-      width: '72px',
+      width: '112px',
       render: (row) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" aria-label={`إجراءات ${row.name}`}>
-              <MoreHorizontal />
+        <div
+          className="flex items-center justify-end gap-1"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {can('customers.write') ? (
+            <Button
+              variant="outline"
+              size="icon"
+              title="تعديل"
+              aria-label={`تعديل ${row.name}`}
+              onClick={() => openEdit(row)}
+            >
+              <Pencil aria-hidden />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => navigate(`/customers/${row.id}`)}>
-              <User />
-              فتح الملف
-            </DropdownMenuItem>
-            {can('customers.write') ? (
-              <DropdownMenuItem onClick={() => openEdit(row)}>
-                <Pencil />
-                تعديل
-              </DropdownMenuItem>
-            ) : null}
-            {can('customers.delete') ? (
-              <DropdownMenuItem destructive onClick={() => setArchiveTarget(row)}>
-                <Trash2 />
-                أرشفة
-              </DropdownMenuItem>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
+          ) : null}
+          {can('customers.delete') ? (
+            <Button
+              variant="outline"
+              size="icon"
+              title="أرشفة"
+              aria-label={`أرشفة ${row.name}`}
+              onClick={() => setArchiveTarget(row)}
+            >
+              <Trash2 className="text-danger" aria-hidden />
+            </Button>
+          ) : null}
+        </div>
       ),
     },
   ];
@@ -226,11 +189,10 @@ export function CustomersPage() {
 
       {/* بطاقات الإحصاء */}
       {stats.isLoading ? (
-        <StatCardsSkeleton count={4} />
+        <StatCardsSkeleton count={3} />
       ) : stats.data ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <StatCard label="إجمالي الزبائن" value={stats.data.total} icon={Users} tone="accent" />
-          <StatCard label="الزبائن النشطون" value={stats.data.active} icon={User} tone="credit" />
           <StatCard
             label="إجمالي الديون"
             money={stats.data.totalDebt}
@@ -256,7 +218,7 @@ export function CustomersPage() {
             setSearch(v);
             setPage(1);
           }}
-          placeholder="ابحث بالاسم أو الرقم أو الهاتف…"
+          placeholder="ابحث بالاسم أو الهاتف…"
         />
         <SelectFilter
           value={accountState}
@@ -272,20 +234,6 @@ export function CustomersPage() {
             { value: 'SETTLED', label: 'لا يوجد رصيد' },
           ]}
         />
-        <SelectFilter
-          value={status}
-          onChange={(v) => {
-            setStatus(v);
-            setPage(1);
-          }}
-          allLabel="كل الحالات"
-          label={t('common.status')}
-          options={[
-            { value: 'ACTIVE', label: 'نشط' },
-            { value: 'INACTIVE', label: 'غير نشط' },
-            { value: 'BLOCKED', label: 'محظور' },
-          ]}
-        />
       </FilterBar>
 
       <div>
@@ -299,8 +247,11 @@ export function CustomersPage() {
             list.isError
               ? {
                   message:
-                    list.error instanceof ApiRequestError ? list.error.message : 'تعذّر تحميل الزبائن.',
-                  requestId: list.error instanceof ApiRequestError ? list.error.requestId : undefined,
+                    list.error instanceof ApiRequestError
+                      ? list.error.message
+                      : 'تعذّر تحميل الزبائن.',
+                  requestId:
+                    list.error instanceof ApiRequestError ? list.error.requestId : undefined,
                 }
               : null
           }
@@ -310,15 +261,18 @@ export function CustomersPage() {
           empty={{
             title: 'لا يوجد زبائن بعد',
             description: 'ابدأ بإضافة أول زبون إلى محلك.',
-            action: can('customers.write') ? { label: 'إضافة زبون جديد', onClick: openAdd } : undefined,
+            action: can('customers.write')
+              ? { label: 'إضافة زبون جديد', onClick: openAdd }
+              : undefined,
           }}
           sort={sort}
           onSortChange={toggleSort}
           onRowClick={(row) => navigate(`/customers/${row.id}`)}
+          rowClassName={(row) => (row.accountState === 'DEBIT' ? 'bg-danger-soft' : undefined)}
         />
 
         {list.data && list.data.total > 0 ? (
-          <div className="rounded-b-card border-x border-b border-border bg-card">
+          <div className="rounded-b-card border-border bg-card border-x border-b">
             <Pagination
               page={list.data.page}
               pageSize={list.data.pageSize}

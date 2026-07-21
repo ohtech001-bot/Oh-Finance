@@ -10,6 +10,8 @@ import { PERMISSIONS, PLATFORM_PERMISSIONS, type Permission } from './permission
 
 export const ROLES = {
   SUPER_ADMIN: 'SUPER_ADMIN',
+  PLATFORM_MANAGER: 'PLATFORM_MANAGER',
+  PLATFORM_EMPLOYEE: 'PLATFORM_EMPLOYEE',
   OWNER: 'OWNER',
   MANAGER: 'MANAGER',
   CASHIER: 'CASHIER',
@@ -24,6 +26,12 @@ export const TENANT_ROLES: RoleName[] = [
   ROLES.MANAGER,
   ROLES.CASHIER,
   ROLES.VIEWER,
+];
+
+export const PLATFORM_ROLES: RoleName[] = [
+  ROLES.SUPER_ADMIN,
+  ROLES.PLATFORM_MANAGER,
+  ROLES.PLATFORM_EMPLOYEE,
 ];
 
 const P = PERMISSIONS;
@@ -88,6 +96,19 @@ const VIEWER_PERMISSIONS: Permission[] = [
 
 export const ROLE_PERMISSIONS: Record<RoleName, Permission[]> = {
   SUPER_ADMIN: [...PLATFORM_PERMISSIONS],
+  PLATFORM_MANAGER: [
+    P.PLATFORM_TENANTS_READ,
+    P.PLATFORM_TENANTS_MANAGE,
+    P.PLATFORM_PLANS_READ,
+    P.PLATFORM_SUBSCRIPTIONS_READ,
+    P.PLATFORM_SUBSCRIPTIONS_MANAGE,
+    P.PLATFORM_STAFF_READ,
+  ],
+  PLATFORM_EMPLOYEE: [
+    P.PLATFORM_TENANTS_READ,
+    P.PLATFORM_SUBSCRIPTIONS_READ,
+    P.PLATFORM_STAFF_READ,
+  ],
   OWNER: OWNER_PERMISSIONS,
   MANAGER: MANAGER_PERMISSIONS,
   CASHIER: CASHIER_PERMISSIONS,
@@ -96,6 +117,8 @@ export const ROLE_PERMISSIONS: Record<RoleName, Permission[]> = {
 
 export const ROLE_LABELS: Record<RoleName, { ar: string; he: string; en: string }> = {
   SUPER_ADMIN: { ar: 'المدير العام', he: 'מנהל ראשי', en: 'Super Admin' },
+  PLATFORM_MANAGER: { ar: 'مدير', he: 'מנהל', en: 'Manager' },
+  PLATFORM_EMPLOYEE: { ar: 'موظف', he: 'עובד', en: 'Employee' },
   OWNER: { ar: 'صاحب المحل', he: 'בעל החנות', en: 'Owner' },
   MANAGER: { ar: 'مدير', he: 'מנהל', en: 'Manager' },
   CASHIER: { ar: 'كاشير', he: 'קופאי', en: 'Cashier' },
@@ -104,6 +127,8 @@ export const ROLE_LABELS: Record<RoleName, { ar: string; he: string; en: string 
 
 export const ROLE_DESCRIPTIONS: Record<RoleName, string> = {
   SUPER_ADMIN: 'يدير المحلات والباقات والاشتراكات. لا يصل إلى بيانات أعمال أي محل.',
+  PLATFORM_MANAGER: 'يدير أعمال المنصة اليومية ضمن الصلاحيات الممنوحة له.',
+  PLATFORM_EMPLOYEE: 'يقرأ بيانات التشغيل المسموح بها ويتواصل مع الدعم.',
   OWNER: 'صلاحيات كاملة داخل المحل، بما فيها عكس الدفعات وقيود التصحيح.',
   MANAGER: 'تشغيل كامل بلا عمليات مالية عكسية ولا إدارة موظفين أو إعدادات.',
   CASHIER: 'إنشاء الطلبات وتسجيل الدفعات. لا يلغي ولا يعكس ولا يرى التقارير.',
@@ -116,5 +141,5 @@ export function permissionsForRole(role: RoleName): Permission[] {
 
 /** هل هذا الدور دور منصة (خارج أي مستأجر)؟ */
 export function isPlatformRole(role: RoleName): boolean {
-  return role === ROLES.SUPER_ADMIN;
+  return PLATFORM_ROLES.includes(role);
 }

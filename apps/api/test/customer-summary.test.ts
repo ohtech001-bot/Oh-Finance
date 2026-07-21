@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type { CreateOrderRequest } from '@oh/contracts';
+import type { CreateCustomerRequest, CreateOrderRequest } from '@oh/contracts';
 import { HAS_TEST_DB, SKIP_REASON, closeTestDb, testDb } from './db.js';
 import { createTestCustomer, createTestTenant, resetAll, type TestTenant } from './helpers.js';
 import { CustomersService } from '../src/modules/customers/customers.service.js';
@@ -71,6 +71,24 @@ function orderPayload(
 
 const daysAgo = (n: number): string => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
 
+function customerPayload(name: string, openingBalance: string): CreateCustomerRequest {
+  return {
+    name,
+    company: '',
+    phone: '',
+    email: '',
+    address: '',
+    city: '',
+    taxNumber: '',
+    notes: '',
+    tags: [],
+    creditLimit: '1500',
+    paymentTermDays: 30,
+    status: 'ACTIVE',
+    openingBalance,
+  };
+}
+
 describe.skipIf(!HAS_TEST_DB)('ملخّص الزبون', () => {
   let t: TestTenant;
   let customers: CustomersService;
@@ -101,6 +119,16 @@ describe.skipIf(!HAS_TEST_DB)('ملخّص الزبون', () => {
                      order_items, orders, customers, tenant_counters
       RESTART IDENTITY CASCADE
     `);
+  });
+
+  it('يفسر الرصيد الافتتاحي الموجب كرصيد للزبون والسالب كدين عليه', async () => {
+    const credited = await asUser(t, () => customers.create(customerPayload('رصيد موجب', '500')));
+    const indebted = await asUser(t, () => customers.create(customerPayload('رصيد سالب', '-350')));
+
+    expect(credited.balance).toBe('-500.00');
+    expect(credited.accountState).toBe('CREDIT');
+    expect(indebted.balance).toBe('350.00');
+    expect(indebted.accountState).toBe('DEBIT');
   });
 
   it('زبون جديد بلا نشاط: صحّة ممتازة، متوسط سداد null', async () => {

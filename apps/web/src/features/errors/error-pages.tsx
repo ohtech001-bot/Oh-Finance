@@ -1,8 +1,9 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { Component, useState, type ErrorInfo, type ReactNode } from 'react';
 import { Link, useNavigate, useRouteError } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AlertOctagon, FileQuestion, Home, RefreshCw, ShieldX } from 'lucide-react';
-import { Button } from '@oh/ui';
+import { Button, toast } from '@oh/ui';
+import { useOptionalAuth } from '@/app/auth-context';
 
 interface ErrorPageShellProps {
   icon: React.ComponentType<{ className?: string }>;
@@ -72,6 +73,26 @@ export function NotFoundPage() {
 export function ForbiddenPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const auth = useOptionalAuth();
+  const user = auth?.user;
+  const [isExiting, setIsExiting] = useState(false);
+
+  const goToCorrectHome = async () => {
+    if (isExiting) return;
+    if (user?.supportMode) {
+      setIsExiting(true);
+      try {
+        await auth?.exitTenantSupport();
+        navigate('/platform/tenants', { replace: true });
+      } catch {
+        toast.error(t('platform.exitSupportFailed'));
+      } finally {
+        setIsExiting(false);
+      }
+      return;
+    }
+    navigate(user?.isSuperAdmin ? '/platform' : '/', { replace: true });
+  };
 
   return (
     <ErrorPageShell
@@ -81,11 +102,11 @@ export function ForbiddenPage() {
       description={t('errors.forbiddenDescription')}
       tone="danger"
     >
-      <Button variant="brand" onClick={() => navigate('/')}>
+      <Button variant="brand" loading={isExiting} onClick={() => void goToCorrectHome()}>
         <Home aria-hidden />
         {t('errors.goHome')}
       </Button>
-      <Button variant="outline" onClick={() => navigate(-1)}>
+      <Button variant="outline" disabled={isExiting} onClick={() => void goToCorrectHome()}>
         {t('common.back')}
       </Button>
     </ErrorPageShell>

@@ -9,6 +9,7 @@ import type {
   OrderStats,
   OrderTotals,
   PaginatedResult,
+  UpdateOrderRequest,
 } from '@oh/contracts';
 import { api, buildQuery } from '@/lib/api';
 
@@ -25,7 +26,8 @@ export function useOrders(query: Partial<OrderListQuery>) {
 export function useOrderStats(query: Partial<OrderListQuery>) {
   return useQuery({
     queryKey: [KEY, 'stats', query],
-    queryFn: () => api.get<OrderStats>(`/orders/stats${buildQuery(query as Record<string, string>)}`),
+    queryFn: () =>
+      api.get<OrderStats>(`/orders/stats${buildQuery(query as Record<string, string>)}`),
   });
 }
 
@@ -46,6 +48,14 @@ export function useCreateOrder() {
       void qc.invalidateQueries({ queryKey: ['customers'] });
       void qc.invalidateQueries({ queryKey: ['ledger'] });
     },
+  });
+}
+
+export function useUpdateOrder(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: UpdateOrderRequest) => api.patch<OrderDetail>(`/orders/${id}`, body),
+    onSuccess: () => invalidateOrderScope(qc),
   });
 }
 

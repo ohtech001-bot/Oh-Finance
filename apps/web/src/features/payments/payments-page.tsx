@@ -1,13 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Banknote, Building2, CreditCard, MoreHorizontal, Plus, Undo2, Wallet } from 'lucide-react';
-import {
-  PAYMENT_METHOD_LABELS,
-  type Payment,
-  type PaymentListQuery,
-  type PaymentMethod,
-} from '@oh/contracts';
+import { Banknote, Plus, Undo2, Wallet } from 'lucide-react';
+import { PAYMENT_METHOD_LABELS, type Payment, type PaymentListQuery } from '@oh/contracts';
 import type { CurrencyCode } from '@oh/money';
 import {
   Button,
@@ -20,10 +15,6 @@ import {
   DialogHeader,
   DialogTitle,
   DateRangeFilter,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   Field,
   FilterBar,
   Input,
@@ -31,7 +22,6 @@ import {
   PageHeader,
   Pagination,
   SearchFilter,
-  SelectFilter,
   StatCard,
   StatCardsSkeleton,
   StatusBadge,
@@ -43,13 +33,6 @@ import { useAuth } from '@/app/auth-context';
 import { usePayments, usePaymentStats, useReversePayment } from './api';
 import { RecordPaymentDialog } from './record-payment-dialog';
 
-const METHOD_TONE: Record<PaymentMethod, 'credit' | 'info' | 'partial' | 'purple'> = {
-  CASH: 'credit',
-  BANK_TRANSFER: 'info',
-  CARD: 'partial',
-  CHECK: 'purple',
-};
-
 export function PaymentsPage() {
   const { t } = useTranslation();
   const { user, can } = useAuth();
@@ -58,7 +41,6 @@ export function PaymentsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
-  const [method, setMethod] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
 
@@ -80,7 +62,6 @@ export function PaymentsPage() {
     page,
     pageSize,
     search: search || undefined,
-    method: (method || undefined) as PaymentListQuery['method'],
     from: from || undefined,
     to: to || undefined,
   };
@@ -89,10 +70,9 @@ export function PaymentsPage() {
   const stats = usePaymentStats({ from: from || undefined, to: to || undefined });
   const reverse = useReversePayment(reverseTarget?.id ?? '');
 
-  const isFiltered = search !== '' || method !== '' || from !== '' || to !== '';
+  const isFiltered = search !== '' || from !== '' || to !== '';
   const resetFilters = () => {
     setSearch('');
-    setMethod('');
     setFrom('');
     setTo('');
     setPage(1);
@@ -120,14 +100,14 @@ export function PaymentsPage() {
     {
       key: 'number',
       header: 'رقم الدفعة',
-      render: (row) => <span className="font-semibold text-accent">{row.number}</span>,
+      render: (row) => <span className="text-accent font-semibold">{row.number}</span>,
     },
     {
       header: 'الزبون',
       render: (row) => (
         <Link to={`/customers/${row.customerId}`} className="min-w-0 hover:underline">
-          <p className="truncate text-sm text-fg">{row.customerName}</p>
-          <p className="truncate text-xs text-fg-muted">{row.customerCode}</p>
+          <p className="text-fg truncate text-sm">{row.customerName}</p>
+          <p className="text-fg-muted truncate text-xs">{row.customerCode}</p>
         </Link>
       ),
     },
@@ -139,10 +119,10 @@ export function PaymentsPage() {
         const d = new Date(row.paidAt);
         return (
           <div className="text-[13px]">
-            <p className="tabular-nums text-fg" dir="ltr">
+            <p className="text-fg tabular-nums" dir="ltr">
               {row.paidAt.slice(0, 10)}
             </p>
-            <p className="tabular-nums text-fg-muted" dir="ltr">
+            <p className="text-fg-muted tabular-nums" dir="ltr">
               {d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
@@ -152,7 +132,7 @@ export function PaymentsPage() {
     {
       header: 'طريقة الدفع',
       align: 'center',
-      render: (row) => <StatusBadge tone={METHOD_TONE[row.method]}>{PAYMENT_METHOD_LABELS[row.method]}</StatusBadge>,
+      render: (row) => <StatusBadge tone="credit">{PAYMENT_METHOD_LABELS[row.method]}</StatusBadge>,
     },
     {
       key: 'amount',
@@ -164,32 +144,22 @@ export function PaymentsPage() {
       header: 'الرصيد قبل',
       align: 'end',
       hideBelow: 'lg',
-      render: (row) => <MoneyText value={row.balanceBefore} currency={currency} tone="balance" withSymbol={false} />,
+      render: (row) => (
+        <MoneyText
+          value={row.balanceBefore}
+          currency={currency}
+          tone="balance"
+          withSymbol={false}
+        />
+      ),
     },
     {
       header: 'الرصيد بعد',
       align: 'end',
       hideBelow: 'lg',
-      render: (row) => <MoneyText value={row.balanceAfter} currency={currency} tone="balance" withSymbol={false} />,
-    },
-    {
-      header: 'مربوطة بـ',
-      hideBelow: 'xl',
-      render: (row) =>
-        row.allocations.length ? (
-          <div className="flex flex-col gap-0.5">
-            {row.allocations.slice(0, 2).map((a) => (
-              <span key={a.orderId} className="text-xs text-accent">
-                {a.orderNumber}
-              </span>
-            ))}
-            {row.allocations.length > 2 ? (
-              <span className="text-xs text-fg-muted">+{row.allocations.length - 2}</span>
-            ) : null}
-          </div>
-        ) : (
-          <span className="text-xs text-fg-subtle">دفعة مقدّمة</span>
-        ),
+      render: (row) => (
+        <MoneyText value={row.balanceAfter} currency={currency} tone="balance" withSymbol={false} />
+      ),
     },
     {
       header: t('common.status'),
@@ -204,22 +174,13 @@ export function PaymentsPage() {
     {
       header: t('common.actions'),
       align: 'end',
-      width: '72px',
+      width: '130px',
       render: (row) =>
         can('payments.reverse') && row.status === 'POSTED' ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" aria-label={`إجراءات ${row.number}`}>
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem destructive onClick={() => setReverseTarget(row)}>
-                <Undo2 />
-                عكس الدفعة
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button variant="outline" size="sm" onClick={() => setReverseTarget(row)}>
+            <Undo2 className="text-danger" aria-hidden />
+            عكس الدفعة
+          </Button>
         ) : (
           <span className="text-fg-subtle">—</span>
         ),
@@ -246,9 +207,9 @@ export function PaymentsPage() {
       />
 
       {stats.isLoading ? (
-        <StatCardsSkeleton count={4} />
+        <StatCardsSkeleton count={2} />
       ) : s ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <StatCard
             label="إجمالي المدفوعات"
             money={s.totalAmount}
@@ -266,22 +227,6 @@ export function PaymentsPage() {
             tone="credit"
             sublabel={`${s.byMethod.CASH.count} دفعة`}
           />
-          <StatCard
-            label="التحويلات البنكية"
-            money={s.byMethod.BANK_TRANSFER.amount}
-            currency={currency}
-            icon={Building2}
-            tone="info"
-            sublabel={`${s.byMethod.BANK_TRANSFER.count} دفعة`}
-          />
-          <StatCard
-            label="المتوسط اليومي"
-            money={s.dailyAverage}
-            currency={currency}
-            icon={CreditCard}
-            tone="purple"
-            sublabel="هذا الشهر"
-          />
         </div>
       ) : null}
 
@@ -293,16 +238,6 @@ export function PaymentsPage() {
             setPage(1);
           }}
           placeholder="ابحث برقم الدفعة أو الزبون…"
-        />
-        <SelectFilter
-          value={method}
-          onChange={(v) => {
-            setMethod(v);
-            setPage(1);
-          }}
-          allLabel="كل الطرق"
-          label="طريقة الدفع"
-          options={Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => ({ value, label }))}
         />
         <DateRangeFilter
           from={from}
@@ -329,8 +264,11 @@ export function PaymentsPage() {
             list.isError
               ? {
                   message:
-                    list.error instanceof ApiRequestError ? list.error.message : 'تعذّر تحميل الدفعات.',
-                  requestId: list.error instanceof ApiRequestError ? list.error.requestId : undefined,
+                    list.error instanceof ApiRequestError
+                      ? list.error.message
+                      : 'تعذّر تحميل الدفعات.',
+                  requestId:
+                    list.error instanceof ApiRequestError ? list.error.requestId : undefined,
                 }
               : null
           }
@@ -340,12 +278,14 @@ export function PaymentsPage() {
           empty={{
             title: 'لا توجد دفعات بعد',
             description: 'سجّل أول دفعة من زبائنك.',
-            action: can('payments.create') ? { label: 'تسجيل دفعة', onClick: () => setRecordOpen(true) } : undefined,
+            action: can('payments.create')
+              ? { label: 'تسجيل دفعة', onClick: () => setRecordOpen(true) }
+              : undefined,
           }}
         />
 
         {list.data && list.data.total > 0 ? (
-          <div className="rounded-b-card border-x border-b border-border bg-card">
+          <div className="rounded-b-card border-border bg-card border-x border-b">
             <Pagination
               page={list.data.page}
               pageSize={list.data.pageSize}
@@ -379,14 +319,18 @@ export function PaymentsPage() {
             <DialogTitle>عكس الدفعة {reverseTarget?.number}</DialogTitle>
           </DialogHeader>
           <DialogBody>
-            <p className="mb-4 text-sm text-fg-muted">
-              يُنشأ قيد عكس مضاد، وتُعاد الطلبات المرتبطة إلى حالتها. الدفعة تبقى
-              مرئية بحالة «معكوسة» — لا تُحذف.
+            <p className="text-fg-muted mb-4 text-sm">
+              يُنشأ قيد عكس مضاد يعيد أثر الدفعة على رصيد الزبون. تبقى الدفعة مرئية بحالة «معكوسة»
+              ولا تُحذف.
             </p>
             <Field
               label="سبب العكس"
               hint="يُسجَّل في سجل التدقيق."
-              error={reverseReason.length > 0 && reverseReason.trim().length < 5 ? '5 أحرف على الأقل.' : undefined}
+              error={
+                reverseReason.length > 0 && reverseReason.trim().length < 5
+                  ? '5 أحرف على الأقل.'
+                  : undefined
+              }
               required
             >
               {(p) => (

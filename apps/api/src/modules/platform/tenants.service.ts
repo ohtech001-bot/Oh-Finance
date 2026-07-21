@@ -1,4 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import {
   AUDIT_ACTIONS,
   type CreateTenantRequest,
@@ -59,15 +62,22 @@ export class TenantsService {
     if (!plan) throw AppError.notFound('الباقة');
     if (!plan.isActive) throw AppError.validation('الباقة غير مفعّلة.');
 
+    const agreedMonthlyAmount = plan.priceMonthly.toString();
+    const paidAmount = Number(dto.paidAmount);
+    const agreed = Number(agreedMonthlyAmount);
+    const paymentIsValid =
+      (dto.paymentStatus === 'UNPAID' && paidAmount === 0) ||
+      (dto.paymentStatus === 'PAID' && paidAmount === agreed) ||
+      (dto.paymentStatus === 'PARTIAL' && paidAmount > 0 && paidAmount < agreed);
+    if (!paymentIsValid) throw AppError.validation('المبلغ المدفوع لا يطابق حالة السداد.');
+
+    const slug = `store-${randomUUID().slice(0, 12)}`;
+    const logoUrl = dto.logoDataUrl ? await this.saveLogo(dto.logoDataUrl) : null;
+
     const passwordHash = await this.passwords.hash(dto.ownerPassword);
 
     const tenantId = await this.prisma.runAsPlatform(async (tx) => {
       // ── تفرّد المعرّف والبريد ──────────────────────────────────────────
-      const existingSlug = await tx.tenant.findUnique({ where: { slug: dto.slug } });
-      if (existingSlug) {
-        throw AppError.conflict(`المعرّف "${dto.slug}" مستخدم لمحل آخر.`);
-      }
-
       const existingEmail = await tx.user.findUnique({ where: { email: dto.ownerEmail } });
       if (existingEmail) {
         throw AppError.conflict('البريد الإلكتروني مستخدم لحساب آخر.');
@@ -77,11 +87,11 @@ export class TenantsService {
       const tenant = await tx.tenant.create({
         data: {
           name: dto.name,
-          slug: dto.slug,
+          slug,
           locale: dto.locale,
           currency: dto.currency,
           timezone: dto.timezone,
-          status: dto.trialDays > 0 ? 'TRIAL' : 'ACTIVE',
+          status: 'ACTIVE',
         },
       });
 
@@ -91,13 +101,14 @@ export class TenantsService {
         data: {
           tenantId: tenant.id,
           code: storeCode,
-          name: dto.storeName,
+          name: dto.name,
           phone: dto.storePhone || null,
           email: dto.storeEmail || null,
           address: dto.storeAddress || null,
           city: dto.storeCity || null,
           currency: dto.currency,
-          settings: {},
+          logoUrl,
+          settings: dto.websiteUrl ? { websiteUrl: dto.websiteUrl } : {},
         },
       });
 
@@ -163,24 +174,20 @@ export class TenantsService {
       });
 
       // ── 6) الاشتراك ────────────────────────────────────────────────────
-      const now = new Date();
-      const periodEnd = new Date(now);
-      periodEnd.setMonth(periodEnd.getMonth() + 1);
-
-      const trialEndsAt =
-        dto.trialDays > 0
-          ? new Date(now.getTime() + dto.trialDays * 24 * 60 * 60 * 1000)
-          : null;
+      const periodStart = new Date(`${dto.subscriptionStartDate}T00:00:00.000Z`);
+      const periodEnd = new Date(`${dto.subscriptionEndDate}T23:59:59.999Z`);
 
       await tx.subscription.create({
         data: {
           tenantId: tenant.id,
           planId: plan.id,
-          status: dto.trialDays > 0 ? 'TRIALING' : 'ACTIVE',
-          startedAt: now,
-          currentPeriodStart: now,
-          currentPeriodEnd: trialEndsAt ?? periodEnd,
-          trialEndsAt,
+          status: 'ACTIVE',
+          startedAt: periodStart,
+          currentPeriodStart: periodStart,
+          currentPeriodEnd: periodEnd,
+          agreedMonthlyAmount,
+          paidAmount: dto.paidAmount,
+          paymentStatus: dto.paymentStatus,
         },
       });
 
@@ -193,12 +200,15 @@ export class TenantsService {
         tenantId: null, // حدث منصة
         after: {
           tenantId: tenant.id,
-          slug: dto.slug,
+          slug,
           storeCode,
           ownerEmail: dto.ownerEmail,
           ownerId: owner.id,
           planCode: plan.code,
-          trialDays: dto.trialDays,
+          subscriptionStartDate: dto.subscriptionStartDate,
+          subscriptionEndDate: dto.subscriptionEndDate,
+          agreedMonthlyAmount,
+          paymentStatus: dto.paymentStatus,
         },
         actor: { id: null, name: actorName },
       });
@@ -206,7 +216,7 @@ export class TenantsService {
       return tenant.id;
     });
 
-    this.logger.log({ tenantId, slug: dto.slug }, 'أُنشئ محل جديد.');
+    this.logger.log({ tenantId, slug }, 'أُنشئ محل جديد.');
 
     const detail = await this.findOne(tenantId);
     if (!detail) throw AppError.internal('تعذّر قراءة المحل بعد إنشائه.');
@@ -341,7 +351,11 @@ export class TenantsService {
           code: store.code,
           name: store.name,
           phone: store.phone,
+          email: store.email,
+          address: store.address,
           city: store.city,
+          logoUrl: store.logoUrl,
+          websiteUrl: this.websiteUrlFromSettings(store.settings),
           currency: store.currency,
           isActive: store.isActive,
           branchCount: store._count.branches,
@@ -355,7 +369,42 @@ export class TenantsService {
       const before = await tx.tenant.findUnique({ where: { id } });
       if (!before) throw AppError.notFound('المحل');
 
-      const after = await tx.tenant.update({ where: { id }, data: dto });
+      const {
+        storePhone,
+        storeEmail,
+        storeAddress,
+        storeCity,
+        websiteUrl,
+        logoDataUrl,
+        ...tenantData
+      } = dto;
+      const after = await tx.tenant.update({ where: { id }, data: tenantData });
+      const primaryStore = await tx.store.findFirst({
+        where: { tenantId: id },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, settings: true },
+      });
+      if (primaryStore) {
+        await tx.store.update({
+          where: { id: primaryStore.id },
+          data: {
+            name: dto.name,
+            phone: storePhone === undefined ? undefined : storePhone || null,
+            email: storeEmail === undefined ? undefined : storeEmail || null,
+            address: storeAddress === undefined ? undefined : storeAddress || null,
+            city: storeCity === undefined ? undefined : storeCity || null,
+            logoUrl: logoDataUrl ? await this.saveLogo(logoDataUrl) : undefined,
+            settings:
+              websiteUrl === undefined
+                ? undefined
+                : {
+                    ...this.settingsObject(primaryStore.settings),
+                    websiteUrl: websiteUrl || null,
+                  },
+            currency: dto.currency,
+          },
+        });
+      }
 
       await this.audit.record(tx, {
         action: AUDIT_ACTIONS.TENANT_UPDATED,
@@ -372,6 +421,30 @@ export class TenantsService {
     const detail = await this.findOne(id);
     if (!detail) throw AppError.notFound('المحل');
     return detail;
+  }
+
+  private async saveLogo(dataUrl: string): Promise<string> {
+    const match = /^data:image\/(png|jpeg|webp);base64,(.+)$/.exec(dataUrl);
+    if (!match?.[1] || !match[2]) throw AppError.validation('صيغة الشعار غير مدعومة.');
+    const extension = match[1] === 'jpeg' ? 'jpg' : match[1];
+    const bytes = Buffer.from(match[2], 'base64');
+    if (bytes.length > 5 * 1024 * 1024) throw AppError.validation('حجم الشعار يجب ألا يتجاوز 5 ميجابايت.');
+    const directory = join(process.cwd(), 'uploads', 'store-logos');
+    await mkdir(directory, { recursive: true });
+    const filename = `${randomUUID()}.${extension}`;
+    await writeFile(join(directory, filename), bytes);
+    return `/api/uploads/store-logos/${filename}`;
+  }
+
+  private settingsObject(value: Prisma.JsonValue): Record<string, Prisma.JsonValue> {
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, Prisma.JsonValue>)
+      : {};
+  }
+
+  private websiteUrlFromSettings(value: Prisma.JsonValue): string | null {
+    const websiteUrl = this.settingsObject(value).websiteUrl;
+    return typeof websiteUrl === 'string' && websiteUrl ? websiteUrl : null;
   }
 
   /**
@@ -439,14 +512,14 @@ export class TenantsService {
         tx.user.count({ where: { isSuperAdmin: false } }),
         tx.subscription.findMany({
           where: { status: 'ACTIVE' },
-          select: { plan: { select: { priceMonthly: true, currency: true } } },
+          select: { agreedMonthlyAmount: true, plan: { select: { currency: true } } },
         }),
         tx.tenant.count({ where: { createdAt: { gte: monthStart } } }),
       ]);
 
       // الإيراد الشهري المتكرر — بـDecimal، لا بجمع أرقام عائمة.
       const mrr = activeSubs.length
-        ? sum(activeSubs.map((s) => s.plan.priceMonthly.toString()))
+        ? sum(activeSubs.map((s) => s.agreedMonthlyAmount.toString()))
         : zero();
 
       return {

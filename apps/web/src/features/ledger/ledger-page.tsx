@@ -2,12 +2,8 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Download, ListOrdered, Printer } from 'lucide-react';
-import {
-  LEDGER_TYPE_LABELS,
-  type LedgerEntry,
-  type LedgerListQuery,
-} from '@oh/contracts';
-import type { CurrencyCode } from '@oh/money';
+import { LEDGER_TYPE_LABELS, type LedgerEntry, type LedgerListQuery } from '@oh/contracts';
+import { negate, toMoneyString, type CurrencyCode } from '@oh/money';
 import {
   Button,
   Card,
@@ -25,6 +21,7 @@ import {
   type Column,
 } from '@oh/ui';
 import { ApiRequestError } from '@/lib/api';
+import { currentLocale } from '@/lib/i18n';
 import { useAuth } from '@/app/auth-context';
 import { fetchAllLedger, useLedger } from './api';
 import { exportLedgerCsv, printLedger } from './export';
@@ -75,6 +72,8 @@ export function LedgerPage() {
 
   const list = useLedger(query);
   const totals = list.data?.totals;
+  const customerName = list.data?.items[0]?.customerName;
+  const locale = currentLocale();
 
   const [busy, setBusy] = useState<'csv' | 'print' | null>(null);
 
@@ -106,17 +105,22 @@ export function LedgerPage() {
     setPage(1);
   };
 
-  const columns: Column<LedgerEntry>[] = [
+  const allColumns: Column<LedgerEntry>[] = [
     {
       header: 'التاريخ والوقت',
       render: (row) => {
         const d = new Date(row.occurredAt);
         return (
           <div className="text-[13px]">
-            <p className="tabular-nums text-fg" dir="ltr">
-              {row.occurredAt.slice(0, 10)}
+            <p className="text-fg">
+              {new Intl.DateTimeFormat(locale, {
+                weekday: 'long',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+              }).format(d)}
             </p>
-            <p className="tabular-nums text-fg-muted" dir="ltr">
+            <p className="text-fg-muted tabular-nums" dir="ltr">
               {d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
@@ -132,12 +136,12 @@ export function LedgerPage() {
       ),
     },
     {
+      key: 'customer',
       header: 'الزبون',
       hideBelow: 'lg',
       render: (row) => (
         <div className="min-w-0">
-          <p className="truncate text-sm text-fg">{row.customerName}</p>
-          <p className="truncate text-xs text-fg-muted">{row.customerCode}</p>
+          <p className="text-fg truncate text-sm">{row.customerName}</p>
         </div>
       ),
     },
@@ -146,7 +150,7 @@ export function LedgerPage() {
       hideBelow: 'md',
       render: (row) =>
         row.refNumber ? (
-          <span className="font-medium text-accent">{row.refNumber}</span>
+          <span className="text-accent font-medium">{row.refNumber}</span>
         ) : (
           <span className="text-fg-subtle">—</span>
         ),
@@ -155,7 +159,7 @@ export function LedgerPage() {
       header: 'التفاصيل',
       hideBelow: 'xl',
       render: (row) => (
-        <span className="line-clamp-1 text-[13px] text-fg-muted">{row.notes ?? '—'}</span>
+        <span className="text-fg-muted line-clamp-1 text-[13px]">{row.notes ?? '—'}</span>
       ),
     },
     {
@@ -183,16 +187,24 @@ export function LedgerPage() {
       align: 'end',
       render: (row) => (
         <span className={row.isReversed ? 'line-through opacity-50' : ''}>
-          <MoneyText value={row.runningBalance} currency={currency} tone="balance" withSymbol={false} />
+          <MoneyText
+            value={customerId ? toMoneyString(negate(row.runningBalance), 2) : row.runningBalance}
+            currency={currency}
+            tone={customerId ? 'auto' : 'balance'}
+            withSymbol={false}
+          />
         </span>
       ),
     },
   ];
+  const columns = customerId
+    ? allColumns.filter((column) => column.key !== 'customer')
+    : allColumns;
 
   return (
     <div className="space-y-5">
       <PageHeader
-        title={t('nav.ledger')}
+        title={customerId && customerName ? `كشف حساب ${customerName}` : t('nav.ledger')}
         icon={ListOrdered}
         breadcrumbs={[{ label: t('nav.dashboard'), href: '/' }, { label: t('nav.ledger') }]}
         linkAs={Link}
@@ -220,16 +232,29 @@ export function LedgerPage() {
         }
       />
 
-      {customerId && list.data?.items[0] ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-accent/30 bg-accent-soft px-4 py-2.5">
-          <p className="text-sm text-fg">
-            كشف حساب: <span className="font-semibold">{list.data.items[0].customerName}</span>{' '}
-            <span className="text-fg-muted">({list.data.items[0].customerCode})</span>
-          </p>
-          <Link to="/ledger" className="text-[13px] font-medium text-accent hover:underline">
-            عرض كل الحركات
-          </Link>
-        </div>
+      {customerId && totals && list.data && list.data.total > 0 ? (
+        <Card>
+          <CardBody className="grid grid-cols-1 gap-6 py-5 text-center sm:grid-cols-3">
+            <Totals
+              label="إجمالي الدين"
+              value={totals.totalDebit}
+              tone="debit"
+              currency={currency}
+            />
+            <Totals
+              label="مدفوع حتى الآن"
+              value={totals.totalCredit}
+              tone="credit"
+              currency={currency}
+            />
+            <Totals
+              label="الرصيد الحالي"
+              value={toMoneyString(negate(totals.currentBalance), 2)}
+              tone="auto"
+              currency={currency}
+            />
+          </CardBody>
+        </Card>
       ) : null}
 
       <FilterBar>
@@ -266,8 +291,11 @@ export function LedgerPage() {
       </FilterBar>
 
       <div>
+        {customerId ? (
+          <h2 className="text-fg mb-3 text-center text-lg font-semibold">طلبات وحركات الزبون</h2>
+        ) : null}
         <DataTable
-          caption="جميع الحركات المالية"
+          caption={customerId ? `طلبات وحركات ${customerName ?? 'الزبون'}` : 'جميع الحركات المالية'}
           columns={columns}
           rows={list.data?.items ?? []}
           rowKey={(r) => r.id}
@@ -276,8 +304,11 @@ export function LedgerPage() {
             list.isError
               ? {
                   message:
-                    list.error instanceof ApiRequestError ? list.error.message : 'تعذّر تحميل الحركات.',
-                  requestId: list.error instanceof ApiRequestError ? list.error.requestId : undefined,
+                    list.error instanceof ApiRequestError
+                      ? list.error.message
+                      : 'تعذّر تحميل الحركات.',
+                  requestId:
+                    list.error instanceof ApiRequestError ? list.error.requestId : undefined,
                 }
               : null
           }
@@ -291,7 +322,7 @@ export function LedgerPage() {
         />
 
         {list.data && list.data.total > 0 ? (
-          <div className="rounded-b-card border-x border-b border-border bg-card">
+          <div className="rounded-b-card border-border bg-card border-x border-b">
             <Pagination
               page={list.data.page}
               pageSize={list.data.pageSize}
@@ -309,12 +340,27 @@ export function LedgerPage() {
       </div>
 
       {/* إجماليات — كما في المرجع (أسفل الجدول) */}
-      {totals && list.data && list.data.total > 0 ? (
+      {!customerId && totals && list.data && list.data.total > 0 ? (
         <Card>
           <CardBody className="flex flex-wrap items-center justify-around gap-4 py-4">
-            <Totals label="إجمالي المدين" value={totals.totalDebit} tone="debit" currency={currency} />
-            <Totals label="إجمالي الدائن" value={totals.totalCredit} tone="credit" currency={currency} />
-            <Totals label="الرصيد الحالي" value={totals.currentBalance} tone="auto" currency={currency} />
+            <Totals
+              label="إجمالي المدين"
+              value={totals.totalDebit}
+              tone="debit"
+              currency={currency}
+            />
+            <Totals
+              label="إجمالي الدائن"
+              value={totals.totalCredit}
+              tone="credit"
+              currency={currency}
+            />
+            <Totals
+              label="الرصيد الحالي"
+              value={totals.currentBalance}
+              tone="auto"
+              currency={currency}
+            />
           </CardBody>
         </Card>
       ) : null}
@@ -335,8 +381,13 @@ function Totals({
 }) {
   return (
     <div className="text-center">
-      <p className="text-[13px] text-fg-muted">{label}</p>
-      <MoneyText value={value} currency={currency} tone={tone === 'auto' ? 'balance' : tone} size="lg" />
+      <p className="text-fg-muted text-[13px]">{label}</p>
+      <MoneyText
+        value={value}
+        currency={currency}
+        tone={tone === 'auto' ? 'balance' : tone}
+        size="lg"
+      />
     </div>
   );
 }

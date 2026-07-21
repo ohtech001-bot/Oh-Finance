@@ -34,6 +34,7 @@ export interface DataTableProps<T> {
   onSortChange?: (key: string) => void;
 
   onRowClick?: (row: T) => void;
+  rowClassName?: (row: T) => string | undefined;
 
   /** وصف الجدول لقارئ الشاشة — إلزامي للوصول. */
   caption: string;
@@ -79,6 +80,7 @@ export function DataTable<T>({
   sort,
   onSortChange,
   onRowClick,
+  rowClassName,
   caption,
   className,
 }: DataTableProps<T>) {
@@ -183,6 +185,7 @@ export function DataTable<T>({
                 className={cn(
                   'border-b border-border-subtle transition-colors last:border-0',
                   onRowClick && 'cursor-pointer hover:bg-card-muted',
+                  rowClassName?.(row),
                 )}
               >
                 {columns.map((col, colIndex) => (

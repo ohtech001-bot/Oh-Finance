@@ -1,8 +1,8 @@
-import { createContext, useCallback, useContext, useMemo } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { LoginRequest, LoginResponse, SessionUser } from '@oh/contracts';
 import type { Permission } from '@oh/config';
-import { api } from '@/lib/api';
+import { api, UNAUTHENTICATED_EVENT } from '@/lib/api';
 
 interface AuthContextValue {
   user: SessionUser | null;
@@ -11,6 +11,8 @@ interface AuthContextValue {
 
   login: (credentials: LoginRequest) => Promise<LoginResponse>;
   logout: () => Promise<void>;
+  enterTenantSupport: (tenantId: string) => Promise<LoginResponse>;
+  exitTenantSupport: () => Promise<LoginResponse>;
 
   /** هل يملك المستخدم الصلاحية؟ **للتجربة فقط** — لا يحل محل فحص الخادم. */
   can: (permission: Permission) => boolean;
@@ -21,6 +23,21 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const handleUnauthenticated = () => {
+      queryClient.setQueryData(['auth', 'me'], null);
+      void queryClient.cancelQueries({
+        predicate: (query) => query.queryKey[0] !== 'auth',
+      });
+      queryClient.removeQueries({
+        predicate: (query) => query.queryKey[0] !== 'auth',
+      });
+    };
+
+    window.addEventListener(UNAUTHENTICATED_EVENT, handleUnauthenticated);
+    return () => window.removeEventListener(UNAUTHENTICATED_EVENT, handleUnauthenticated);
+  }, [queryClient]);
 
   /**
    * الجلسة الحالية.
@@ -60,8 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const loginMutation = useMutation({
-    mutationFn: (credentials: LoginRequest) =>
-      api.post<LoginResponse>('/auth/login', credentials),
+    mutationFn: (credentials: LoginRequest) => api.post<LoginResponse>('/auth/login', credentials),
     onSuccess: (data) => {
       queryClient.setQueryData(['auth', 'me'], data.user);
     },
@@ -77,6 +93,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
   });
 
+  const supportMutation = useMutation({
+    mutationFn: (tenantId: string) =>
+      api.post<LoginResponse>(`/platform/tenants/${tenantId}/support-session`),
+    onSuccess: (data) => {
+      queryClient.clear();
+      queryClient.setQueryData(['auth', 'me'], data.user);
+    },
+  });
+
+  const exitSupportMutation = useMutation({
+    mutationFn: () => api.post<LoginResponse>('/auth/support/exit'),
+    onSuccess: (data) => {
+      queryClient.clear();
+      queryClient.setQueryData(['auth', 'me'], data.user);
+    },
+  });
+
   const login = useCallback(
     (credentials: LoginRequest) => loginMutation.mutateAsync(credentials),
     [loginMutation],
@@ -85,6 +118,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     await logoutMutation.mutateAsync();
   }, [logoutMutation]);
+
+  const enterTenantSupport = useCallback(
+    (tenantId: string) => supportMutation.mutateAsync(tenantId),
+    [supportMutation],
+  );
+
+  const exitTenantSupport = useCallback(
+    () => exitSupportMutation.mutateAsync(),
+    [exitSupportMutation],
+  );
 
   const permissions = useMemo(() => new Set(user?.permissions ?? []), [user]);
 
@@ -95,10 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    *    مباشرة. الحماية الحقيقية في `PermissionsGuard` على الخادم، ولا شيء
    *    غيرها. لو حُذف هذا الملف كله، لظل النظام آمنًا — أقبح فقط.
    */
-  const can = useCallback(
-    (permission: Permission) => permissions.has(permission),
-    [permissions],
-  );
+  const can = useCallback((permission: Permission) => permissions.has(permission), [permissions]);
 
   const canAny = useCallback(
     (...list: Permission[]) => list.some((p) => permissions.has(p)),
@@ -112,10 +152,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated: !isError && Boolean(user),
       login,
       logout,
+      enterTenantSupport,
+      exitTenantSupport,
       can,
       canAny,
     }),
-    [user, isLoading, isError, login, logout, can, canAny],
+    [user, isLoading, isError, login, logout, enterTenantSupport, exitTenantSupport, can, canAny],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -127,4 +169,8 @@ export function useAuth(): AuthContextValue {
     throw new Error('useAuth يجب أن يُستخدم داخل <AuthProvider>.');
   }
   return context;
+}
+
+export function useOptionalAuth(): AuthContextValue | null {
+  return useContext(AuthContext);
 }

@@ -109,6 +109,13 @@ const KPI_PERMS: Record<DashboardKpiId, readonly string[]> = {
   active_customers: ['customers.read'],
 };
 
+const HIDDEN_KPIS = new Set<DashboardKpiId>([
+  'revenue',
+  'average_order_value',
+  'unallocated_payments',
+  'active_customers',
+]);
+
 const TREND_PERMS: Record<DashboardTrendId, readonly string[]> = {
   revenue: ['orders.read'],
   orders: ['orders.read'],
@@ -149,11 +156,11 @@ export class DashboardService {
       const now = new Date();
 
       // نطاق الأقسام المسموح بها.
-      const kpiScope = (Object.keys(KPI_PERMS) as DashboardKpiId[]).filter((id) =>
-        has(...KPI_PERMS[id]),
+      const kpiScope = (Object.keys(KPI_PERMS) as DashboardKpiId[]).filter(
+        (id) => !HIDDEN_KPIS.has(id) && has(...KPI_PERMS[id]),
       );
-      const trendScope = (Object.keys(TREND_PERMS) as DashboardTrendId[]).filter((id) =>
-        has(...TREND_PERMS[id]),
+      const trendScope = (Object.keys(TREND_PERMS) as DashboardTrendId[]).filter(
+        (id) => id !== 'revenue' && has(...TREND_PERMS[id]),
       );
       const listScope = (Object.keys(LIST_PERMS) as ListId[]).filter((id) => has(...LIST_PERMS[id]));
       const basis: TopCustomersBasis = has('orders.read') ? 'sales' : 'collection';

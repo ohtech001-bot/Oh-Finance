@@ -13,7 +13,9 @@ export const RequirePermissions = (...permissions: Permission[]) =>
 
 /** يتطلب مديرًا عامًا — مسارات /platform. */
 export const IS_SUPER_ADMIN_ONLY = 'isSuperAdminOnly';
+export const ALLOW_PENDING_PASSWORD_CHANGE = 'allowPendingPasswordChange';
 export const SuperAdminOnly = () => SetMetadata(IS_SUPER_ADMIN_ONLY, true);
+export const AllowPendingPasswordChange = () => SetMetadata(ALLOW_PENDING_PASSWORD_CHANGE, true);
 
 /**
  * يتخطى فحص CSRF.

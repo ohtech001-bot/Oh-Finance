@@ -5,18 +5,17 @@ import {
   Bell,
   ChevronDown,
   Globe,
-  HelpCircle,
   LogOut,
   Menu,
   Moon,
   Search,
   Settings,
   Sun,
+  Undo2,
   User,
 } from 'lucide-react';
 import { LOCALES, LOCALE_CODES, ROLE_LABELS, type LocaleCode, type RoleName } from '@oh/config';
 import {
-  Avatar,
   Button,
   DropdownMenu,
   DropdownMenuContent,
@@ -46,10 +45,11 @@ export interface TopbarProps {
  */
 export function Topbar({ onOpenMobileNav }: TopbarProps) {
   const { t } = useTranslation();
-  const { user, logout } = useAuth();
+  const { user, logout, exitTenantSupport } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const [exitingSupport, setExitingSupport] = useState(false);
 
   const locale = currentLocale();
 
@@ -62,6 +62,18 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
     }
   };
 
+  const handleExitSupport = async () => {
+    setExitingSupport(true);
+    try {
+      await exitTenantSupport();
+      navigate('/platform/tenants', { replace: true });
+    } catch {
+      toast.error(t('platform.exitSupportFailed'));
+    } finally {
+      setExitingSupport(false);
+    }
+  };
+
   /**
    * البحث الشامل.
    *
@@ -71,12 +83,10 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
    */
   const searchEnabled = false;
 
-  const roleLabel = user?.role
-    ? (ROLE_LABELS[user.role as RoleName]?.[locale] ?? user.role)
-    : '';
+  const roleLabel = user?.role ? (ROLE_LABELS[user.role as RoleName]?.[locale] ?? user.role) : '';
 
   return (
-    <header className="flex h-topbar shrink-0 items-center gap-3 border-b border-border bg-card px-4 lg:px-6">
+    <header className="h-topbar border-border bg-card flex shrink-0 items-center gap-3 border-b px-4 lg:px-6">
       {/* زر القائمة — موبايل فقط */}
       <Button
         variant="ghost"
@@ -107,10 +117,22 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
 
       {/* ── الإجراءات ────────────────────────────────────────────────── */}
       <div className="flex items-center gap-1">
+        {user?.supportMode ? (
+          <Button variant="brand" size="sm" loading={exitingSupport} onClick={handleExitSupport}>
+            <Undo2 aria-hidden />
+            <span className="hidden sm:inline">{t('platform.exitSupport')}</span>
+          </Button>
+        ) : null}
+
         {/* الإشعارات */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label={t('common.notifications')} className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t('common.notifications')}
+              className="relative"
+            >
               <Bell />
             </Button>
           </DropdownMenuTrigger>
@@ -123,21 +145,12 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
               لا يوجد نظام إشعارات بعد، والرقم لن يتغيّر أبدًا مهما فعل المستخدم.
             */}
             <div className="px-3 py-8 text-center">
-              <Bell className="mx-auto size-8 text-fg-subtle" aria-hidden />
-              <p className="mt-2 text-sm font-medium text-fg">لا توجد إشعارات</p>
-              <p className="mt-1 text-xs text-fg-muted">
-                نظام الإشعارات يُفعَّل في المرحلة 7.
-              </p>
+              <Bell className="text-fg-subtle mx-auto size-8" aria-hidden />
+              <p className="text-fg mt-2 text-sm font-medium">لا توجد إشعارات</p>
+              <p className="text-fg-muted mt-1 text-xs">نظام الإشعارات يُفعَّل في المرحلة 7.</p>
             </div>
           </DropdownMenuContent>
         </DropdownMenu>
-
-        {/* المساعدة */}
-        <Button variant="ghost" size="icon" asChild aria-label="المساعدة">
-          <a href="mailto:support@oh-finance.app">
-            <HelpCircle />
-          </a>
-        </Button>
 
         {/* المظهر */}
         <Button
@@ -163,10 +176,10 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
               <DropdownMenuItem
                 key={code}
                 onClick={() => changeLocale(code as LocaleCode)}
-                className={cn(code === locale && 'bg-accent-soft font-semibold text-accent')}
+                className={cn(code === locale && 'bg-accent-soft text-accent font-semibold')}
               >
                 {LOCALES[code].nameNative}
-                <span className="ms-auto text-xs text-fg-subtle">
+                <span className="text-fg-subtle ms-auto text-xs">
                   {LOCALES[code].dir.toUpperCase()}
                 </span>
               </DropdownMenuItem>
@@ -181,33 +194,34 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
               <button
                 type="button"
                 className={cn(
-                  'ms-1 flex items-center gap-2.5 rounded-ctrl p-1 transition-colors hover:bg-card-muted',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  'rounded-ctrl hover:bg-card-muted ms-1 flex items-center gap-2.5 p-1 transition-colors',
+                  'focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2',
                 )}
               >
-                <Avatar src={user.avatarUrl} name={user.name} size="md" />
                 <div className="hidden text-start md:block">
-                  <p className="text-sm font-semibold leading-tight text-fg">{user.name}</p>
-                  <p className="text-xs leading-tight text-fg-muted">{roleLabel}</p>
+                  <p className="text-fg text-sm font-semibold leading-tight">{user.name}</p>
+                  <p className="text-fg-muted text-xs leading-tight">{roleLabel}</p>
                 </div>
-                <ChevronDown className="hidden size-4 text-fg-muted md:block" aria-hidden />
+                <ChevronDown className="text-fg-muted hidden size-4 md:block" aria-hidden />
               </button>
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="end" className="w-64">
               <DropdownMenuLabel>
-                <p className="text-sm font-semibold text-fg">{user.name}</p>
-                <p className="mt-0.5 truncate text-xs font-normal text-fg-muted" dir="ltr">
+                <p className="text-fg text-sm font-semibold">{user.name}</p>
+                <p className="text-fg-muted mt-0.5 truncate text-xs font-normal" dir="ltr">
                   {user.email}
                 </p>
               </DropdownMenuLabel>
 
               <DropdownMenuSeparator />
 
-              <DropdownMenuItem onClick={() => navigate('/profile')}>
-                <User />
-                {t('common.profile')}
-              </DropdownMenuItem>
+              {user.role !== 'SUPER_ADMIN' ? (
+                <DropdownMenuItem onClick={() => navigate('/profile')}>
+                  <User />
+                  {t('common.profile')}
+                </DropdownMenuItem>
+              ) : null}
 
               {!user.isSuperAdmin ? (
                 <DropdownMenuItem onClick={() => navigate('/settings')}>

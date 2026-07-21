@@ -2,13 +2,8 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Building2, MoreHorizontal, PauseCircle, Pencil, PlayCircle, Plus } from 'lucide-react';
-import type {
-  PaginatedResult,
-  SetTenantStatusRequest,
-  Tenant,
-  TenantStatus,
-} from '@oh/contracts';
+import { Building2, LogIn, PauseCircle, Pencil, PlayCircle, Plus } from 'lucide-react';
+import type { PaginatedResult, SetTenantStatusRequest, Tenant, TenantStatus } from '@oh/contracts';
 import {
   Button,
   DataTable,
@@ -20,10 +15,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   Field,
   FilterBar,
   Input,
@@ -37,6 +28,7 @@ import {
   type Column,
 } from '@oh/ui';
 import { ApiRequestError, api, buildQuery } from '@/lib/api';
+import { useAuth } from '@/app/auth-context';
 
 /**
  * قائمة المحلات — شاشة تعمل بالكامل ببيانات حقيقية.
@@ -51,6 +43,7 @@ export function TenantsListPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { enterTenantSupport } = useAuth();
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -101,6 +94,15 @@ export function TenantsListPage() {
     },
   });
 
+  const supportMutation = useMutation({
+    mutationFn: (tenantId: string) => enterTenantSupport(tenantId),
+    onSuccess: () => navigate('/', { replace: true }),
+    onError: (error) => {
+      if (error instanceof ApiRequestError) toast.apiError(error.message, error.requestId);
+      else toast.error(t('errors.network'));
+    },
+  });
+
   const resetFilters = () => {
     setSearch('');
     setStatus('');
@@ -119,30 +121,32 @@ export function TenantsListPage() {
     {
       key: 'name',
       header: t('platform.tenantName'),
+      width: '19%',
       render: (row) => (
         <div className="min-w-0">
           <Link
             to={`/platform/tenants/${row.id}`}
-            className="block truncate font-semibold text-accent hover:underline"
+            className="text-accent block truncate font-semibold hover:underline"
           >
             {row.name}
           </Link>
-          <p className="truncate text-xs text-fg-muted" dir="ltr">
+          <span className="text-fg-muted inline-block max-w-full truncate text-xs" dir="ltr">
             {row.slug}
-          </p>
+          </span>
         </div>
       ),
     },
     {
       header: t('platform.ownerName'),
+      width: '21%',
       hideBelow: 'md',
       render: (row) =>
         row.ownerName ? (
           <div className="min-w-0">
-            <p className="truncate text-sm text-fg">{row.ownerName}</p>
-            <p className="truncate text-xs text-fg-muted" dir="ltr">
+            <p className="text-fg truncate text-sm">{row.ownerName}</p>
+            <span className="text-fg-muted inline-block max-w-full truncate text-xs" dir="ltr">
               {row.ownerEmail}
-            </p>
+            </span>
           </div>
         ) : (
           <span className="text-fg-subtle">—</span>
@@ -150,29 +154,33 @@ export function TenantsListPage() {
     },
     {
       header: t('platform.plan'),
+      width: '11%',
       hideBelow: 'lg',
       render: (row) =>
         row.planName ? (
-          <span className="text-sm text-fg">{row.planName}</span>
+          <span className="text-fg text-sm">{row.planName}</span>
         ) : (
           <span className="text-fg-subtle">—</span>
         ),
     },
     {
       header: t('platform.storeCount'),
+      width: '7%',
       align: 'center',
       hideBelow: 'xl',
-      render: (row) => <span className="tabular-nums text-fg">{row.storeCount}</span>,
+      render: (row) => <span className="text-fg tabular-nums">{row.storeCount}</span>,
     },
     {
       header: t('platform.userCount'),
+      width: '7%',
       align: 'center',
       hideBelow: 'xl',
-      render: (row) => <span className="tabular-nums text-fg">{row.userCount}</span>,
+      render: (row) => <span className="text-fg tabular-nums">{row.userCount}</span>,
     },
     {
       key: 'status',
       header: t('common.status'),
+      width: '10%',
       align: 'center',
       render: (row) => {
         const badge = TENANT_STATUS_BADGE[row.status as TenantStatus];
@@ -186,9 +194,10 @@ export function TenantsListPage() {
     {
       key: 'createdAt',
       header: t('platform.createdAt'),
+      width: '11%',
       hideBelow: 'lg',
       render: (row) => (
-        <span className="tabular-nums text-[13px] text-fg-muted" dir="ltr">
+        <span className="text-fg-muted inline-block text-[13px] tabular-nums" dir="ltr">
           {row.createdAt.slice(0, 10)}
         </span>
       ),
@@ -196,34 +205,35 @@ export function TenantsListPage() {
     {
       header: t('common.actions'),
       align: 'end',
-      width: '80px',
+      width: '330px',
       render: (row) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" aria-label={`إجراءات ${row.name}`}>
-              <MoreHorizontal />
-            </Button>
-          </DropdownMenuTrigger>
-
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => navigate(`/platform/tenants/${row.id}`)}>
-              <Pencil />
-              {t('common.edit')}
-            </DropdownMenuItem>
-
-            {row.status === 'SUSPENDED' ? (
-              <DropdownMenuItem onClick={() => setStatusTarget(row)}>
-                <PlayCircle />
-                {t('platform.activate')}
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem destructive onClick={() => setStatusTarget(row)}>
-                <PauseCircle />
-                {t('platform.suspend')}
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/platform/tenants/${row.id}`)}
+          >
+            <Pencil aria-hidden />
+            {t('common.edit')}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            loading={supportMutation.isPending && supportMutation.variables === row.id}
+            onClick={() => supportMutation.mutate(row.id)}
+          >
+            <LogIn aria-hidden />
+            {t('platform.supportAccess')}
+          </Button>
+          <Button
+            variant={row.status === 'SUSPENDED' ? 'brand' : 'danger'}
+            size="sm"
+            onClick={() => setStatusTarget(row)}
+          >
+            {row.status === 'SUSPENDED' ? <PlayCircle aria-hidden /> : <PauseCircle aria-hidden />}
+            {row.status === 'SUSPENDED' ? t('platform.activate') : t('platform.suspend')}
+          </Button>
+        </div>
       ),
     },
   ];
@@ -311,7 +321,7 @@ export function TenantsListPage() {
         />
 
         {query.data && query.data.total > 0 ? (
-          <div className="rounded-b-card border-x border-b border-border bg-card">
+          <div className="rounded-b-card border-border bg-card border-x border-b">
             <Pagination
               page={query.data.page}
               pageSize={query.data.pageSize}

@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 import type { Permission } from '@oh/config';
 import { AppError } from '../../../core/errors/app-error.js';
 import { TenantContext } from '../../../core/tenancy/tenant-context.js';
-import { IS_PUBLIC, IS_SUPER_ADMIN_ONLY, REQUIRED_PERMISSIONS } from '../decorators.js';
+import { ALLOW_PENDING_PASSWORD_CHANGE, IS_PUBLIC, IS_SUPER_ADMIN_ONLY, REQUIRED_PERMISSIONS } from '../decorators.js';
 
 /**
  * الحارس الثاني: التفويض.
@@ -34,6 +34,18 @@ export class PermissionsGuard implements CanActivate {
       throw AppError.unauthenticated();
     }
 
+    const allowPendingPasswordChange = this.reflector.getAllAndOverride<boolean>(ALLOW_PENDING_PASSWORD_CHANGE, [
+      context.getHandler(), context.getClass(),
+    ]);
+    if (ctx.mustChangePassword && !allowPendingPasswordChange) {
+      throw AppError.forbidden('يجب تغيير كلمة المرور المؤقتة قبل متابعة استخدام النظام.');
+    }
+
+    const required = this.reflector.getAllAndOverride<Permission[]>(REQUIRED_PERMISSIONS, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
     const superAdminOnly = this.reflector.getAllAndOverride<boolean>(IS_SUPER_ADMIN_ONLY, [
       context.getHandler(),
       context.getClass(),
@@ -43,7 +55,7 @@ export class PermissionsGuard implements CanActivate {
       if (!ctx.isSuperAdmin || ctx.tenantId !== null) {
         throw AppError.forbidden('هذا المسار للمدير العام فقط.');
       }
-    } else {
+    } else if (required?.some((permission) => !permission.startsWith('platform.'))) {
       // مسار محل: المدير العام لا يدخله — لا يرى بيانات أعمال أي محل.
       if (ctx.isSuperAdmin) {
         throw AppError.forbidden(
@@ -54,11 +66,6 @@ export class PermissionsGuard implements CanActivate {
         throw AppError.forbidden('لا يوجد محل مرتبط بهذا الحساب.');
       }
     }
-
-    const required = this.reflector.getAllAndOverride<Permission[]>(REQUIRED_PERMISSIONS, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
 
     if (!required || required.length === 0) {
       return true; // موثّق يكفي (مثل /auth/me)

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
-import type { Customer, OrderItemInput, PaginatedResult } from '@oh/contracts';
-import type { CurrencyCode } from '@oh/money';
+import type { Customer, OrderDetail, OrderItemInput, PaginatedResult } from '@oh/contracts';
+import { greaterThan, negate, toMoneyString, type CurrencyCode } from '@oh/money';
 import {
   Button,
   Dialog,
@@ -20,7 +20,8 @@ import {
 import { ApiRequestError, api } from '@/lib/api';
 import { useUnsavedChangesWarning } from '@/lib/use-unsaved-changes';
 import { useAuth } from '@/app/auth-context';
-import { useCreateOrder, usePreviewOrder } from './api';
+import { useCreatePayment } from '@/features/payments/api';
+import { useCreateOrder, usePreviewOrder, useUpdateOrder } from './api';
 
 interface DraftItem {
   name: string;
@@ -30,12 +31,19 @@ interface DraftItem {
   taxRate: string;
 }
 
-const emptyItem = (): DraftItem => ({ name: '', quantity: '1', unitPrice: '', discount: '0', taxRate: '0' });
+const emptyItem = (): DraftItem => ({
+  name: '',
+  quantity: '1',
+  unitPrice: '',
+  discount: '0',
+  taxRate: '0',
+});
 
 export interface CreateOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   fixedCustomerId?: string;
+  order?: OrderDetail;
 }
 
 /**
@@ -47,7 +55,12 @@ export interface CreateOrderDialogProps {
  *
  * الحفظ: مسودة أو تأكيد مباشر (يولّد قيدًا مدينًا).
  */
-export function CreateOrderDialog({ open, onOpenChange, fixedCustomerId }: CreateOrderDialogProps) {
+export function CreateOrderDialog({
+  open,
+  onOpenChange,
+  fixedCustomerId,
+  order,
+}: CreateOrderDialogProps) {
   const { user } = useAuth();
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
 
@@ -55,39 +68,69 @@ export function CreateOrderDialog({ open, onOpenChange, fixedCustomerId }: Creat
   const [items, setItems] = useState<DraftItem[]>([emptyItem()]);
   const [discount, setDiscount] = useState('0');
   const [notes, setNotes] = useState('');
+  const [paidAmount, setPaidAmount] = useState('0');
+  const [paymentKey, setPaymentKey] = useState(() => crypto.randomUUID());
 
   const create = useCreateOrder();
+  const update = useUpdateOrder(order?.id ?? '');
+  const createPayment = useCreatePayment();
   const preview = usePreviewOrder();
 
   const customersQuery = useQuery({
     queryKey: ['customers', 'picker'],
-    queryFn: () => api.get<PaginatedResult<Customer>>('/customers?pageSize=100&sortBy=name&sortOrder=asc'),
-    enabled: open && !fixedCustomerId,
+    queryFn: () =>
+      api.get<PaginatedResult<Customer>>('/customers?pageSize=100&sortBy=name&sortOrder=asc'),
+    enabled: open && !fixedCustomerId && !order,
+  });
+  const fixedCustomerQuery = useQuery({
+    queryKey: ['customers', fixedCustomerId ?? order?.customerId],
+    queryFn: () => api.get<Customer>(`/customers/${fixedCustomerId ?? order?.customerId}`),
+    enabled: open && Boolean(fixedCustomerId ?? order?.customerId),
   });
 
   useEffect(() => {
     if (open) {
-      setCustomerId(fixedCustomerId ?? '');
-      setItems([emptyItem()]);
-      setDiscount('0');
-      setNotes('');
+      setCustomerId(order?.customerId ?? fixedCustomerId ?? '');
+      setItems(
+        order
+          ? order.items.map((item) => ({
+              name: item.name,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              discount: item.discount,
+              taxRate: item.taxRate,
+            }))
+          : [emptyItem()],
+      );
+      setDiscount(order?.discountAmount ?? '0');
+      setNotes(order?.notes ?? '');
+      setPaidAmount('0');
+      setPaymentKey(crypto.randomUUID());
       preview.reset();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, fixedCustomerId]);
+  }, [open, fixedCustomerId, order]);
 
   // متسخ = المستخدم أدخل شيئًا ذا قيمة (زبون، بند مُسمّى، خصم، أو ملاحظة).
   const isDirty =
     (!fixedCustomerId && customerId !== '') ||
     items.some((it) => it.name.trim() !== '') ||
     discount !== '0' ||
+    paidAmount !== '0' ||
     notes.trim() !== '';
-  useUnsavedChangesWarning(open && isDirty && !create.isPending);
+  useUnsavedChangesWarning(
+    open && isDirty && !create.isPending && !update.isPending && !createPayment.isPending,
+  );
 
   const validItems: OrderItemInput[] = useMemo(
     () =>
       items
-        .filter((it) => it.name.trim() && /^\d+(\.\d{1,4})?$/.test(it.unitPrice) && /^\d+(\.\d{1,4})?$/.test(it.quantity))
+        .filter(
+          (it) =>
+            it.name.trim() &&
+            /^\d+(\.\d{1,4})?$/.test(it.unitPrice) &&
+            /^\d+(\.\d{1,4})?$/.test(it.quantity),
+        )
         .map((it) => ({
           sourceType: 'MANUAL' as const,
           name: it.name.trim(),
@@ -99,14 +142,18 @@ export function CreateOrderDialog({ open, onOpenChange, fixedCustomerId }: Creat
     [items],
   );
 
-  // معاينة تلقائية عند تغيّر البنود (debounced بسيط عبر onBlur في الحقول).
-  const runPreview = () => {
-    if (validItems.length === 0) {
-      preview.reset();
-      return;
-    }
-    preview.mutate({ items: validItems, discountAmount: discount || '0' });
-  };
+  const { mutate: previewOrder, reset: resetPreview } = preview;
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setTimeout(() => {
+      if (validItems.length === 0) {
+        resetPreview();
+        return;
+      }
+      previewOrder({ items: validItems, discountAmount: discount || '0' });
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [discount, open, previewOrder, resetPreview, validItems]);
 
   const updateItem = (index: number, patch: Partial<DraftItem>) =>
     setItems((prev) => prev.map((it, i) => (i === index ? { ...it, ...patch } : it)));
@@ -120,6 +167,46 @@ export function CreateOrderDialog({ open, onOpenChange, fixedCustomerId }: Creat
       toast.error('أضف بندًا واحدًا صحيحًا على الأقل.');
       return;
     }
+    if (order) {
+      update.mutate(
+        {
+          version: order.version,
+          customerId,
+          discountAmount: discount || '0',
+          notes: notes || undefined,
+          items: validItems,
+        },
+        {
+          onSuccess: (updated) => {
+            toast.success(`حُفظت تعديلات الطلب ${updated.number}`);
+            onOpenChange(false);
+          },
+          onError: (e) => {
+            if (e instanceof ApiRequestError) toast.apiError(e.message, e.requestId);
+            else toast.error('تعذّر تعديل الطلب.');
+          },
+        },
+      );
+      return;
+    }
+
+    if (!/^\d+(\.\d{1,4})?$/.test(paidAmount)) {
+      toast.error('أدخل مبلغًا مدفوعًا صحيحًا، أو اكتب 0 عند عدم الدفع.');
+      return;
+    }
+    const paymentAmount = paidAmount;
+    if (!confirm && greaterThan(paymentAmount, '0')) {
+      toast.error('سجّل الطلب كمؤكد حتى يمكن حفظ الدفعة معه.');
+      return;
+    }
+    if (greaterThan(paymentAmount, '0') && !totals) {
+      toast.error('انتظر ظهور إجمالي الطلب قبل تسجيل الدفعة.');
+      return;
+    }
+    if (totals && greaterThan(paymentAmount, totals.total)) {
+      toast.error('المبلغ المدفوع لا يمكن أن يتجاوز إجمالي الطلب.');
+      return;
+    }
     create.mutate(
       {
         customerId,
@@ -129,12 +216,43 @@ export function CreateOrderDialog({ open, onOpenChange, fixedCustomerId }: Creat
         items: validItems,
       },
       {
-        onSuccess: (order) => {
-          toast.success(
-            confirm ? `أُكِّد الطلب ${order.number}` : `حُفظ الطلب ${order.number} كمسودة`,
-            confirm ? `الإجمالي: ${order.total}` : undefined,
-          );
-          onOpenChange(false);
+        onSuccess: (createdOrder) => {
+          if (confirm && greaterThan(paymentAmount, '0')) {
+            createPayment.mutate(
+              {
+                body: {
+                  customerId,
+                  amount: paymentAmount,
+                  method: 'CASH',
+                  strategy: 'MANUAL',
+                  allocations: [{ orderId: createdOrder.id, amount: paymentAmount }],
+                },
+                idempotencyKey: paymentKey,
+              },
+              {
+                onSuccess: () => {
+                  toast.success(`حُفظ الطلب ${createdOrder.number} وسُجّلت الدفعة النقدية`);
+                  onOpenChange(false);
+                },
+                onError: (e) => {
+                  toast.error(
+                    e instanceof ApiRequestError
+                      ? `حُفظ الطلب، لكن تعذّر تسجيل الدفعة: ${e.message}`
+                      : 'حُفظ الطلب، لكن تعذّر تسجيل الدفعة.',
+                  );
+                  onOpenChange(false);
+                },
+              },
+            );
+          } else {
+            toast.success(
+              confirm
+                ? `أُكِّد الطلب ${createdOrder.number}`
+                : `حُفظ الطلب ${createdOrder.number} كمسودة`,
+              confirm ? `الإجمالي: ${createdOrder.total}` : undefined,
+            );
+            onOpenChange(false);
+          }
         },
         onError: (e) => {
           if (e instanceof ApiRequestError) toast.apiError(e.message, e.requestId);
@@ -145,30 +263,35 @@ export function CreateOrderDialog({ open, onOpenChange, fixedCustomerId }: Creat
   };
 
   const customers = customersQuery.data?.items ?? [];
+  const selectedCustomer =
+    fixedCustomerId || order
+      ? fixedCustomerQuery.data
+      : customers.find((customer) => customer.id === customerId);
   const totals = preview.data;
-  const cellClass = 'h-10 rounded-ctrl border border-border bg-card px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+  const cellClass =
+    'h-10 rounded-ctrl border border-border bg-card px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="xl">
         <DialogHeader>
-          <DialogTitle>إضافة طلب جديد</DialogTitle>
+          <DialogTitle>{order ? `تعديل الطلب ${order.number}` : 'إضافة طلب جديد'}</DialogTitle>
         </DialogHeader>
 
         <DialogBody className="space-y-5">
-          {!fixedCustomerId ? (
+          {!fixedCustomerId && !order ? (
             <Field label="الزبون" required>
               {(p) => (
                 <select
                   {...p}
                   value={customerId}
                   onChange={(e) => setCustomerId(e.target.value)}
-                  className="h-11 w-full rounded-ctrl border border-border bg-card px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="rounded-ctrl border-border bg-card focus-visible:ring-ring h-11 w-full border px-3 text-sm focus-visible:outline-none focus-visible:ring-2"
                 >
                   <option value="">اختر زبونًا…</option>
                   {customers.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.code} — {c.name}
+                      {c.name}
                     </option>
                   ))}
                 </select>
@@ -179,7 +302,7 @@ export function CreateOrderDialog({ open, onOpenChange, fixedCustomerId }: Creat
           {/* البنود */}
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-[13px] font-semibold text-fg">البنود</h3>
+              <h3 className="text-fg text-[13px] font-semibold">البنود</h3>
               <Button
                 variant="outline"
                 size="sm"
@@ -192,7 +315,7 @@ export function CreateOrderDialog({ open, onOpenChange, fixedCustomerId }: Creat
 
             <div className="space-y-2">
               {/* رؤوس الأعمدة */}
-              <div className="hidden grid-cols-[1fr_70px_90px_80px_70px_90px_36px] gap-2 px-1 text-[11px] font-medium text-fg-muted sm:grid">
+              <div className="text-fg-muted hidden grid-cols-[1fr_70px_90px_80px_70px_90px_36px] gap-2 px-1 text-[11px] font-medium sm:grid">
                 <span>الوصف</span>
                 <span className="text-center">الكمية</span>
                 <span className="text-center">السعر</span>
@@ -207,19 +330,17 @@ export function CreateOrderDialog({ open, onOpenChange, fixedCustomerId }: Creat
                 return (
                   <div
                     key={i}
-                    className="grid grid-cols-2 gap-2 rounded-ctrl border border-border-subtle p-2 sm:grid-cols-[1fr_70px_90px_80px_70px_90px_36px] sm:border-0 sm:p-0"
+                    className="rounded-ctrl border-border-subtle grid grid-cols-2 gap-2 border p-2 sm:grid-cols-[1fr_70px_90px_80px_70px_90px_36px] sm:border-0 sm:p-0"
                   >
                     <input
                       value={item.name}
                       onChange={(e) => updateItem(i, { name: e.target.value })}
-                      onBlur={runPreview}
                       placeholder="اسم البند"
                       className={`${cellClass} col-span-2 sm:col-span-1`}
                     />
                     <input
                       value={item.quantity}
                       onChange={(e) => updateItem(i, { quantity: e.target.value })}
-                      onBlur={runPreview}
                       dir="ltr"
                       inputMode="decimal"
                       placeholder="الكمية"
@@ -228,7 +349,6 @@ export function CreateOrderDialog({ open, onOpenChange, fixedCustomerId }: Creat
                     <input
                       value={item.unitPrice}
                       onChange={(e) => updateItem(i, { unitPrice: e.target.value })}
-                      onBlur={runPreview}
                       dir="ltr"
                       inputMode="decimal"
                       placeholder="السعر"
@@ -237,7 +357,6 @@ export function CreateOrderDialog({ open, onOpenChange, fixedCustomerId }: Creat
                     <input
                       value={item.discount}
                       onChange={(e) => updateItem(i, { discount: e.target.value })}
-                      onBlur={runPreview}
                       dir="ltr"
                       inputMode="decimal"
                       className={`${cellClass} text-center`}
@@ -245,25 +364,29 @@ export function CreateOrderDialog({ open, onOpenChange, fixedCustomerId }: Creat
                     <input
                       value={item.taxRate}
                       onChange={(e) => updateItem(i, { taxRate: e.target.value })}
-                      onBlur={runPreview}
                       dir="ltr"
                       inputMode="decimal"
                       className={`${cellClass} text-center`}
                     />
                     <div className="flex items-center justify-end px-1">
                       {lineTotal ? (
-                        <MoneyText value={lineTotal} currency={currency} tone="plain" withSymbol={false} size="sm" />
+                        <MoneyText
+                          value={lineTotal}
+                          currency={currency}
+                          tone="plain"
+                          withSymbol={false}
+                          size="sm"
+                        />
                       ) : (
-                        <span className="text-xs text-fg-subtle">—</span>
+                        <span className="text-fg-subtle text-xs">—</span>
                       )}
                     </div>
                     <button
                       type="button"
                       onClick={() => {
                         setItems((p) => (p.length > 1 ? p.filter((_, idx) => idx !== i) : p));
-                        setTimeout(runPreview, 0);
                       }}
-                      className="flex items-center justify-center rounded-ctrl text-fg-muted hover:bg-danger-soft hover:text-danger"
+                      className="rounded-ctrl text-fg-muted hover:bg-danger-soft hover:text-danger flex items-center justify-center"
                       aria-label="حذف البند"
                     >
                       <Trash2 className="size-4" />
@@ -281,7 +404,6 @@ export function CreateOrderDialog({ open, onOpenChange, fixedCustomerId }: Creat
                   {...p}
                   value={discount}
                   onChange={(e) => setDiscount(e.target.value)}
-                  onBlur={runPreview}
                   dir="ltr"
                   inputMode="decimal"
                   placeholder="0.00"
@@ -293,15 +415,42 @@ export function CreateOrderDialog({ open, onOpenChange, fixedCustomerId }: Creat
             </Field>
           </div>
 
+          {selectedCustomer ? (
+            <div className="rounded-ctrl border-border bg-card flex items-center justify-between border px-4 py-3">
+              <span className="text-fg-muted text-sm">الرصيد الحالي</span>
+              <MoneyText
+                value={toMoneyString(negate(selectedCustomer.balance), 2)}
+                currency={currency}
+                tone="auto"
+                size="lg"
+              />
+            </div>
+          ) : null}
+
+          {!order ? (
+            <Field label="المبلغ المدفوع الآن" hint="اختياري، ويُسجّل كدفعة نقدية لهذا الطلب">
+              {(p) => (
+                <Input
+                  {...p}
+                  value={paidAmount}
+                  onChange={(event) => setPaidAmount(event.target.value)}
+                  dir="ltr"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                />
+              )}
+            </Field>
+          ) : null}
+
           {/* الإجماليات — من الخادم */}
           {totals ? (
-            <div className="rounded-card border border-border bg-card-muted p-4">
+            <div className="rounded-card border-border bg-card-muted border p-4">
               <dl className="space-y-1.5 text-sm">
                 <Row label="المجموع الفرعي" value={totals.subtotal} currency={currency} />
                 <Row label="الخصم" value={totals.discountAmount} currency={currency} />
                 <Row label="الضريبة" value={totals.taxAmount} currency={currency} />
-                <div className="flex items-center justify-between border-t border-border pt-2">
-                  <dt className="font-semibold text-fg">الإجمالي</dt>
+                <div className="border-border flex items-center justify-between border-t pt-2">
+                  <dt className="text-fg font-semibold">الإجمالي</dt>
                   <dd>
                     <MoneyText value={totals.total} currency={currency} tone="plain" size="lg" />
                   </dd>
@@ -312,14 +461,33 @@ export function CreateOrderDialog({ open, onOpenChange, fixedCustomerId }: Creat
         </DialogBody>
 
         <DialogFooter>
-          <Button variant="brand" onClick={() => submit(true)} loading={create.isPending}>
-            تأكيد الطلب
-          </Button>
-          <Button variant="outline" onClick={() => submit(false)} disabled={create.isPending}>
-            حفظ كمسودة
-          </Button>
+          {order ? (
+            <Button variant="brand" onClick={() => submit(false)} loading={update.isPending}>
+              حفظ التعديلات
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="brand"
+                onClick={() => submit(true)}
+                loading={create.isPending || createPayment.isPending}
+              >
+                تأكيد الطلب
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => submit(false)}
+                disabled={create.isPending || createPayment.isPending}
+              >
+                حفظ كمسودة
+              </Button>
+            </>
+          )}
           <DialogClose asChild>
-            <Button variant="ghost" disabled={create.isPending}>
+            <Button
+              variant="ghost"
+              disabled={create.isPending || update.isPending || createPayment.isPending}
+            >
               إلغاء
             </Button>
           </DialogClose>

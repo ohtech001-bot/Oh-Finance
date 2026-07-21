@@ -21,6 +21,7 @@ import type { ApiError } from '@oh/contracts';
  */
 
 const API_BASE = '/api';
+export const UNAUTHENTICATED_EVENT = 'oh:unauthenticated';
 
 export class ApiRequestError extends Error {
   constructor(
@@ -104,6 +105,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   if (!response.ok) {
     const error = (payload ?? {}) as Partial<ApiError>;
+    if (response.status === 401 && path !== '/auth/me') {
+      window.dispatchEvent(new Event(UNAUTHENTICATED_EVENT));
+    }
     throw new ApiRequestError(
       response.status,
       error.code ?? 'INTERNAL',

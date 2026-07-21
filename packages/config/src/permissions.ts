@@ -72,6 +72,8 @@ export const PERMISSIONS = {
   PLATFORM_SUBSCRIPTIONS_READ: 'platform.subscriptions.read',
   PLATFORM_SUBSCRIPTIONS_MANAGE: 'platform.subscriptions.manage',
   PLATFORM_AUDIT_READ: 'platform.audit.read',
+  PLATFORM_STAFF_READ: 'platform.staff.read',
+  PLATFORM_STAFF_MANAGE: 'platform.staff.manage',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -128,4 +130,6 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   'platform.subscriptions.read': 'عرض الاشتراكات',
   'platform.subscriptions.manage': 'إدارة الاشتراكات',
   'platform.audit.read': 'سجل تدقيق المنصة',
+  'platform.staff.read': 'عرض مدراء وموظفي المنصة',
+  'platform.staff.manage': 'إضافة وإدارة مدراء وموظفي المنصة',
 };

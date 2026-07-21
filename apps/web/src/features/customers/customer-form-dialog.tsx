@@ -16,6 +16,7 @@ import {
   toast,
 } from '@oh/ui';
 import { ApiRequestError } from '@/lib/api';
+import { currentLocale } from '@/lib/i18n';
 import { useUnsavedChangesWarning } from '@/lib/use-unsaved-changes';
 import { useCreateCustomer, useUpdateCustomer } from './api';
 
@@ -35,6 +36,24 @@ export interface CustomerFormDialogProps {
  */
 export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFormDialogProps) {
   const isEdit = Boolean(customer);
+  const locale = currentLocale();
+  const labels = {
+    ar: {
+      debtLimit: 'حد الدين',
+      debtLimitHint: 'الحد الافتراضي 1500 شيكل ويمكن تعديله.',
+      openingHint: 'الرقم الموجب رصيد للزبون. الرقم السالب (-x أو x-) دين على الزبون.',
+    },
+    he: {
+      debtLimit: 'מסגרת',
+      debtLimitHint: 'ברירת המחדל היא 1,500 ₪ וניתן לשנות אותה.',
+      openingHint: 'מספר חיובי הוא יתרה לזכות הלקוח. מספר שלילי (-x או x-) הוא חוב.',
+    },
+    en: {
+      debtLimit: 'Debt limit',
+      debtLimitHint: 'The default is ILS 1,500 and can be changed.',
+      openingHint: 'A positive number is customer credit. A negative number (-x or x-) is debt.',
+    },
+  }[locale];
   const create = useCreateCustomer();
   const update = useUpdateCustomer(customer?.id ?? '');
 
@@ -56,7 +75,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
       address: '',
       notes: '',
       tags: [],
-      creditLimit: '0',
+      creditLimit: '1500',
       paymentTermDays: 30,
       status: 'ACTIVE',
       openingBalance: '0',
@@ -157,11 +176,11 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
             </Field>
 
             <Field
-              label="حد الائتمان"
-              hint="صفر = بلا حد. يُفحص عند تأكيد الطلب."
+              label={labels.debtLimit}
+              hint={labels.debtLimitHint}
               error={errors.creditLimit?.message}
             >
-              {(p) => <Input {...p} {...register('creditLimit')} dir="ltr" inputMode="decimal" placeholder="0.00" />}
+              {(p) => <Input {...p} {...register('creditLimit')} dir="ltr" inputMode="decimal" placeholder="1500.00" />}
             </Field>
 
             <Field label="مدة السداد (يوم)" error={errors.paymentTermDays?.message}>
@@ -181,14 +200,19 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
             {!isEdit ? (
               <Field
                 label="الرصيد الافتتاحي"
-                hint="دَين قديم مُرحَّل. موجب = عليه، سالب = له. يولّد قيدًا في الدفتر."
+                hint={labels.openingHint}
                 error={errors.openingBalance?.message}
                 className="sm:col-span-2"
               >
                 {(p) => (
                   <Input
                     {...p}
-                    {...register('openingBalance')}
+                    {...register('openingBalance', {
+                      setValueAs: (raw: unknown) => {
+                        const value = String(raw ?? '').trim();
+                        return /^\d+(?:\.\d+)?-$/.test(value) ? `-${value.slice(0, -1)}` : value;
+                      },
+                    })}
                     dir="ltr"
                     inputMode="decimal"
                     placeholder="0.00"

@@ -47,6 +47,18 @@ enum SubscriptionStatus {
   EXPIRED
 }
 
+enum SubscriptionPaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+}
+
+enum PlatformRole {
+  GENERAL_MANAGER
+  MANAGER
+  EMPLOYEE
+}
+
 /// الباقة — تعريف حدود الاستخدام والسعر.
 model Plan {
   id     String @id @default(uuid()) @db.Uuid
@@ -124,6 +136,11 @@ model Subscription {
   currentPeriodEnd   DateTime  @map("current_period_end") @db.Timestamptz(6)
   trialEndsAt        DateTime? @map("trial_ends_at") @db.Timestamptz(6)
   cancelledAt        DateTime? @map("cancelled_at") @db.Timestamptz(6)
+
+  /// الاتفاق المالي اليدوي مع المحل للدورة الحالية.
+  agreedMonthlyAmount Decimal                   @default(0) @map("agreed_monthly_amount") @db.Decimal(18, 4)
+  paidAmount          Decimal                   @default(0) @map("paid_amount") @db.Decimal(18, 4)
+  paymentStatus       SubscriptionPaymentStatus @default(UNPAID) @map("payment_status")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -302,6 +319,8 @@ model User {
   email String  @unique @db.VarChar(254)
   name  String  @db.VarChar(120)
   phone String? @db.VarChar(32)
+  dateOfBirth   DateTime? @map("date_of_birth") @db.Date
+  identityNumber String? @map("identity_number") @db.VarChar(32)
 
   /// Argon2id. لا يُعاد أبدًا من أي endpoint، ومُنقّح من كل السجلات.
   passwordHash String @map("password_hash") @db.VarChar(255)
@@ -312,7 +331,10 @@ model User {
   locale     String  @default("ar") @db.VarChar(5)
 
   isSuperAdmin Boolean    @default(false) @map("is_super_admin")
+  platformRole PlatformRole? @map("platform_role")
   status       UserStatus @default(ACTIVE)
+  emailVerifiedAt   DateTime? @map("email_verified_at") @db.Timestamptz(6)
+  mustChangePassword Boolean @default(false) @map("must_change_password")
 
   /// 2FA — السر مشفّر بمفتاح التطبيق قبل التخزين (ليس نصًا صريحًا).
   totpSecret    String? @map("totp_secret") @db.VarChar(255)
@@ -338,6 +360,28 @@ model User {
   @@index([tenantId, status])
   @@index([tenantId, roleId])
   @@map("users")
+}
+
+/// دعوة موظف منصة قبل إثبات ملكية البريد. لا تتحول إلى مستخدم إلا بعد الرمز.
+model PlatformStaffInvite {
+  id             String       @id @default(uuid()) @db.Uuid
+  email          String       @unique @db.VarChar(254)
+  name           String       @db.VarChar(120)
+  phone          String       @db.VarChar(10)
+  dateOfBirth    DateTime     @map("date_of_birth") @db.Date
+  identityNumber String       @map("identity_number") @db.VarChar(32)
+  jobTitle       String       @map("job_title") @db.VarChar(80)
+  platformRole   PlatformRole @map("platform_role")
+  locale         String       @default("ar") @db.VarChar(5)
+
+  verificationCodeHash String   @map("verification_code_hash") @db.Char(64)
+  expiresAt            DateTime @map("expires_at") @db.Timestamptz(6)
+  attempts             Int      @default(0)
+  createdBy            String   @map("created_by") @db.Uuid
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([expiresAt])
+  @@map("platform_staff_invites")
 }
 
 /// الجلسة — رمز تجديد واحد.

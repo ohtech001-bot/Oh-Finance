@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createTenantSchema,
+  createPlatformStaffInviteSchema,
   dateRangeSchema,
   loginRequestSchema,
   moneySchema,
@@ -86,12 +87,13 @@ describe('passwordSchema', () => {
 describe('createTenantSchema — إنشاء محل من لوحة المدير العام', () => {
   const valid = {
     name: 'محل النجاح',
-    slug: 'al-najah',
-    storeName: 'محل النجاح',
     ownerName: 'أحمد محمود',
     ownerEmail: 'owner@alnajah.com',
     ownerPassword: 'a-long-enough-passphrase',
     planId: '3f1b6e2a-9c4d-4b8e-9f2a-7d5c1e3a8b6f',
+    subscriptionStartDate: '2026-07-01',
+    subscriptionEndDate: '2026-08-01',
+    agreedMonthlyAmount: '250.00',
   };
 
   it('يقبل حمولة صالحة ويطبّق الافتراضيات', () => {
@@ -99,17 +101,35 @@ describe('createTenantSchema — إنشاء محل من لوحة المدير ا
     expect(parsed.currency).toBe('ILS');
     expect(parsed.locale).toBe('ar');
     expect(parsed.timezone).toBe('Asia/Jerusalem');
-    expect(parsed.trialDays).toBe(0);
+    expect(parsed.paymentStatus).toBe('UNPAID');
+    expect(parsed.paidAmount).toBe('0.00');
   });
 
-  it('يرفض المعرّف بحروف غير مسموحة', () => {
-    expect(createTenantSchema.safeParse({ ...valid, slug: 'محل النجاح' }).success).toBe(false);
-    expect(createTenantSchema.safeParse({ ...valid, slug: 'Al Najah' }).success).toBe(false);
-    expect(createTenantSchema.safeParse({ ...valid, slug: 'al-najah-2' }).success).toBe(true);
+  it('لا يطلب معرّفًا أو اسمًا تجاريًا إضافيًا', () => {
+    const parsed = createTenantSchema.parse(valid);
+    expect('slug' in parsed).toBe(false);
+    expect('storeName' in parsed).toBe(false);
   });
 
   it('يرفض كلمة مرور ضعيفة لصاحب المحل', () => {
     expect(createTenantSchema.safeParse({ ...valid, ownerPassword: '123' }).success).toBe(false);
+  });
+});
+
+describe('createPlatformStaffInviteSchema', () => {
+  const valid = {
+    name: 'موظف جديد', email: 'staff@example.com', phone: '0501234567',
+    dateOfBirth: '1995-05-10', identityNumber: '123456789', jobTitle: 'خدمة العملاء',
+    platformRole: 'EMPLOYEE', locale: 'ar',
+  } as const;
+
+  it('يقبل كل الحقول الإلزامية', () => {
+    expect(createPlatformStaffInviteSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('يرفض هاتفًا لا يبدأ بـ05 أو لا يتكون من 10 أرقام', () => {
+    expect(createPlatformStaffInviteSchema.safeParse({ ...valid, phone: '0401234567' }).success).toBe(false);
+    expect(createPlatformStaffInviteSchema.safeParse({ ...valid, phone: '050123456' }).success).toBe(false);
   });
 });
 

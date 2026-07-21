@@ -30,7 +30,7 @@ export function AppShell() {
   const isPlatform = user?.isSuperAdmin ?? false;
   const items = isPlatform ? PLATFORM_NAV : TENANT_NAV;
 
-  const title = isPlatform ? 'منصة أوه فاينانس' : (user?.store?.name ?? user?.tenant?.name ?? '—');
+  const title = isPlatform ? 'OH Finance' : (user?.store?.name ?? user?.tenant?.name ?? '—');
 
   const subtitle = isPlatform
     ? 'المدير العام'

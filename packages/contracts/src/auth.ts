@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ALL_PERMISSIONS, TENANT_ROLES, ROLES } from '@oh/config';
+import { ALL_PERMISSIONS, PLATFORM_ROLES, TENANT_ROLES } from '@oh/config';
 import { emailSchema, localeSchema, uuidSchema } from './common.js';
 
 /**
@@ -36,7 +36,7 @@ export const loginRequestSchema = z.object({
 });
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 
-export const roleSchema = z.enum([ROLES.SUPER_ADMIN, ...TENANT_ROLES] as [string, ...string[]]);
+export const roleSchema = z.enum([...PLATFORM_ROLES, ...TENANT_ROLES] as [string, ...string[]]);
 export const permissionSchema = z.enum(ALL_PERMISSIONS as [string, ...string[]]);
 
 /** المستخدم الحالي — ما تعرفه الواجهة عن الجلسة. */
@@ -49,6 +49,8 @@ export const sessionUserSchema = z.object({
   permissions: z.array(permissionSchema),
   locale: localeSchema,
   isSuperAdmin: z.boolean(),
+  supportMode: z.boolean().default(false),
+  mustChangePassword: z.boolean(),
   twoFactorEnabled: z.boolean(),
   /** null للمدير العام — لا ينتمي إلى أي مستأجر. */
   tenant: z
