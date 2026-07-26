@@ -37,6 +37,13 @@ export class ActivityController {
     return this.activity.feed(query);
   }
 
+  @Get('notifications')
+  @RequirePermissions(PERMISSIONS.DASHBOARD_READ)
+  @ApiOperation({ summary: 'إشعارات الطلبات والدفعات ومواعيد سداد الزبائن.' })
+  async notifications() {
+    return this.activity.notifications();
+  }
+
   @Get('customers/:id/activity')
   @RequirePermissions(PERMISSIONS.CUSTOMERS_READ)
   @ApiOperation({ summary: 'الخط الزمني لزبون — أحداثه وطلباته ودفعاته.' })

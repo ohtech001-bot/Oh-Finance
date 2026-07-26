@@ -89,7 +89,7 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        'flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between',
+        'flex items-start justify-between gap-3',
         className,
       )}
     >
@@ -100,13 +100,15 @@ export function PageHeader({
         </div>
 
         {breadcrumbs ? (
-          <Breadcrumbs items={breadcrumbs} linkAs={linkAs} className="mt-1.5" />
+          <Breadcrumbs items={breadcrumbs} linkAs={linkAs} className="mt-1.5 hidden sm:flex" />
         ) : null}
 
         {description ? <p className="mt-1.5 text-sm text-fg-muted">{description}</p> : null}
       </div>
 
-      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? (
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">{actions}</div>
+      ) : null}
     </div>
   );
 }

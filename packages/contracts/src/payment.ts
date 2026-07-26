@@ -31,7 +31,7 @@ export const paymentStatusSchema = z.enum(['POSTED', 'REVERSED']);
 export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
 
 export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
-  POSTED: 'مُسجَّلة',
+  POSTED: 'مقبوضة',
   REVERSED: 'معكوسة',
 };
 
@@ -128,10 +128,10 @@ export const createPaymentSchema = z
     /** إلزامي عند `MANUAL`، ومُتجاهَل فيما عداه. */
     allocations: z.array(manualAllocationSchema).max(100).optional(),
   })
-  .refine(
-    (dto) => dto.strategy !== 'MANUAL' || (dto.allocations?.length ?? 0) > 0,
-    { message: 'التوزيع اليدوي يتطلب تحديد طلب واحد على الأقل.', path: ['allocations'] },
-  );
+  .refine((dto) => dto.strategy !== 'MANUAL' || (dto.allocations?.length ?? 0) > 0, {
+    message: 'التوزيع اليدوي يتطلب تحديد طلب واحد على الأقل.',
+    path: ['allocations'],
+  });
 export type CreatePaymentRequest = z.infer<typeof createPaymentSchema>;
 
 /**

@@ -24,7 +24,6 @@ import {
   zero,
   type CurrencyCode,
 } from '@oh/money';
-import { PERMISSIONS } from '@oh/config';
 import type { Prisma } from '@prisma/client';
 import { AppError } from '../../core/errors/app-error.js';
 import { AuditService } from '../../core/audit/audit.service.js';
@@ -35,7 +34,10 @@ import { LedgerService } from '../ledger/ledger.service.js';
 import { OrderCalculator } from './order-calculator.js';
 
 type OrderRow = Prisma.OrderGetPayload<{
-  include: { customer: { select: { name: true; code: true } }; _count: { select: { items: true } } };
+  include: {
+    customer: { select: { name: true; code: true } };
+    _count: { select: { items: true } };
+  };
 }>;
 
 @Injectable()
@@ -66,7 +68,15 @@ export class OrdersService {
     const orderId = await this.prisma.runInTenant(tenantId, async (tx) => {
       const customer = await tx.customer.findFirst({
         where: { id: dto.customerId, archivedAt: null },
-        select: { id: true, name: true, code: true, status: true, paymentTermDays: true, creditLimit: true },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          status: true,
+          paymentTermDays: true,
+          paymentDueDate: true,
+          creditLimit: true,
+        },
       });
       if (!customer) throw AppError.notFound('الزبون');
 
@@ -80,7 +90,7 @@ export class OrdersService {
       const issuedAt = dto.issuedAt ? new Date(dto.issuedAt) : new Date();
       const dueAt = dto.dueAt
         ? new Date(dto.dueAt)
-        : this.addDays(issuedAt, customer.paymentTermDays);
+        : (customer.paymentDueDate ?? this.addDays(issuedAt, customer.paymentTermDays));
 
       const willConfirm = dto.status === 'CONFIRMED';
 
@@ -146,8 +156,6 @@ export class OrdersService {
           total: toMoneyString(calculated.total),
           dueAt,
           userId,
-          overrideCreditLimit: false,
-          overrideReason: undefined,
         });
       }
 
@@ -168,18 +176,25 @@ export class OrdersService {
    *
    *  ثلاث حمايات:
    *    1. **قفل متفائل** (`version`) — يمنع تأكيدين متزامنين لنفس الطلب
-   *    2. **حد الائتمان** — يُفحص قبل القيد، لا بعده
+   *    2. **حد الدين** — يُفحص قبل القيد ويُسجّل التجاوز دون تعطيل البيع
    *    3. **القفل الفعلي** (`lockedAt`) — يمنع أي تعديل لاحق على المبالغ
    */
   async confirm(id: string, dto: ConfirmOrderRequest): Promise<OrderDetail> {
     const { tenantId, storeId, userId } = this.context();
-    const permissions = TenantContext.get()?.permissions ?? [];
-
     await this.prisma.runInTenant(tenantId, async (tx) => {
       const order = await tx.order.findFirst({
         where: { id },
         include: {
-          customer: { select: { id: true, name: true, creditLimit: true, paymentTermDays: true, status: true } },
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              creditLimit: true,
+              paymentTermDays: true,
+              paymentDueDate: true,
+              status: true,
+            },
+          },
         },
       });
       if (!order) throw AppError.notFound('الطلب');
@@ -204,16 +219,9 @@ export class OrdersService {
 
       const dueAt = dto.dueAt
         ? new Date(dto.dueAt)
-        : (order.dueAt ?? this.addDays(order.issuedAt, order.customer.paymentTermDays));
-
-      // ── 2. حد الائتمان ───────────────────────────────────────────────
-      const canOverride = permissions.includes(PERMISSIONS.LEDGER_ADJUST);
-      if (dto.overrideCreditLimit && !canOverride) {
-        throw AppError.forbidden('تجاوز حد الائتمان يتطلب صلاحية صاحب المحل.');
-      }
-      if (dto.overrideCreditLimit && (dto.overrideReason ?? '').trim().length < 5) {
-        throw AppError.validation('تجاوز حد الائتمان يتطلب سببًا مكتوبًا.');
-      }
+        : (order.dueAt ??
+          order.customer.paymentDueDate ??
+          this.addDays(order.issuedAt, order.customer.paymentTermDays));
 
       await this.postConfirmation(tx, {
         tenantId,
@@ -226,8 +234,6 @@ export class OrdersService {
         total: order.total.toString(),
         dueAt,
         userId,
-        overrideCreditLimit: dto.overrideCreditLimit,
-        overrideReason: dto.overrideReason,
         expectedVersion: dto.version,
       });
     });
@@ -256,8 +262,6 @@ export class OrdersService {
       total: string;
       dueAt: Date;
       userId: string;
-      overrideCreditLimit: boolean;
-      overrideReason?: string | undefined;
       expectedVersion?: number;
     },
   ): Promise<void> {
@@ -267,7 +271,7 @@ export class OrdersService {
       throw AppError.validation('لا يُؤكَّد طلب بإجمالي صفر.');
     }
 
-    // ── فحص حد الائتمان — قبل القيد ────────────────────────────────────
+    // ── رصد تجاوز حد الدين قبل القيد دون تعطيل البيع ───────────────────
     const creditLimit = toMoney(params.customerCreditLimit);
 
     if (!isZero(creditLimit)) {
@@ -275,28 +279,19 @@ export class OrdersService {
       const balanceAfter = add(currentBalance, total);
 
       if (greaterThan(balanceAfter, creditLimit)) {
-        if (!params.overrideCreditLimit) {
-          throw AppError.conflict(
-            `تأكيد هذا الطلب يرفع رصيد "${params.customerName}" إلى ` +
-              `${toMoneyString(balanceAfter, 2)} — متجاوزًا حد الائتمان ` +
-              `${toMoneyString(creditLimit, 2)}. ` +
-              'يلزم تجاوز صريح من صاحب المحل، أو تحصيل دفعة أولًا.',
-          );
-        }
-
-        // التجاوز مسموح لكنه **حدث مُدقَّق**: من تجاوز، ولماذا، وبكم.
+        // التجاوز لا يوقف البيع، لكنه يبقى حدثًا واضحًا في سجل التدقيق.
         await this.audit.record(tx, {
           action: AUDIT_ACTIONS.ORDER_CREDIT_LIMIT_OVERRIDDEN,
           summary:
             `تجاوز حد الائتمان للزبون "${params.customerName}" عند تأكيد ${params.orderNumber}. ` +
             `الحد ${toMoneyString(creditLimit, 2)}، الرصيد بعد التأكيد ${toMoneyString(balanceAfter, 2)}. ` +
-            `السبب: ${params.overrideReason}`,
+            'استمر تسجيل الطلب حسب سياسة المحل.',
           entityType: 'Order',
           entityId: params.orderId,
           after: {
             creditLimit: toMoneyString(creditLimit, 2),
             balanceAfter: toMoneyString(balanceAfter, 2),
-            reason: params.overrideReason,
+            reason: 'استمرار تلقائي حسب سياسة المحل',
           },
         });
       }
@@ -633,10 +628,7 @@ export class OrdersService {
       }
 
       // نمنع أرشفة طلب نشط (مؤكد/مدفوع جزئيًا) — قد يُنسى وهو مستحق.
-      if (
-        archived &&
-        (order.status === 'CONFIRMED' || order.status === 'PARTIALLY_PAID')
-      ) {
+      if (archived && (order.status === 'CONFIRMED' || order.status === 'PARTIALLY_PAID')) {
         throw AppError.conflict(
           'لا تُؤرشف طلبًا نشطًا (مؤكد أو مدفوع جزئيًا). أغلقه أو ألغه أولًا.',
         );
@@ -798,7 +790,11 @@ export class OrdersService {
     const { tenantId } = this.context();
 
     return this.prisma.runInTenant(tenantId, async (tx) => {
-      const where = this.buildWhere({ ...query, status: undefined });
+      const where = this.buildWhere({
+        ...query,
+        status: undefined,
+        classification: undefined,
+      });
 
       const [grouped, agg] = await Promise.all([
         tx.order.groupBy({ by: ['status'], where, _count: true }),
@@ -808,14 +804,13 @@ export class OrdersService {
         }),
       ]);
 
-      const count = (status: string) =>
-        grouped.find((g) => g.status === status)?._count ?? 0;
+      const count = (status: string) => grouped.find((g) => g.status === status)?._count ?? 0;
 
       const totalAmount = toMoney(agg._sum.total?.toString() ?? '0');
       const paidAmount = toMoney(agg._sum.paidAmount?.toString() ?? '0');
 
       return {
-        total: grouped.reduce((acc, g) => acc + g._count, 0),
+        total: count('CONFIRMED') + count('PARTIALLY_PAID') + count('PAID'),
         draft: count('DRAFT'),
         quote: count('QUOTE'),
         confirmed: count('CONFIRMED'),
@@ -832,11 +827,18 @@ export class OrdersService {
 
   private buildWhere(query: OrderListQuery): Prisma.OrderWhereInput {
     const now = new Date();
+    const statusFilter: Prisma.OrderWhereInput = query.status
+      ? { status: query.status }
+      : query.classification === 'DRAFT'
+        ? { status: 'DRAFT' }
+        : query.classification === 'CONFIRMED'
+          ? { status: { in: ['CONFIRMED', 'PARTIALLY_PAID', 'PAID'] } }
+          : {};
 
     return {
       // المؤرشفة مخفية افتراضيًا.
       ...(query.includeArchived ? {} : { archivedAt: null }),
-      ...(query.status ? { status: query.status } : {}),
+      ...statusFilter,
       ...(query.customerId ? { customerId: query.customerId } : {}),
       ...(query.search
         ? {

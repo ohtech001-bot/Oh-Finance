@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { Drawer, DrawerContent } from '@oh/ui';
 import { useAuth } from '@/app/auth-context';
 import { PLATFORM_NAV, TENANT_NAV } from './nav-items';
 import { MobileTabBar } from './mobile-tabbar';
 import { Sidebar } from './sidebar';
 import { Topbar } from './topbar';
+import { currentLocale } from '@/lib/i18n';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -25,6 +26,7 @@ import { Topbar } from './topbar';
  */
 export function AppShell() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const isPlatform = user?.isSuperAdmin ?? false;
@@ -32,14 +34,15 @@ export function AppShell() {
 
   const title = isPlatform ? 'OH Finance' : (user?.store?.name ?? user?.tenant?.name ?? '—');
 
-  const subtitle = isPlatform
-    ? 'المدير العام'
-    : user?.store?.code
-      ? `رقم المحل: ${user.store.code}`
-      : (user?.tenant?.name ?? '');
+  const subtitle = isPlatform ? 'المدير العام' : '';
+  const newOrderLabel = {
+    ar: 'إضافة طلبية',
+    he: 'הזמנה חדשה',
+    en: 'New order',
+  }[currentLocale()];
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-bg">
+    <div className="bg-bg flex h-dvh overflow-hidden">
       {/* الشريط الجانبي — ديسكتوب */}
       <Sidebar items={items} title={title} subtitle={subtitle} className="hidden lg:flex" />
 
@@ -62,7 +65,7 @@ export function AppShell() {
 
         <main
           id="main-content"
-          className="flex-1 overflow-y-auto p-4 pb-24 sm:p-6 lg:pb-6"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-y-none p-3 pb-[calc(84px+env(safe-area-inset-bottom))] sm:p-6 lg:pb-6"
           tabIndex={-1}
         >
           <Outlet />
@@ -77,11 +80,9 @@ export function AppShell() {
           isPlatform
             ? undefined
             : {
-                label: 'طلب جديد',
-                // مُعطَّل بصدق: شاشة الطلبات تُبنى في المرحلة 4.
-                // زر يفتح شاشة فارغة أسوأ من زر يقول «قريبًا».
-                disabled: true,
-                onClick: () => undefined,
+                label: newOrderLabel,
+                disabled: !user?.permissions.includes('orders.create'),
+                onClick: () => navigate('/orders?new=1'),
               }
         }
       />

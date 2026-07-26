@@ -56,14 +56,14 @@ export function KpiCard({ metric, currency }: { metric: KpiMetric; currency: Cur
 
   return (
     <Card>
-      <CardBody className="flex flex-col gap-2">
+      <CardBody className="flex flex-col gap-2 p-3 sm:p-5">
         <div className="flex items-center justify-between gap-2">
-          <span className="flex items-center gap-1.5 text-[13px] text-fg-muted">
-            <Icon className="size-4 text-fg-subtle" aria-hidden />
+          <span className="text-fg-muted flex items-center gap-1.5 text-[13px]">
+            <Icon className="text-fg-subtle size-4" aria-hidden />
             {meta.label}
           </span>
           <span
-            className="cursor-help text-fg-subtle"
+            className="text-fg-subtle cursor-help"
             title={meta.definition}
             aria-label={`طريقة حساب ${meta.label}: ${meta.definition}`}
             tabIndex={0}
@@ -72,7 +72,7 @@ export function KpiCard({ metric, currency }: { metric: KpiMetric; currency: Cur
           </span>
         </div>
 
-        <p className="text-xl font-semibold tabular-nums text-fg" dir="ltr">
+        <p className="text-fg text-xl font-semibold tabular-nums" dir="ltr">
           {formatValue(metric, currency)}
         </p>
 
@@ -83,10 +83,10 @@ export function KpiCard({ metric, currency }: { metric: KpiMetric; currency: Cur
               {metric.deltaPct > 0 ? '+' : ''}
               {metric.deltaPct}%
             </span>
-            <span className="text-fg-subtle">مقابل الفترة السابقة</span>
+            <span className="text-fg-subtle hidden sm:inline">مقابل الفترة السابقة</span>
           </p>
         ) : (
-          <p className="text-xs text-fg-subtle">قيمة لحظية</p>
+          <p className="text-fg-subtle text-xs">قيمة لحظية</p>
         )}
       </CardBody>
     </Card>

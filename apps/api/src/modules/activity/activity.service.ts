@@ -3,11 +3,15 @@ import type {
   ActivityCategory,
   ActivityItem,
   ActivityQuery,
+  NotificationFeed,
+  NotificationItem,
   PaginatedResult,
 } from '@oh/contracts';
 import type { Prisma } from '@prisma/client';
+import { toMoneyString } from '@oh/money';
 import { PrismaService } from '../../core/prisma/prisma.service.js';
 import { TenantContext } from '../../core/tenancy/tenant-context.js';
+import { isoDateInTimeZone } from '../../core/time/iso-date-in-timezone.js';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -135,6 +139,157 @@ export class ActivityService {
     });
   }
 
+  async notifications(): Promise<NotificationFeed> {
+    const tenantId = TenantContext.requireTenantId();
+    const permissions = new Set<string>(TenantContext.get()?.permissions ?? []);
+
+    return this.prisma.runInTenant(tenantId, async (tx) => {
+      const tenant = await tx.tenant.findUnique({
+        where: { id: tenantId },
+        select: { timezone: true },
+      });
+      const timezone = tenant?.timezone ?? 'Asia/Jerusalem';
+      const todayText = isoDateInTimeZone(new Date(), timezone);
+      const today = new Date(`${todayText}T00:00:00.000Z`);
+      const fiveDaysFromNow = new Date(today);
+      fiveDaysFromNow.setUTCDate(fiveDaysFromNow.getUTCDate() + 5);
+
+      const allowedActions: string[] = [];
+      if (permissions.has('orders.read')) allowedActions.push('order.created');
+      if (permissions.has('payments.read')) allowedActions.push('payment.created');
+      const recentActivityStart = new Date();
+      recentActivityStart.setDate(recentActivityStart.getDate() - 7);
+
+      const activityRows =
+        allowedActions.length > 0
+          ? await tx.auditLog.findMany({
+              where: {
+                action: { in: allowedActions },
+                createdAt: { gte: recentActivityStart },
+              },
+              orderBy: { seq: 'desc' },
+              take: 12,
+              select: {
+                id: true,
+                action: true,
+                entityId: true,
+                summary: true,
+                createdAt: true,
+              },
+            })
+          : [];
+
+      const orderIds = activityRows
+        .filter((row) => row.action === 'order.created' && row.entityId)
+        .map((row) => row.entityId as string);
+      const paymentIds = activityRows
+        .filter((row) => row.action === 'payment.created' && row.entityId)
+        .map((row) => row.entityId as string);
+      const [orders, payments] = await Promise.all([
+        orderIds.length
+          ? tx.order.findMany({
+              where: { id: { in: orderIds } },
+              select: {
+                id: true,
+                number: true,
+                total: true,
+                customer: { select: { name: true } },
+              },
+            })
+          : [],
+        paymentIds.length
+          ? tx.payment.findMany({
+              where: { id: { in: paymentIds } },
+              select: {
+                id: true,
+                amount: true,
+                customer: { select: { name: true } },
+              },
+            })
+          : [],
+      ]);
+      const ordersById = new Map(orders.map((order) => [order.id, order]));
+      const paymentsById = new Map(payments.map((payment) => [payment.id, payment]));
+
+      const items: NotificationItem[] = activityRows.map((row) => {
+        if (row.action === 'payment.created') {
+          const payment = row.entityId ? paymentsById.get(row.entityId) : undefined;
+          return {
+            id: row.id,
+            kind: 'PAYMENT_RECEIVED',
+            severity: 'success',
+            title: 'تم استلام دفعة',
+            description: row.summary,
+            customerName: payment?.customer.name,
+            amount: payment ? decimalAmount(payment.amount.toString()) : undefined,
+            occurredAt: row.createdAt.toISOString(),
+            href: '/payments',
+          };
+        }
+
+        const order = row.entityId ? ordersById.get(row.entityId) : undefined;
+        return {
+          id: row.id,
+          kind: 'ORDER_CREATED',
+          severity: 'info',
+          title: 'تم إدخال طلبية جديدة',
+          description: row.summary,
+          customerName: order?.customer.name,
+          amount: order ? decimalAmount(order.total.toString()) : undefined,
+          orderNumber: order?.number,
+          occurredAt: row.createdAt.toISOString(),
+          href: row.entityId ? `/orders?orderId=${row.entityId}` : '/orders',
+        };
+      });
+
+      if (permissions.has('customers.read')) {
+        const dueCustomers = await tx.$queryRaw<
+          { id: string; name: string; payment_due_date: Date; balance: string }[]
+        >`
+          WITH balances AS (
+            SELECT DISTINCT ON (le.customer_id)
+                   le.customer_id,
+                   le.running_balance
+            FROM ledger_entries le
+            WHERE le.tenant_id = ${tenantId}::uuid
+            ORDER BY le.customer_id, le.seq DESC
+          )
+          SELECT c.id, c.name, c.payment_due_date, b.running_balance::text AS balance
+          FROM customers c
+          JOIN balances b ON b.customer_id = c.id
+          WHERE c.tenant_id = ${tenantId}::uuid
+            AND c.archived_at IS NULL
+            AND b.running_balance > 0
+            AND c.payment_due_date IN (${today}::date, ${fiveDaysFromNow}::date)
+          ORDER BY c.payment_due_date ASC, c.name ASC
+        `;
+
+        const generatedAt = new Date().toISOString();
+        for (const customer of dueCustomers) {
+          const dueToday = customer.payment_due_date.getTime() === today.getTime();
+          items.push({
+            id: `${dueToday ? 'due-today' : 'due-soon'}-${customer.id}-${todayText}`,
+            kind: dueToday ? 'PAYMENT_DUE_TODAY' : 'PAYMENT_DUE_SOON',
+            severity: dueToday ? 'danger' : 'warning',
+            title: dueToday
+              ? `موعد سداد ${customer.name} اليوم`
+              : `اقترب موعد سداد ${customer.name}`,
+            description: dueToday
+              ? `موعد سداد الدين اليوم. الرصيد المستحق: ${customer.balance}`
+              : `متبقي 5 أيام على موعد سداد الدين. الرصيد المستحق: ${customer.balance}`,
+            customerName: customer.name,
+            balance: customer.balance,
+            occurredAt: generatedAt,
+            href: `/customers/${customer.id}`,
+          });
+        }
+      }
+
+      const sorted = items.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).slice(0, 20);
+      return { items: sorted, total: sorted.length };
+    });
+  }
+
   /**
    * نطاق الرؤية بحسب الصلاحيات.
    *
@@ -172,4 +327,8 @@ export class ActivityService {
       occurredAt: row.createdAt.toISOString(),
     };
   }
+}
+
+function decimalAmount(value: string): string {
+  return toMoneyString(value.includes('.') ? value : `${value}.0`, 2);
 }

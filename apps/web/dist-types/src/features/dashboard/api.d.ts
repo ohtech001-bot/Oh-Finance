@@ -7,30 +7,30 @@ import type { DashboardQuery } from '@oh/contracts';
  */
 export declare function useDashboard(query: Partial<DashboardQuery>): import("@tanstack/react-query").UseQueryResult<NoInfer<{
     kpis: {
-        value: string;
         id: "revenue" | "payments" | "orders" | "outstanding_balance" | "overdue_balance" | "overdue_customers" | "active_customers" | "average_order_value" | "collection_rate" | "unallocated_payments";
-        unit: "count" | "money" | "percent";
+        value: string;
+        unit: "money" | "count" | "percent";
         previous: string | null;
         deltaPct: number | null;
         trend: "flat" | "up" | "down";
     }[];
     trends: {
         id: "revenue" | "payments" | "orders" | "outstanding_balance" | "new_customers";
-        unit: "count" | "money" | "percent";
+        unit: "money" | "count" | "percent";
         points: {
             value: string;
             bucket: string;
         }[];
     }[];
     topCustomers: {
-        code: string;
         id: string;
+        code: string;
         name: string;
         amount: string;
     }[];
     topDebtors: {
-        code: string;
         id: string;
+        code: string;
         name: string;
         balance: string;
         oldestOverdueAt: string | null;
@@ -48,16 +48,16 @@ export declare function useDashboard(query: Partial<DashboardQuery>): import("@t
     }[];
     recentOrders: {
         number: string;
-        status: "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID";
-        total: string;
         id: string;
+        status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
+        total: string;
         customerId: string;
         customerName: string;
         issuedAt: string;
     }[];
     meta: {
-        currency: string;
         storeName: string;
+        currency: string;
         timezone: string;
         generatedAt: string;
         range: {
@@ -77,14 +77,14 @@ export declare function useDashboard(query: Partial<DashboardQuery>): import("@t
         };
     };
     alerts: {
+        id: string;
         message: string;
         date: string | null;
-        id: string;
-        entityType: string | null;
-        entityId: string | null;
         amount: string | null;
         kind: "unallocated_payments" | "approaching_credit_limit" | "over_credit_limit" | "long_overdue" | "stale_draft_orders" | "inactive_no_activity" | "subscription_ending";
         severity: "info" | "warning" | "critical";
+        entityType: string | null;
+        entityId: string | null;
         actionHref: string | null;
     }[];
 }>, Error>;

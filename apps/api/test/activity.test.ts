@@ -1,5 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type { CreateCustomerRequest, CreateOrderRequest, CreatePaymentRequest } from '@oh/contracts';
+import type {
+  CreateCustomerRequest,
+  CreateOrderRequest,
+  CreatePaymentRequest,
+} from '@oh/contracts';
 import { AUDIT_ACTIONS } from '@oh/contracts';
 import { HAS_TEST_DB, SKIP_REASON, closeTestDb, testDb } from './db.js';
 import { createTestTenant, inTenant, resetAll, type TestTenant } from './helpers.js';
@@ -46,9 +50,19 @@ function fakePrisma(): PrismaService {
   } as unknown as PrismaService;
 }
 
-const FULL_READ = ['customers.read', 'orders.read', 'payments.read', 'ledger.read', 'audit.read'] as const;
+const FULL_READ = [
+  'customers.read',
+  'orders.read',
+  'payments.read',
+  'ledger.read',
+  'audit.read',
+] as const;
 
-function asUser<T>(tn: TestTenant, fn: () => Promise<T>, perms: readonly string[] = FULL_READ): Promise<T> {
+function asUser<T>(
+  tn: TestTenant,
+  fn: () => Promise<T>,
+  perms: readonly string[] = FULL_READ,
+): Promise<T> {
   return TenantContext.run(
     {
       requestId: 'test-activity',
@@ -80,7 +94,16 @@ function orderPayload(customerId: string): CreateOrderRequest {
     customerId,
     status: 'CONFIRMED',
     discountAmount: '0',
-    items: [{ sourceType: 'MANUAL', name: 'بند', quantity: '1', unitPrice: '500', discount: '0', taxRate: '0' }],
+    items: [
+      {
+        sourceType: 'MANUAL',
+        name: 'بند',
+        quantity: '1',
+        unitPrice: '500',
+        discount: '0',
+        taxRate: '0',
+      },
+    ],
   } as CreateOrderRequest;
 }
 
@@ -98,6 +121,18 @@ function isoDay(offsetDays: number): string {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() + offsetDays);
   return d.toISOString().slice(0, 10);
+}
+
+function jerusalemDay(offsetDays: number): string {
+  const localDay = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jerusalem',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+  const date = new Date(`${localDay}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
 }
 
 describe.skipIf(!HAS_TEST_DB)('موجز النشاط', () => {
@@ -119,7 +154,13 @@ describe.skipIf(!HAS_TEST_DB)('موجز النشاط', () => {
     audit = new AuditService();
     activity = new ActivityService(prisma);
     customers = new CustomersService(prisma, ledger, new NumberingService(), audit);
-    orders = new OrdersService(prisma, ledger, new OrderCalculator(), new NumberingService(), audit);
+    orders = new OrdersService(
+      prisma,
+      ledger,
+      new OrderCalculator(),
+      new NumberingService(),
+      audit,
+    );
     payments = new PaymentsService(prisma, ledger, new NumberingService(), audit);
   });
 
@@ -157,13 +198,61 @@ describe.skipIf(!HAS_TEST_DB)('موجز النشاط', () => {
     await asUser(a, () => orders.create(orderPayload(customer.id)));
     await asUser(a, () => payments.create(paymentPayload(customer.id), `k${payKey++}`));
 
-    const feed = await asUser(a, () => activity.feed({ customerId: customer.id, page: 1, pageSize: 50 }));
+    const feed = await asUser(a, () =>
+      activity.feed({ customerId: customer.id, page: 1, pageSize: 50 }),
+    );
 
     expect(feed.items.some((i) => i.category === 'CUSTOMER')).toBe(true);
     expect(feed.items.some((i) => i.category === 'ORDER')).toBe(true);
     expect(feed.items.some((i) => i.category === 'PAYMENT')).toBe(true);
     // كل عنصر يحمل وقتًا وعنوانًا.
     expect(feed.items.every((i) => i.occurredAt && i.title)).toBe(true);
+  });
+
+  it('الإشعارات تعرض إنشاء الطلب واستلام الدفعة', async () => {
+    const customer = await asUser(a, () => customers.create(customerPayload('زبون إشعارات')));
+    const order = await asUser(a, () => orders.create(orderPayload(customer.id)));
+    await asUser(a, () => payments.create(paymentPayload(customer.id), `k${payKey++}`));
+
+    const notifications = await asUser(a, () => activity.notifications());
+    const orderNotification = notifications.items.find((item) => item.kind === 'ORDER_CREATED');
+    const paymentNotification = notifications.items.find(
+      (item) => item.kind === 'PAYMENT_RECEIVED',
+    );
+
+    expect(orderNotification).toMatchObject({
+      customerName: customer.name,
+      amount: '500.00',
+      orderNumber: order.number,
+    });
+    expect(paymentNotification).toMatchObject({
+      customerName: customer.name,
+      amount: '200.00',
+    });
+  });
+
+  it('الإشعارات تميّز موعد السداد بعد خمسة أيام واليوم نفسه', async () => {
+    const dueSoon = await asUser(a, () =>
+      customers.create({
+        ...customerPayload('سداد قريب'),
+        paymentDueDate: jerusalemDay(5),
+      }),
+    );
+    const dueToday = await asUser(a, () =>
+      customers.create({
+        ...customerPayload('سداد اليوم'),
+        paymentDueDate: jerusalemDay(0),
+      }),
+    );
+    await asUser(a, () => orders.create(orderPayload(dueSoon.id)));
+    await asUser(a, () => orders.create(orderPayload(dueToday.id)));
+
+    const notifications = await asUser(a, () => activity.notifications());
+    const soon = notifications.items.find((item) => item.kind === 'PAYMENT_DUE_SOON');
+    const today = notifications.items.find((item) => item.kind === 'PAYMENT_DUE_TODAY');
+
+    expect(soon).toMatchObject({ severity: 'warning', href: `/customers/${dueSoon.id}` });
+    expect(today).toMatchObject({ severity: 'danger', href: `/customers/${dueToday.id}` });
   });
 
   it('الترتيب زمني تنازلي بالتسلسل', async () => {
@@ -217,11 +306,15 @@ describe.skipIf(!HAS_TEST_DB)('موجز النشاط', () => {
     await asUser(a, () => orders.create(orderPayload(customer.id)));
 
     // to = اليوم → شامل (حتى 23:59:59).
-    const upToToday = await asUser(a, () => activity.feed({ page: 1, pageSize: 50, to: isoDay(0) }));
+    const upToToday = await asUser(a, () =>
+      activity.feed({ page: 1, pageSize: 50, to: isoDay(0) }),
+    );
     expect(upToToday.total).toBeGreaterThan(0);
 
     // to = الأمس → يستبعد أحداث اليوم.
-    const upToYesterday = await asUser(a, () => activity.feed({ page: 1, pageSize: 50, to: isoDay(-1) }));
+    const upToYesterday = await asUser(a, () =>
+      activity.feed({ page: 1, pageSize: 50, to: isoDay(-1) }),
+    );
     expect(upToYesterday.total).toBe(0);
   });
 
@@ -266,7 +359,9 @@ describe.skipIf(!HAS_TEST_DB)('موجز النشاط', () => {
     await asUser(b, () => orders.create(orderPayload(custB.id)));
 
     // المستأجر أ يطلب خطّ زبون يخص المستأجر ب — RLS يعزل، فلا نشاط ولا تسريب.
-    const leaked = await asUser(a, () => activity.feed({ customerId: custB.id, page: 1, pageSize: 50 }));
+    const leaked = await asUser(a, () =>
+      activity.feed({ customerId: custB.id, page: 1, pageSize: 50 }),
+    );
     expect(leaked.total).toBe(0);
     expect(leaked.items).toHaveLength(0);
   });

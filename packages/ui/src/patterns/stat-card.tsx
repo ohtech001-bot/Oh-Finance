@@ -83,7 +83,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        'rounded-card border border-border bg-card p-5 shadow-card',
+        'rounded-card border border-border bg-card p-3 shadow-card sm:p-5',
         'transition-shadow hover:shadow-card-hover',
         className,
       )}
@@ -139,7 +139,7 @@ export function StatCard({
 
         <div
           className={cn(
-            'flex size-12 shrink-0 items-center justify-center rounded-icon',
+            'flex size-10 shrink-0 items-center justify-center rounded-icon sm:size-12',
             ICON_TONE[tone],
           )}
           aria-hidden

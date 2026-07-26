@@ -1,11 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  ACTIVITY_CATEGORY_LABELS,
   LEDGER_TYPE_LABELS,
   ORDER_STATUS_LABELS,
   PAYMENT_METHOD_LABELS,
-  type ActivityCategory,
   type LedgerEntry,
   type Order,
   type Payment,
@@ -21,8 +19,6 @@ import {
   ErrorState,
   MoneyText,
   PageHeader,
-  Pagination,
-  SelectFilter,
   StatCard,
   StatCardsSkeleton,
   StatusBadge,
@@ -33,19 +29,29 @@ import {
   ORDER_STATUS_BADGE,
   type Column,
 } from '@oh/ui';
-import { CreditCard, FileText, Pencil, Plus, ShoppingBag, Users, Wallet } from 'lucide-react';
+import {
+  ArrowLeft,
+  CreditCard,
+  FileText,
+  Pencil,
+  Plus,
+  ShoppingBag,
+  Users,
+  Wallet,
+} from 'lucide-react';
 import { ApiRequestError } from '@/lib/api';
 import { currentLocale } from '@/lib/i18n';
 import { useAuth } from '@/app/auth-context';
 import { useLedger } from '@/features/ledger/api';
 import { useOrders } from '@/features/orders/api';
 import { usePayments } from '@/features/payments/api';
-import { ActivityFeed } from '@/features/activity/activity-feed';
-import { useCustomerActivityFeed } from '@/features/activity/api';
 import { RecordPaymentDialog } from '@/features/payments/record-payment-dialog';
 import { CreateOrderDialog } from '@/features/orders/create-order-dialog';
+import { OrderDetailsDialog } from '@/features/orders/order-details-dialog';
+import { displayOrderNumber } from '@/features/orders/order-number';
 import { useCustomer, useCustomerSummary } from './api';
 import { CustomerFormDialog } from './customer-form-dialog';
+import { CustomerStatementDialog } from './customer-statement-dialog';
 
 /**
  * صفحة كل زبون — مطابقة لـ`ui/other screens/صفحة كل زبون.jpeg`.
@@ -57,28 +63,30 @@ export function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user, can } = useAuth();
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
-  const debtLimitLabel = { ar: 'حد الدين', he: 'מסגרת', en: 'Debt limit' }[currentLocale()];
+  const locale = currentLocale();
+  const debtLimitLabel = { ar: 'حد الدين', he: 'מסגרת', en: 'Debt limit' }[locale];
+  const paymentDueMessage = {
+    ar: 'حان أو تجاوز موعد السداد المتفق عليه',
+    he: 'מועד התשלום המוסכם הגיע או עבר',
+    en: 'The agreed payment date has arrived or passed',
+  }[locale];
+  const outstandingBalanceLabel = {
+    ar: 'الرصيد المستحق',
+    he: 'היתרה לתשלום',
+    en: 'Outstanding balance',
+  }[locale];
 
   const [editOpen, setEditOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [orderOpen, setOrderOpen] = useState(false);
-  const [activityPage, setActivityPage] = useState(1);
-  const [activityCategory, setActivityCategory] = useState('');
+  const [statementOpen, setStatementOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string>();
 
   const customerQuery = useCustomer(id);
   const summaryQuery = useCustomerSummary(id);
   const ledgerQuery = useLedger({ customerId: id, pageSize: 25 });
   const ordersQuery = useOrders({ customerId: id, pageSize: 25 });
   const paymentsQuery = usePayments({ customerId: id, pageSize: 25 });
-  const activityFeed = useCustomerActivityFeed(
-    id ?? '',
-    {
-      page: activityPage,
-      pageSize: 25,
-      category: (activityCategory || undefined) as ActivityCategory | undefined,
-    },
-    Boolean(id),
-  );
 
   if (customerQuery.isLoading) {
     return (
@@ -117,18 +125,24 @@ export function CustomerDetailPage() {
       ),
     },
     {
+      header: 'الساعة',
+      render: (row) => (
+        <span className="text-fg text-[13px] tabular-nums" dir="ltr">
+          {new Date(row.occurredAt).toLocaleTimeString(locale, {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </span>
+      ),
+    },
+    {
       header: 'نوع الحركة',
       render: (row) => (
         <span className="text-fg text-[13px]">{LEDGER_TYPE_LABELS[row.entryType]}</span>
       ),
     },
     {
-      header: 'المرجع',
-      hideBelow: 'md',
-      render: (row) => (row.refNumber ? <span className="text-accent">{row.refNumber}</span> : '—'),
-    },
-    {
-      header: 'المدين',
+      header: 'الدين',
       align: 'end',
       render: (row) =>
         row.debit !== '0.00' ? (
@@ -138,7 +152,7 @@ export function CustomerDetailPage() {
         ),
     },
     {
-      header: 'الدائن',
+      header: 'المدفوع',
       align: 'end',
       render: (row) =>
         row.credit !== '0.00' ? (
@@ -151,12 +165,7 @@ export function CustomerDetailPage() {
       header: 'الرصيد بعد',
       align: 'end',
       render: (row) => (
-        <MoneyText
-          value={row.runningBalance}
-          currency={currency}
-          tone="balance"
-          withSymbol={false}
-        />
+        <MoneyText value={row.runningBalance} currency={currency} tone="auto" withSymbol={false} />
       ),
     },
   ];
@@ -164,7 +173,9 @@ export function CustomerDetailPage() {
   const orderColumns: Column<Order>[] = [
     {
       header: 'رقم الطلب',
-      render: (row) => <span className="text-accent font-medium">{row.number}</span>,
+      render: (row) => (
+        <span className="text-accent font-medium">{displayOrderNumber(row.number)}</span>
+      ),
     },
     {
       header: 'التاريخ',
@@ -213,10 +224,20 @@ export function CustomerDetailPage() {
     },
     {
       header: 'التاريخ',
-      hideBelow: 'md',
       render: (row) => (
         <span className="text-fg text-[13px] tabular-nums" dir="ltr">
           {row.paidAt.slice(0, 10)}
+        </span>
+      ),
+    },
+    {
+      header: 'الساعة',
+      render: (row) => (
+        <span className="text-fg text-[13px] tabular-nums" dir="ltr">
+          {new Date(row.paidAt).toLocaleTimeString(locale, {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
         </span>
       ),
     },
@@ -241,20 +262,27 @@ export function CustomerDetailPage() {
         row.status === 'REVERSED' ? (
           <StatusBadge tone="debit">معكوسة</StatusBadge>
         ) : (
-          <StatusBadge tone="credit">مُسجَّلة</StatusBadge>
+          <StatusBadge tone="credit">مقبوضة</StatusBadge>
         ),
     },
   ];
 
   return (
     <div className="space-y-5">
+      <Button variant="outline" size="icon" asChild title="العودة إلى الزبائن">
+        <Link to="/customers" aria-label="العودة إلى صفحة الزبائن">
+          <ArrowLeft className="rtl:rotate-180" aria-hidden />
+        </Link>
+      </Button>
+
       <PageHeader
         title={customer.name}
         icon={Users}
+        className="flex-col sm:flex-row"
         breadcrumbs={[{ label: 'الزبائن', href: '/customers' }, { label: customer.name }]}
         linkAs={Link}
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
             {can('orders.create') ? (
               <Button variant="brand" onClick={() => setOrderOpen(true)}>
                 <ShoppingBag aria-hidden />
@@ -268,11 +296,9 @@ export function CustomerDetailPage() {
               </Button>
             ) : null}
             {can('ledger.read') ? (
-              <Button variant="outline" asChild>
-                <Link to={`/ledger?customerId=${customer.id}`}>
-                  <FileText aria-hidden />
-                  كشف الحساب
-                </Link>
+              <Button variant="outline" onClick={() => setStatementOpen(true)}>
+                <FileText aria-hidden />
+                كشف الحساب
               </Button>
             ) : null}
             {can('customers.write') ? (
@@ -303,7 +329,7 @@ export function CustomerDetailPage() {
               {customer.taxNumber ? (
                 <Info label="الرقم الضريبي" value={customer.taxNumber} ltr />
               ) : null}
-              <Info label="مدة السداد" value={`${customer.paymentTermDays} يوم`} />
+              <Info label="تاريخ السداد" value={customer.paymentDueDate ?? '—'} ltr />
             </dl>
           </CardBody>
         </Card>
@@ -311,9 +337,9 @@ export function CustomerDetailPage() {
         {/* البطاقات المالية */}
         <div className="lg:col-span-2">
           {summaryQuery.isLoading ? (
-            <StatCardsSkeleton count={4} />
+            <StatCardsSkeleton count={3} />
           ) : summary ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
               <StatCard
                 label="الرصيد الحالي"
                 money={toMoneyString(negate(customer.balance), 2)}
@@ -348,25 +374,19 @@ export function CustomerDetailPage() {
                 value={summary.totalOrders}
                 icon={ShoppingBag}
                 tone="purple"
-              />
-              <StatCard
-                label="إجمالي المدفوعات"
-                money={summary.totalPaymentsAmount}
-                currency={currency}
-                moneyTone="credit"
-                icon={CreditCard}
-                tone="credit"
-                sublabel={`${summary.totalPayments} دفعة`}
+                className="col-span-2 sm:col-span-1"
               />
             </div>
           ) : null}
 
-          {summary && summary.overdueOrders > 0 ? (
+          {summary?.paymentDueReached ? (
             <div className="rounded-card border-danger/30 bg-danger-soft mt-4 border px-4 py-3">
               <p className="text-danger text-sm font-semibold">
-                {summary.overdueOrders} طلب متأخر عن الاستحقاق — بمبلغ{' '}
+                {paymentDueMessage}
+                {customer.paymentDueDate ? ` (${customer.paymentDueDate})` : ''} —{' '}
+                {outstandingBalanceLabel}:{' '}
                 <MoneyText
-                  value={summary.overdueAmount}
+                  value={summary.paymentDueAmount}
                   currency={currency}
                   tone="debit"
                   withSymbol={false}
@@ -379,7 +399,7 @@ export function CustomerDetailPage() {
 
       {/* ── معلومات الحساب المختصرة ───────────────────────────────────── */}
       {summary ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
           <InsightCard label="استخدام الائتمان">
             {summary.creditUsagePct === null ? (
               <span className="text-fg-subtle text-sm">بلا حد</span>
@@ -415,64 +435,17 @@ export function CustomerDetailPage() {
         </div>
       ) : null}
 
-      {/* ── التبويبات الستة ────────────────────────────────────────────── */}
+      {/* ── تفاصيل حساب الزبون ─────────────────────────────────────────── */}
       <Card>
-        <Tabs defaultValue="overview">
+        <Tabs defaultValue="orders">
           <div className="overflow-x-auto px-5 pt-2">
             <TabsList>
-              <TabsTrigger value="overview">نظرة عامة</TabsTrigger>
               <TabsTrigger value="orders">الطلبات</TabsTrigger>
               {can('ledger.read') ? <TabsTrigger value="ledger">دفتر الحركات</TabsTrigger> : null}
               <TabsTrigger value="payments">الدفعات</TabsTrigger>
               <TabsTrigger value="notes">الملاحظات</TabsTrigger>
-              <TabsTrigger value="activity">الخط الزمني</TabsTrigger>
             </TabsList>
           </div>
-
-          {/* نظرة عامة: آخر طلبات + آخر دفعات */}
-          <TabsContent value="overview">
-            <div className="grid grid-cols-1 gap-4 p-5 lg:grid-cols-2">
-              <div>
-                <h3 className="text-fg mb-2 text-[13px] font-semibold">آخر الطلبات</h3>
-                {(ordersQuery.data?.items ?? []).slice(0, 5).map((o) => (
-                  <Link
-                    key={o.id}
-                    to={`/orders/${o.id}`}
-                    className="rounded-ctrl hover:bg-card-muted flex items-center justify-between gap-2 px-2 py-2"
-                  >
-                    <MoneyText value={o.total} currency={currency} tone="plain" size="sm" />
-                    <StatusBadge tone={ORDER_STATUS_BADGE[o.status].tone}>
-                      {ORDER_STATUS_BADGE[o.status].label}
-                    </StatusBadge>
-                    <span className="text-accent flex-1 text-end text-[13px] font-medium">
-                      {o.number}
-                    </span>
-                  </Link>
-                ))}
-                {(ordersQuery.data?.total ?? 0) === 0 ? (
-                  <p className="text-fg-subtle py-4 text-center text-[13px]">لا طلبات.</p>
-                ) : null}
-              </div>
-              <div>
-                <h3 className="text-fg mb-2 text-[13px] font-semibold">آخر الدفعات</h3>
-                {(paymentsQuery.data?.items ?? []).slice(0, 5).map((p) => (
-                  <div
-                    key={p.id}
-                    className="rounded-ctrl flex items-center justify-between gap-2 px-2 py-2"
-                  >
-                    <MoneyText value={p.amount} currency={currency} tone="credit" size="sm" />
-                    <span className="text-fg-muted text-xs">{PAYMENT_METHOD_LABELS[p.method]}</span>
-                    <span className="text-accent flex-1 text-end text-[13px] font-medium">
-                      {p.number}
-                    </span>
-                  </div>
-                ))}
-                {(paymentsQuery.data?.total ?? 0) === 0 ? (
-                  <p className="text-fg-subtle py-4 text-center text-[13px]">لا دفعات.</p>
-                ) : null}
-              </div>
-            </div>
-          </TabsContent>
 
           {/* الطلبات */}
           <TabsContent value="orders">
@@ -482,7 +455,7 @@ export function CustomerDetailPage() {
               rows={ordersQuery.data?.items ?? []}
               rowKey={(r) => r.id}
               loading={ordersQuery.isLoading}
-              onRowClick={(r) => (window.location.href = `/orders/${r.id}`)}
+              onRowClick={(r) => setSelectedOrderId(r.id)}
               empty={{ title: 'لا توجد طلبات لهذا الزبون' }}
               className="border-0 shadow-none"
             />
@@ -494,12 +467,13 @@ export function CustomerDetailPage() {
               <CardHeader
                 title="الحركات المالية"
                 action={
-                  <Link
-                    to={`/ledger?customerId=${customer.id}`}
+                  <button
+                    type="button"
+                    onClick={() => setStatementOpen(true)}
                     className="text-accent text-[13px] font-medium hover:underline"
                   >
                     كشف الحساب الكامل
-                  </Link>
+                  </button>
                 }
               />
               <DataTable
@@ -539,45 +513,6 @@ export function CustomerDetailPage() {
               </div>
             </CardBody>
           </TabsContent>
-
-          {/* الخط الزمني — أحداث موحّدة من الطلبات والدفعات والحركات والتعديلات */}
-          <TabsContent value="activity">
-            <div className="flex items-center justify-between px-5 pt-4">
-              <h3 className="text-fg text-[13px] font-semibold">الخط الزمني للزبون</h3>
-              <SelectFilter
-                value={activityCategory}
-                onChange={(v) => {
-                  setActivityCategory(v);
-                  setActivityPage(1);
-                }}
-                allLabel="كل الأنواع"
-                label="النوع"
-                options={(['ORDER', 'PAYMENT', 'CUSTOMER', 'LEDGER'] as ActivityCategory[]).map(
-                  (c) => ({
-                    value: c,
-                    label: ACTIVITY_CATEGORY_LABELS[c],
-                  }),
-                )}
-              />
-            </div>
-            <div className="px-3 pb-2">
-              <ActivityFeed
-                items={activityFeed.data?.items ?? []}
-                loading={activityFeed.isLoading}
-                emptyText="لا يوجد نشاط لهذا الزبون بعد."
-              />
-            </div>
-            {activityFeed.data && activityFeed.data.total > activityFeed.data.pageSize ? (
-              <Pagination
-                page={activityFeed.data.page}
-                pageSize={activityFeed.data.pageSize}
-                total={activityFeed.data.total}
-                totalPages={activityFeed.data.totalPages}
-                onPageChange={setActivityPage}
-                itemLabel="حدث"
-              />
-            ) : null}
-          </TabsContent>
         </Tabs>
       </Card>
 
@@ -587,6 +522,19 @@ export function CustomerDetailPage() {
         open={orderOpen}
         onOpenChange={setOrderOpen}
         fixedCustomerId={customer.id}
+      />
+      <CustomerStatementDialog
+        open={statementOpen}
+        onOpenChange={setStatementOpen}
+        customer={customer}
+        currency={currency}
+      />
+      <OrderDetailsDialog
+        orderId={selectedOrderId}
+        open={Boolean(selectedOrderId)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedOrderId(undefined);
+        }}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   emailSchema,
+  isoDateSchema,
   isoDateTimeSchema,
   moneySchema,
   nonNegativeMoneySchema,
@@ -63,6 +64,7 @@ export const customerSchema = z.object({
 
   creditLimit: nonNegativeMoneySchema,
   paymentTermDays: z.number().int(),
+  paymentDueDate: isoDateSchema.nullable(),
   status: customerStatusSchema,
 
   /**
@@ -116,6 +118,10 @@ export const customerSummarySchema = z.object({
   overdueOrders: z.number().int(),
   overdueAmount: nonNegativeMoneySchema,
 
+  /** حان أو مضى تاريخ السداد المتفق عليه وما زال على الزبون رصيد مدين. */
+  paymentDueReached: z.boolean(),
+  paymentDueAmount: nonNegativeMoneySchema,
+
   /** متوسط أيام السداد (من إصدار الطلب إلى استلام الدفعة). null إن لا دفعات. */
   avgPaymentDays: z.number().int().nullable(),
 
@@ -132,12 +138,12 @@ export const createCustomerSchema = z.object({
   name: z.string().trim().min(2, 'اسم الزبون مطلوب.').max(160),
   company: optionalText(160),
 
-  phone: phoneSchema.optional().or(z.literal('')),
+  phone: phoneSchema,
   phoneAlt: phoneSchema.optional().or(z.literal('')),
   email: emailSchema.optional().or(z.literal('')),
 
   address: optionalText(240),
-  city: optionalText(80),
+  city: z.string().trim().min(1, 'المدينة مطلوبة.').max(80),
   taxNumber: optionalText(32),
   notes: z.string().trim().max(2000).optional().or(z.literal('')),
 
@@ -145,6 +151,7 @@ export const createCustomerSchema = z.object({
 
   creditLimit: nonNegativeMoneySchema.default('1500'),
   paymentTermDays: z.number().int().min(0).max(365).default(30),
+  paymentDueDate: isoDateSchema.optional(),
   status: customerStatusSchema.default('ACTIVE'),
 
   /**
@@ -167,20 +174,12 @@ export type CreateCustomerRequest = z.infer<typeof createCustomerSchema>;
  * الرصيد بلا قيد محاسبي. من أراد تصحيح رصيد افتتاحي خاطئ، فليُنشئ قيد تسوية
  * (`POST /ledger/adjustments`) — فيبقى الخطأ والتصحيح كلاهما مرئيين.
  */
-export const updateCustomerSchema = createCustomerSchema
-  .omit({ openingBalance: true })
-  .partial();
+export const updateCustomerSchema = createCustomerSchema.omit({ openingBalance: true }).partial();
 export type UpdateCustomerRequest = z.infer<typeof updateCustomerSchema>;
 
 // ── الاستعلام ───────────────────────────────────────────────────────────────
 
-export const customerSortSchema = z.enum([
-  'code',
-  'name',
-  'createdAt',
-  'balance',
-  'lastOrderAt',
-]);
+export const customerSortSchema = z.enum(['code', 'name', 'createdAt', 'balance', 'lastOrderAt']);
 
 export const customerListQuerySchema = paginationQuerySchema.extend({
   /** بحث في الاسم أو الرقم أو الهاتف أو الشركة. */

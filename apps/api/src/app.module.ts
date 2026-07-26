@@ -27,6 +27,7 @@ import { LedgerModule } from './modules/ledger/ledger.module.js';
 import { CustomersModule } from './modules/customers/customers.module.js';
 import { OrdersModule } from './modules/orders/orders.module.js';
 import { PaymentsModule } from './modules/payments/payments.module.js';
+import { EmployeesModule } from './modules/employees/employees.module.js';
 
 // ── المرحلة 3: لوحة التحكم وسجل النشاط ──
 import { DashboardModule } from './modules/dashboard/dashboard.module.js';
@@ -50,7 +51,8 @@ import { MailModule } from './core/mail/mail.module.js';
     /**
      * حدود المعدل.
      *
-     * مسميّان: `default` للطلبات العامة، و`auth` لمسارات المصادقة (أشد بكثير).
+     * حد `default` للطلبات العامة. مسارات المصادقة الحساسة تستبدله بحدود أشد
+     * عبر `@Throttle` على كل مسار، كي لا يُطبَّق حد تسجيل الدخول على بقية API.
      * التخزين بالذاكرة في التطوير مقبول؛ الإنتاج يفرض Redis عبر `envSchema`
      * لأن العدّاد بالذاكرة لا يعمل عبر عدة نسخ من الخادم — يصير كل نسخة تعدّ
      * وحدها، فيتضاعف الحد الفعلي بعدد النسخ.
@@ -62,11 +64,6 @@ import { MailModule } from './core/mail/mail.module.js';
           name: 'default',
           ttl: env.get('RATE_LIMIT_TTL_SECONDS') * 1000,
           limit: env.get('RATE_LIMIT_MAX'),
-        },
-        {
-          name: 'auth',
-          ttl: 900_000,
-          limit: env.get('AUTH_RATE_LIMIT_MAX'),
         },
       ],
     }),
@@ -90,6 +87,7 @@ import { MailModule } from './core/mail/mail.module.js';
     CustomersModule,
     OrdersModule,
     PaymentsModule,
+    EmployeesModule,
 
     // ── المرحلة 3 ──
     DashboardModule,

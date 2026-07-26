@@ -102,7 +102,6 @@ export class PaymentsService {
       );
 
       const allocatedTotal = sum(planned.map((p) => p.willAllocate));
-      const unallocated = subtract(amount, allocatedTotal);
 
       /**
        * ثابت حاسم: مجموع التوزيعات لا يتجاوز الدفعة أبدًا.
@@ -111,8 +110,8 @@ export class PaymentsService {
        */
       if (greaterThan(allocatedTotal, amount)) {
         throw AppError.internal(
-          `خطأ في التوزيع: المجموع ${toMoneyString(allocatedTotal, 2)} ` +
-            `يتجاوز الدفعة ${toMoneyString(amount, 2)}.`,
+          `تعذّر تسجيل الدفعة: المبلغ المرتبط بالطلبات ${toMoneyString(allocatedTotal, 2)} ` +
+            `يتجاوز قيمة الدفعة ${toMoneyString(amount, 2)}.`,
         );
       }
 
@@ -189,17 +188,11 @@ export class PaymentsService {
       }
 
       // ── 6. التدقيق ─────────────────────────────────────────────────────
-      const allocationSummary = planned
-        .filter((p) => !isZero(p.willAllocate))
-        .map((p) => `${p.orderNumber}: ${toMoneyString(p.willAllocate, 2)}`)
-        .join('، ');
-
       await this.audit.record(tx, {
         action: AUDIT_ACTIONS.PAYMENT_CREATED,
         summary:
           `تسجيل دفعة ${number} بمبلغ ${toMoneyString(amount, 2)} من "${customer.name}" (${dto.method}). ` +
-          `الرصيد ${toMoneyString(entry.openingBalance, 2)} → ${toMoneyString(entry.runningBalance, 2)}. ` +
-          (allocationSummary ? `التوزيع: ${allocationSummary}` : 'دفعة مقدّمة بلا توزيع.'),
+          `الرصيد ${toMoneyString(entry.openingBalance, 2)} → ${toMoneyString(entry.runningBalance, 2)}.`,
         entityType: 'Payment',
         entityId: payment.id,
         after: {
@@ -208,10 +201,6 @@ export class PaymentsService {
           method: dto.method,
           balanceBefore: toMoneyString(entry.openingBalance, 2),
           balanceAfter: toMoneyString(entry.runningBalance, 2),
-          allocations: planned
-            .filter((p) => !isZero(p.willAllocate))
-            .map((p) => ({ order: p.orderNumber, amount: toMoneyString(p.willAllocate, 2) })),
-          unallocated: toMoneyString(unallocated, 2),
         },
       });
 
@@ -263,9 +252,7 @@ export class PaymentsService {
       for (const entry of manual) {
         const order = byId.get(entry.orderId);
         if (!order) {
-          throw AppError.validation(
-            `الطلب المحدد غير موجود أو مسدَّد أو لا يخص هذا الزبون.`,
-          );
+          throw AppError.validation(`الطلب المحدد غير موجود أو مسدَّد أو لا يخص هذا الزبون.`);
         }
 
         const orderTotal = toMoney(order.total.toString());
@@ -343,7 +330,14 @@ export class PaymentsService {
         status: { in: ['CONFIRMED', 'PARTIALLY_PAID'] },
       },
       orderBy: [{ issuedAt: 'asc' }, { number: 'asc' }],
-      select: { id: true, number: true, issuedAt: true, dueAt: true, total: true, paidAmount: true },
+      select: {
+        id: true,
+        number: true,
+        issuedAt: true,
+        dueAt: true,
+        total: true,
+        paidAmount: true,
+      },
     });
   }
 
@@ -439,7 +433,11 @@ export class PaymentsService {
         where: { id },
         include: {
           customer: { select: { name: true } },
-          allocations: { include: { order: { select: { id: true, number: true, total: true, paidAmount: true } } } },
+          allocations: {
+            include: {
+              order: { select: { id: true, number: true, total: true, paidAmount: true } },
+            },
+          },
         },
       });
       if (!payment) throw AppError.notFound('الدفعة');
@@ -519,7 +517,6 @@ export class PaymentsService {
           status: 'REVERSED',
           reason: dto.reason,
           reversalEntryId: reversal.id,
-          restoredOrders: payment.allocations.map((a) => a.order.number),
         },
       });
     });

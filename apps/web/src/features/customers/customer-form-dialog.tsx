@@ -41,16 +41,25 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
     ar: {
       debtLimit: 'حد الدين',
       debtLimitHint: 'الحد الافتراضي 1500 شيكل ويمكن تعديله.',
+      paymentDueDate: 'تاريخ السداد',
+      paymentDueDateHint: 'التاريخ المتفق عليه لسداد الدين.',
+      paymentDueDateRequired: 'تاريخ السداد مطلوب.',
       openingHint: 'الرقم الموجب رصيد للزبون. الرقم السالب (-x أو x-) دين على الزبون.',
     },
     he: {
       debtLimit: 'מסגרת',
       debtLimitHint: 'ברירת המחדל היא 1,500 ₪ וניתן לשנות אותה.',
+      paymentDueDate: 'תאריך תשלום',
+      paymentDueDateHint: 'התאריך שסוכם לתשלום החוב.',
+      paymentDueDateRequired: 'יש לבחור תאריך תשלום.',
       openingHint: 'מספר חיובי הוא יתרה לזכות הלקוח. מספר שלילי (-x או x-) הוא חוב.',
     },
     en: {
       debtLimit: 'Debt limit',
       debtLimitHint: 'The default is ILS 1,500 and can be changed.',
+      paymentDueDate: 'Payment due date',
+      paymentDueDateHint: 'The agreed date for settling the debt.',
+      paymentDueDateRequired: 'Payment due date is required.',
       openingHint: 'A positive number is customer credit. A negative number (-x or x-) is debt.',
     },
   }[locale];
@@ -77,6 +86,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
       tags: [],
       creditLimit: '1500',
       paymentTermDays: 30,
+      paymentDueDate: '',
       status: 'ACTIVE',
       openingBalance: '0',
     },
@@ -97,6 +107,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
         tags: customer.tags,
         creditLimit: customer.creditLimit,
         paymentTermDays: customer.paymentTermDays,
+        paymentDueDate: customer.paymentDueDate ?? '',
         status: customer.status,
         openingBalance: '0',
       });
@@ -109,6 +120,10 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
   useUnsavedChangesWarning(open && isDirty && !isSubmitting);
 
   const onSubmit = handleSubmit(async (values) => {
+    if (!values.paymentDueDate) {
+      setError('paymentDueDate', { message: labels.paymentDueDateRequired });
+      return;
+    }
     try {
       if (isEdit && customer) {
         const { openingBalance: _drop, ...rest } = values;
@@ -147,7 +162,13 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
           <DialogBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="اسم الزبون" error={errors.name?.message} required>
               {(p) => (
-                <Input {...p} {...register('name')} placeholder="أحمد محمود" error={Boolean(errors.name)} autoFocus />
+                <Input
+                  {...p}
+                  {...register('name')}
+                  placeholder="أحمد محمود"
+                  error={Boolean(errors.name)}
+                  autoFocus
+                />
               )}
             </Field>
 
@@ -155,15 +176,23 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
               {(p) => <Input {...p} {...register('company')} placeholder="اختياري" />}
             </Field>
 
-            <Field label="الهاتف" error={errors.phone?.message}>
-              {(p) => <Input {...p} {...register('phone')} dir="ltr" placeholder="050-1234567" />}
+            <Field label="الهاتف" error={errors.phone?.message} required>
+              {(p) => <Input {...p} {...register('phone')} dir="ltr" placeholder="0501234567" />}
             </Field>
 
             <Field label="البريد الإلكتروني" error={errors.email?.message}>
-              {(p) => <Input {...p} {...register('email')} type="email" dir="ltr" placeholder="name@example.com" />}
+              {(p) => (
+                <Input
+                  {...p}
+                  {...register('email')}
+                  type="email"
+                  dir="ltr"
+                  placeholder="name@example.com"
+                />
+              )}
             </Field>
 
-            <Field label="المدينة" error={errors.city?.message}>
+            <Field label="المدينة" error={errors.city?.message} required>
               {(p) => <Input {...p} {...register('city')} placeholder="الرياض" />}
             </Field>
 
@@ -180,20 +209,24 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
               hint={labels.debtLimitHint}
               error={errors.creditLimit?.message}
             >
-              {(p) => <Input {...p} {...register('creditLimit')} dir="ltr" inputMode="decimal" placeholder="1500.00" />}
-            </Field>
-
-            <Field label="مدة السداد (يوم)" error={errors.paymentTermDays?.message}>
               {(p) => (
                 <Input
                   {...p}
-                  {...register('paymentTermDays', { valueAsNumber: true })}
-                  type="number"
+                  {...register('creditLimit')}
                   dir="ltr"
-                  min={0}
-                  max={365}
+                  inputMode="decimal"
+                  placeholder="1500.00"
                 />
               )}
+            </Field>
+
+            <Field
+              label={labels.paymentDueDate}
+              hint={labels.paymentDueDateHint}
+              error={errors.paymentDueDate?.message}
+              required
+            >
+              {(p) => <Input {...p} {...register('paymentDueDate')} type="date" dir="ltr" />}
             </Field>
 
             {/* الرصيد الافتتاحي — عند الإضافة فقط */}

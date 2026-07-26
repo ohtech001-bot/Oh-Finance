@@ -1,9 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
-  AllocationPreview,
-  AllocationPreviewRequest,
   CreatePaymentRequest,
-  OpenOrder,
   PaginatedResult,
   Payment,
   PaymentListQuery,
@@ -38,14 +35,6 @@ export function usePayment(id: string | undefined) {
   });
 }
 
-export function useOpenOrders(customerId: string | undefined) {
-  return useQuery({
-    queryKey: [KEY, 'open-orders', customerId],
-    queryFn: () => api.get<OpenOrder[]>(`/payments/open-orders/${customerId}`),
-    enabled: Boolean(customerId),
-  });
-}
-
 /**
  * تسجيل دفعة.
  *
@@ -56,21 +45,19 @@ export function useOpenOrders(customerId: string | undefined) {
 export function useCreatePayment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ body, idempotencyKey }: { body: CreatePaymentRequest; idempotencyKey: string }) =>
-      api.post<Payment>('/payments', body, { idempotencyKey }),
+    mutationFn: ({
+      body,
+      idempotencyKey,
+    }: {
+      body: CreatePaymentRequest;
+      idempotencyKey: string;
+    }) => api.post<Payment>('/payments', body, { idempotencyKey }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: [KEY] });
       void qc.invalidateQueries({ queryKey: ['customers'] });
       void qc.invalidateQueries({ queryKey: ['orders'] });
       void qc.invalidateQueries({ queryKey: ['ledger'] });
     },
-  });
-}
-
-export function usePreviewAllocation() {
-  return useMutation({
-    mutationFn: (body: AllocationPreviewRequest) =>
-      api.post<AllocationPreview>('/payments/preview-allocation', body),
   });
 }
 

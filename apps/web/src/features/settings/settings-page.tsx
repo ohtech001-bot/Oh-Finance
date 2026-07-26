@@ -1,6 +1,17 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Settings as SettingsIcon } from 'lucide-react';
+import {
+  ChevronLeft,
+  CircleDollarSign,
+  Clock3,
+  Crown,
+  FileText,
+  MessageSquare,
+  Printer,
+  Settings as SettingsIcon,
+  Store,
+} from 'lucide-react';
 import {
   financialSettingsSchema,
   generalSettingsSchema,
@@ -45,6 +56,8 @@ import { useSettings, useUpdateSettingsSection } from './api';
  */
 export function SettingsPage() {
   const { can } = useAuth();
+  const [activeTab, setActiveTab] = useState('general');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(true);
   const canManage = can(PERMISSIONS.SETTINGS_MANAGE);
   const { data, isLoading, isError, error, refetch } = useSettings();
 
@@ -60,33 +73,131 @@ export function SettingsPage() {
           />
         </Card>
       ) : (
-        <Tabs defaultValue="general">
-          <TabsList className="flex flex-wrap gap-1">
-            <TabsTrigger value="general">عام</TabsTrigger>
-            <TabsTrigger value="financial">المالية</TabsTrigger>
-            <TabsTrigger value="invoices">الفواتير</TabsTrigger>
-            <TabsTrigger value="printing">الطباعة</TabsTrigger>
-            <TabsTrigger value="messaging">الرسائل</TabsTrigger>
-            <TabsTrigger value="activity">سجل النشاط</TabsTrigger>
-            <TabsTrigger value="subscription">إدارة الاشتراك</TabsTrigger>
-          </TabsList>
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => {
+            setActiveTab(value);
+            setMobileMenuOpen(false);
+          }}
+        >
+          <div className={mobileMenuOpen ? 'block' : 'hidden sm:block'}>
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-2 bg-transparent p-0">
+              <SettingsTab
+                value="general"
+                label="عام"
+                description="معلومات المحل، اللغة والمنطقة الزمنية"
+                icon={Store}
+              />
+              <SettingsTab
+                value="financial"
+                label="المالية"
+                description="العملة، الضرائب وطرق الدفع"
+                icon={CircleDollarSign}
+              />
+              <SettingsTab
+                value="invoices"
+                label="الفواتير"
+                description="التسعير والرقم التسلسلي"
+                icon={FileText}
+              />
+              <SettingsTab
+                value="printing"
+                label="الطباعة"
+                description="الطابعة وتنسيق المستندات"
+                icon={Printer}
+              />
+              <SettingsTab
+                value="messaging"
+                label="الرسائل"
+                description="واتساب والتنبيهات والقوالب"
+                icon={MessageSquare}
+              />
+              <SettingsTab
+                value="activity"
+                label="سجل النشاط"
+                description="جميع العمليات والتغييرات"
+                icon={Clock3}
+              />
+              <SettingsTab
+                value="subscription"
+                label="إدارة الاشتراك"
+                description="تفاصيل الباقة والاستخدام"
+                icon={Crown}
+              />
+            </TabsList>
+          </div>
 
-          {isLoading || !data ? (
-            <Card className="mt-4"><CardBody>جارٍ التحميل…</CardBody></Card>
-          ) : (
-            <>
-              <TabsContent value="general"><GeneralForm data={data} canManage={canManage} /></TabsContent>
-              <TabsContent value="financial"><FinancialForm data={data} canManage={canManage} /></TabsContent>
-              <TabsContent value="invoices"><InvoicesForm data={data} canManage={canManage} /></TabsContent>
-              <TabsContent value="printing"><PrintingForm data={data} canManage={canManage} /></TabsContent>
-              <TabsContent value="messaging"><MessagingForm data={data} canManage={canManage} /></TabsContent>
-              <TabsContent value="activity"><ActivityTab /></TabsContent>
-              <TabsContent value="subscription"><SubscriptionTab /></TabsContent>
-            </>
-          )}
+          <div className={mobileMenuOpen ? 'hidden sm:block' : 'block'}>
+            <Button
+              variant="ghost"
+              className="mb-2 sm:hidden"
+              onClick={() => setMobileMenuOpen(true)}
+            >
+              <ChevronLeft className="rtl:rotate-180" aria-hidden />
+              جميع الإعدادات
+            </Button>
+
+            {isLoading || !data ? (
+              <Card className="mt-4">
+                <CardBody>جارٍ التحميل…</CardBody>
+              </Card>
+            ) : (
+              <>
+                <TabsContent value="general">
+                  <GeneralForm data={data} canManage={canManage} />
+                </TabsContent>
+                <TabsContent value="financial">
+                  <FinancialForm data={data} canManage={canManage} />
+                </TabsContent>
+                <TabsContent value="invoices">
+                  <InvoicesForm data={data} canManage={canManage} />
+                </TabsContent>
+                <TabsContent value="printing">
+                  <PrintingForm data={data} canManage={canManage} />
+                </TabsContent>
+                <TabsContent value="messaging">
+                  <MessagingForm data={data} canManage={canManage} />
+                </TabsContent>
+                <TabsContent value="activity">
+                  <ActivityTab />
+                </TabsContent>
+                <TabsContent value="subscription">
+                  <SubscriptionTab />
+                </TabsContent>
+              </>
+            )}
+          </div>
         </Tabs>
       )}
     </div>
+  );
+}
+
+function SettingsTab({
+  value,
+  label,
+  description,
+  icon: Icon,
+}: {
+  value: string;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <TabsTrigger
+      value={value}
+      className="border-border bg-card shadow-card h-auto w-full justify-start gap-3 border p-4 text-start"
+    >
+      <span className="bg-brand-soft text-brand rounded-icon flex size-11 shrink-0 items-center justify-center">
+        <Icon className="size-5" aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="text-fg block text-sm font-bold">{label}</span>
+        <span className="text-fg-muted mt-1 block text-xs font-normal">{description}</span>
+      </span>
+      <ChevronLeft className="text-fg-subtle ms-auto size-5" aria-hidden />
+    </TabsTrigger>
   );
 }
 
@@ -136,8 +247,15 @@ function useSectionForm<T extends Record<string, unknown>>(
 // ── عام ──────────────────────────────────────────────────────────────────────
 
 function GeneralForm({ data, canManage }: { data: StoreSettings; canManage: boolean }) {
-  const { form, onSubmit, saving } = useSectionForm<GeneralSettings>('general', generalSettingsSchema, data.general);
-  const { register, formState: { errors } } = form;
+  const { form, onSubmit, saving } = useSectionForm<GeneralSettings>(
+    'general',
+    generalSettingsSchema,
+    data.general,
+  );
+  const {
+    register,
+    formState: { errors },
+  } = form;
   return (
     <form onSubmit={onSubmit}>
       <SectionCard title="الإعدادات العامة — معلومات المحل">
@@ -160,7 +278,15 @@ function GeneralForm({ data, canManage }: { data: StoreSettings; canManage: bool
           )}
         </Field>
         <Field label="المنطقة الزمنية" error={errors.timezone?.message}>
-          {(p) => <Input {...p} {...register('timezone')} dir="ltr" disabled={!canManage} placeholder="Asia/Jerusalem" />}
+          {(p) => (
+            <Input
+              {...p}
+              {...register('timezone')}
+              dir="ltr"
+              disabled={!canManage}
+              placeholder="Asia/Jerusalem"
+            />
+          )}
         </Field>
         {canManage ? <SaveBar disabled={saving} loading={saving} /> : null}
       </SectionCard>
@@ -171,19 +297,43 @@ function GeneralForm({ data, canManage }: { data: StoreSettings; canManage: bool
 // ── المالية ──────────────────────────────────────────────────────────────────
 
 function FinancialForm({ data, canManage }: { data: StoreSettings; canManage: boolean }) {
-  const { form, onSubmit, saving } = useSectionForm<FinancialSettings>('financial', financialSettingsSchema, data.financial);
-  const { register, formState: { errors }, watch, setValue } = form;
+  const { form, onSubmit, saving } = useSectionForm<FinancialSettings>(
+    'financial',
+    financialSettingsSchema,
+    data.financial,
+  );
+  const {
+    register,
+    formState: { errors },
+    watch,
+    setValue,
+  } = form;
   const taxEnabled = watch('tax.enabled');
   return (
     <form onSubmit={onSubmit}>
       <SectionCard title="الإعدادات المالية — العملة والمنطقة">
         <Field label="العملة" error={errors.currency?.message}>
-          {(p) => <Input {...p} {...register('currency')} dir="ltr" disabled={!canManage} placeholder="ILS" />}
+          {(p) => (
+            <Input
+              {...p}
+              {...register('currency')}
+              dir="ltr"
+              disabled={!canManage}
+              placeholder="ILS"
+            />
+          )}
         </Field>
-        <Field label="الدولة">{(p) => <Input {...p} {...register('country')} disabled={!canManage} />}</Field>
+        <Field label="الدولة">
+          {(p) => <Input {...p} {...register('country')} disabled={!canManage} />}
+        </Field>
         <Field label="فاصل الأرقام">
           {(p) => (
-            <select {...p} {...register('numberFormat')} className={selectCls} disabled={!canManage}>
+            <select
+              {...p}
+              {...register('numberFormat')}
+              className={selectCls}
+              disabled={!canManage}
+            >
               <option value="1,234.56">1,234.56</option>
               <option value="1.234,56">1.234,56</option>
               <option value="1234.56">1234.56</option>
@@ -199,12 +349,34 @@ function FinancialForm({ data, canManage }: { data: StoreSettings; canManage: bo
             </select>
           )}
         </Field>
-        <ToggleRow label="تفعيل الضريبة" checked={!!taxEnabled} disabled={!canManage} onChange={(v) => setValue('tax.enabled', v, { shouldDirty: true })} />
+        <ToggleRow
+          label="تفعيل الضريبة"
+          checked={!!taxEnabled}
+          disabled={!canManage}
+          onChange={(v) => setValue('tax.enabled', v, { shouldDirty: true })}
+        />
         <Field label="نسبة الضريبة (%)" error={errors.tax?.rate?.message}>
-          {(p) => <Input {...p} type="number" step="0.01" {...register('tax.rate', { valueAsNumber: true })} dir="ltr" disabled={!canManage || !taxEnabled} />}
+          {(p) => (
+            <Input
+              {...p}
+              type="number"
+              step="0.01"
+              {...register('tax.rate', { valueAsNumber: true })}
+              dir="ltr"
+              disabled={!canManage || !taxEnabled}
+            />
+          )}
         </Field>
         <Field label="نص الفاتورة الضريبية">
-          {(p) => <textarea {...p} {...register('tax.text')} className={areaCls} rows={3} disabled={!canManage} />}
+          {(p) => (
+            <textarea
+              {...p}
+              {...register('tax.text')}
+              className={areaCls}
+              rows={3}
+              disabled={!canManage}
+            />
+          )}
         </Field>
         {canManage ? <SaveBar disabled={saving} loading={saving} /> : null}
       </SectionCard>
@@ -215,21 +387,70 @@ function FinancialForm({ data, canManage }: { data: StoreSettings; canManage: bo
 // ── الفواتير ─────────────────────────────────────────────────────────────────
 
 function InvoicesForm({ data, canManage }: { data: StoreSettings; canManage: boolean }) {
-  const { form, onSubmit, saving } = useSectionForm<InvoiceSettings>('invoices', invoiceSettingsSchema, data.invoices);
-  const { register, formState: { errors }, watch, setValue } = form;
+  const { form, onSubmit, saving } = useSectionForm<InvoiceSettings>(
+    'invoices',
+    invoiceSettingsSchema,
+    data.invoices,
+  );
+  const {
+    register,
+    formState: { errors },
+    watch,
+    setValue,
+  } = form;
   return (
     <form onSubmit={onSubmit}>
       <SectionCard title="إعدادات الفواتير — معلومات الفاتورة">
         <Field label="رقم بداية الفاتورة" error={errors.startNumber?.message}>
-          {(p) => <Input {...p} type="number" {...register('startNumber', { valueAsNumber: true })} dir="ltr" disabled={!canManage} />}
+          {(p) => (
+            <Input
+              {...p}
+              type="number"
+              {...register('startNumber', { valueAsNumber: true })}
+              dir="ltr"
+              disabled={!canManage}
+            />
+          )}
         </Field>
-        <Field label="البادئة">{(p) => <Input {...p} {...register('prefix')} dir="ltr" disabled={!canManage} />}</Field>
-        <Field label="اللاحقة">{(p) => <Input {...p} {...register('suffix')} dir="ltr" disabled={!canManage} />}</Field>
-        <Field label="صيغة رقم الفاتورة">{(p) => <Input {...p} {...register('numberFormat')} dir="ltr" disabled={!canManage} placeholder="INV-{0001}" />}</Field>
-        <ToggleRow label="عرض الأسعار شامل الضريبة" checked={!!watch('priceIncludesTax')} disabled={!canManage} onChange={(v) => setValue('priceIncludesTax', v, { shouldDirty: true })} />
-        <ToggleRow label="إظهار عمود الضريبة في الفاتورة" checked={!!watch('showTaxColumn')} disabled={!canManage} onChange={(v) => setValue('showTaxColumn', v, { shouldDirty: true })} />
+        <Field label="البادئة">
+          {(p) => <Input {...p} {...register('prefix')} dir="ltr" disabled={!canManage} />}
+        </Field>
+        <Field label="اللاحقة">
+          {(p) => <Input {...p} {...register('suffix')} dir="ltr" disabled={!canManage} />}
+        </Field>
+        <Field label="صيغة رقم الفاتورة">
+          {(p) => (
+            <Input
+              {...p}
+              {...register('numberFormat')}
+              dir="ltr"
+              disabled={!canManage}
+              placeholder="INV-{0001}"
+            />
+          )}
+        </Field>
+        <ToggleRow
+          label="عرض الأسعار شامل الضريبة"
+          checked={!!watch('priceIncludesTax')}
+          disabled={!canManage}
+          onChange={(v) => setValue('priceIncludesTax', v, { shouldDirty: true })}
+        />
+        <ToggleRow
+          label="إظهار عمود الضريبة في الفاتورة"
+          checked={!!watch('showTaxColumn')}
+          disabled={!canManage}
+          onChange={(v) => setValue('showTaxColumn', v, { shouldDirty: true })}
+        />
         <Field label="ملاحظات الفاتورة">
-          {(p) => <textarea {...p} {...register('notes')} className={areaCls} rows={3} disabled={!canManage} />}
+          {(p) => (
+            <textarea
+              {...p}
+              {...register('notes')}
+              className={areaCls}
+              rows={3}
+              disabled={!canManage}
+            />
+          )}
         </Field>
         {canManage ? <SaveBar disabled={saving} loading={saving} /> : null}
       </SectionCard>
@@ -240,15 +461,26 @@ function InvoicesForm({ data, canManage }: { data: StoreSettings; canManage: boo
 // ── الطباعة ──────────────────────────────────────────────────────────────────
 
 function PrintingForm({ data, canManage }: { data: StoreSettings; canManage: boolean }) {
-  const { form, onSubmit, saving } = useSectionForm<PrintingSettings>('printing', printingSettingsSchema, data.printing);
+  const { form, onSubmit, saving } = useSectionForm<PrintingSettings>(
+    'printing',
+    printingSettingsSchema,
+    data.printing,
+  );
   const { register, watch, setValue } = form;
   const check = (k: keyof PrintingSettings, label: string) => (
-    <ToggleRow label={label} checked={!!watch(k)} disabled={!canManage} onChange={(v) => setValue(k, v as never, { shouldDirty: true })} />
+    <ToggleRow
+      label={label}
+      checked={!!watch(k)}
+      disabled={!canManage}
+      onChange={(v) => setValue(k, v as never, { shouldDirty: true })}
+    />
   );
   return (
     <form onSubmit={onSubmit}>
       <SectionCard title="إعدادات الطباعة — الطابعة الافتراضية">
-        <Field label="الطابعة">{(p) => <Input {...p} {...register('printer')} disabled={!canManage} />}</Field>
+        <Field label="الطابعة">
+          {(p) => <Input {...p} {...register('printer')} disabled={!canManage} />}
+        </Field>
         <Field label="القياس">
           {(p) => (
             <select {...p} {...register('paperSize')} className={selectCls} disabled={!canManage}>
@@ -267,7 +499,7 @@ function PrintingForm({ data, canManage }: { data: StoreSettings; canManage: boo
             </select>
           )}
         </Field>
-        <p className="pt-2 text-[13px] font-semibold text-fg">خيارات الطباعة</p>
+        <p className="text-fg pt-2 text-[13px] font-semibold">خيارات الطباعة</p>
         {check('printLogo', 'طباعة الشعار في الفاتورة')}
         {check('printInvoiceNumber', 'طباعة رقم الفاتورة')}
         {check('printDateTime', 'طباعة التاريخ والوقت')}
@@ -281,20 +513,57 @@ function PrintingForm({ data, canManage }: { data: StoreSettings; canManage: boo
 // ── الرسائل ──────────────────────────────────────────────────────────────────
 
 function MessagingForm({ data, canManage }: { data: StoreSettings; canManage: boolean }) {
-  const { form, onSubmit, saving } = useSectionForm<MessagingSettings>('messaging', messagingSettingsSchema, data.messaging);
+  const { form, onSubmit, saving } = useSectionForm<MessagingSettings>(
+    'messaging',
+    messagingSettingsSchema,
+    data.messaging,
+  );
   const { register, watch, setValue } = form;
   return (
     <form onSubmit={onSubmit}>
       <SectionCard title="إعدادات الرسائل — واتساب">
-        <ToggleRow label="تفعيل واتساب" checked={!!watch('whatsappEnabled')} disabled={!canManage} onChange={(v) => setValue('whatsappEnabled', v, { shouldDirty: true })} />
-        <Field label="رقم واتساب الأعمال">{(p) => <Input {...p} {...register('whatsappNumber')} dir="ltr" disabled={!canManage} placeholder="97250..." />}</Field>
-        <Field label="رسالة الطلب الجديد (المتغيّرات: {order_id} {customer_name} {amount})">
-          {(p) => <textarea {...p} {...register('newOrderTemplate')} className={areaCls} rows={3} disabled={!canManage} />}
+        <ToggleRow
+          label="تفعيل واتساب"
+          checked={!!watch('whatsappEnabled')}
+          disabled={!canManage}
+          onChange={(v) => setValue('whatsappEnabled', v, { shouldDirty: true })}
+        />
+        <Field label="رقم واتساب الأعمال">
+          {(p) => (
+            <Input
+              {...p}
+              {...register('whatsappNumber')}
+              dir="ltr"
+              disabled={!canManage}
+              placeholder="97250..."
+            />
+          )}
         </Field>
-        <ToggleRow label="تفعيل رسائل التنبيهات" checked={!!watch('alertsEnabled')} disabled={!canManage} onChange={(v) => setValue('alertsEnabled', v, { shouldDirty: true })} />
+        <Field label="رسالة الطلب الجديد (المتغيّرات: {order_id} {customer_name} {amount})">
+          {(p) => (
+            <textarea
+              {...p}
+              {...register('newOrderTemplate')}
+              className={areaCls}
+              rows={3}
+              disabled={!canManage}
+            />
+          )}
+        </Field>
+        <ToggleRow
+          label="تفعيل رسائل التنبيهات"
+          checked={!!watch('alertsEnabled')}
+          disabled={!canManage}
+          onChange={(v) => setValue('alertsEnabled', v, { shouldDirty: true })}
+        />
         <Field label="الطلبات الجديدة">
           {(p) => (
-            <select {...p} {...register('newOrdersFrequency')} className={selectCls} disabled={!canManage}>
+            <select
+              {...p}
+              {...register('newOrdersFrequency')}
+              className={selectCls}
+              disabled={!canManage}
+            >
               <option value="instant">فوري</option>
               <option value="hourly">كل ساعة</option>
               <option value="daily">يومي</option>
@@ -327,9 +596,15 @@ function ActivityTab() {
   return (
     <SectionCard title="سجل النشاط">
       {canSee ? (
-        <ActivityFeed items={feed.data?.items ?? []} loading={feed.isLoading} emptyText="لا يوجد نشاط في المحل بعد." />
+        <ActivityFeed
+          items={feed.data?.items ?? []}
+          loading={feed.isLoading}
+          emptyText="لا يوجد نشاط في المحل بعد."
+        />
       ) : (
-        <p className="py-8 text-center text-[13px] text-fg-subtle">لا تملك صلاحية عرض سجل النشاط.</p>
+        <p className="text-fg-subtle py-8 text-center text-[13px]">
+          لا تملك صلاحية عرض سجل النشاط.
+        </p>
       )}
     </SectionCard>
   );
@@ -341,20 +616,30 @@ function SubscriptionTab() {
   // تجنّبًا لتكرار منطق وحدة الاشتراك، نوجّه إلى شاشتها المخصّصة.
   return (
     <SectionCard title="إدارة الاشتراك">
-      <p className="text-[13px] text-fg-muted">
+      <p className="text-fg-muted text-[13px]">
         تُدار تفاصيل الباقة والفواتير والاستخدام من شاشة الاشتراك المخصّصة.
       </p>
-      <a href="/subscription" className="text-[13px] font-medium text-accent hover:underline">
+      <a href="/subscription" className="text-accent text-[13px] font-medium hover:underline">
         فتح إدارة الاشتراك ←
       </a>
     </SectionCard>
   );
 }
 
-function ToggleRow({ label, checked, onChange, disabled }: { label: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+function ToggleRow({
+  label,
+  checked,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
   return (
-    <div className="flex items-center justify-between rounded-ctrl border border-border px-3 py-2.5">
-      <span className="text-[13px] text-fg">{label}</span>
+    <div className="rounded-ctrl border-border flex items-center justify-between border px-3 py-2.5">
+      <span className="text-fg text-[13px]">{label}</span>
       <Switch checked={checked} onCheckedChange={onChange} disabled={disabled} />
     </div>
   );

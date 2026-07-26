@@ -8,7 +8,7 @@ import type { NavItem } from './nav-items';
 
 export interface SidebarProps {
   items: NavItem[];
-  /** اسم المحل + رقمه في الترويسة (أو «المنصة» للمدير العام). */
+  /** اسم المحل في الترويسة (أو «المنصة» للمدير العام). */
   title: string;
   subtitle: string;
   onNavigate?: () => void;
@@ -66,7 +66,7 @@ export function Sidebar({ items, title, subtitle, onNavigate, className }: Sideb
         )}
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-white">{title}</p>
-          <p className="text-sidebar-fg truncate text-xs">{subtitle}</p>
+          {subtitle ? <p className="text-sidebar-fg truncate text-xs">{subtitle}</p> : null}
         </div>
       </div>
 

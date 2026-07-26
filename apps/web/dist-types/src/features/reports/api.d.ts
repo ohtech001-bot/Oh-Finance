@@ -49,14 +49,14 @@ export declare function useReports(query: Partial<ReportsQuery>): import("@tanst
         avgPaymentDurationDays: number | null;
     };
     topCustomers: {
-        code: string;
         id: string;
+        code: string;
         name: string;
         purchases: string;
     }[];
     meta: {
-        currency: string;
         storeName: string;
+        currency: string;
         timezone: string;
         generatedAt: string;
         range: {
@@ -76,12 +76,12 @@ export declare function useReports(query: Partial<ReportsQuery>): import("@tanst
         sales: string;
     }[];
     ordersByWeekday: {
-        count: number;
         label: string;
+        count: number;
         weekday: number;
     }[];
     ordersByStatus: {
-        status: "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID";
+        status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
         amount: string;
         count: number;
     }[];

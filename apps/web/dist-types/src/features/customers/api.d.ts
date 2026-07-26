@@ -15,6 +15,7 @@ export declare function useCustomers(query: Partial<CustomerListQuery>): import(
     status: "ACTIVE" | "INACTIVE" | "BLOCKED";
     creditLimit: string;
     paymentTermDays: number;
+    paymentDueDate: string | null;
     balance: string;
     accountState: "DEBIT" | "CREDIT" | "SETTLED";
     availableCredit: string;
@@ -45,6 +46,7 @@ export declare function useCustomer(id: string | undefined): import("@tanstack/r
     status: "ACTIVE" | "INACTIVE" | "BLOCKED";
     creditLimit: string;
     paymentTermDays: number;
+    paymentDueDate: string | null;
     balance: string;
     accountState: "DEBIT" | "CREDIT" | "SETTLED";
     availableCredit: string;
@@ -69,6 +71,7 @@ export declare function useCustomerSummary(id: string | undefined): import("@tan
         status: "ACTIVE" | "INACTIVE" | "BLOCKED";
         creditLimit: string;
         paymentTermDays: number;
+        paymentDueDate: string | null;
         balance: string;
         accountState: "DEBIT" | "CREDIT" | "SETTLED";
         availableCredit: string;
@@ -104,6 +107,7 @@ export declare function useCreateCustomer(): import("@tanstack/react-query").Use
     status: "ACTIVE" | "INACTIVE" | "BLOCKED";
     creditLimit: string;
     paymentTermDays: number;
+    paymentDueDate: string | null;
     balance: string;
     accountState: "DEBIT" | "CREDIT" | "SETTLED";
     availableCredit: string;
@@ -112,19 +116,20 @@ export declare function useCreateCustomer(): import("@tanstack/react-query").Use
     archivedAt: string | null;
 }, Error, {
     name: string;
+    phone: string;
+    city: string;
     tags: string[];
     status: "ACTIVE" | "INACTIVE" | "BLOCKED";
     creditLimit: string;
     paymentTermDays: number;
     openingBalance: string;
     company?: string | undefined;
-    phone?: string | undefined;
     phoneAlt?: string | undefined;
     email?: string | undefined;
     address?: string | undefined;
-    city?: string | undefined;
     taxNumber?: string | undefined;
     notes?: string | undefined;
+    paymentDueDate?: string | undefined;
 }, unknown>;
 export declare function useUpdateCustomer(id: string): import("@tanstack/react-query").UseMutationResult<{
     id: string;
@@ -142,6 +147,7 @@ export declare function useUpdateCustomer(id: string): import("@tanstack/react-q
     status: "ACTIVE" | "INACTIVE" | "BLOCKED";
     creditLimit: string;
     paymentTermDays: number;
+    paymentDueDate: string | null;
     balance: string;
     accountState: "DEBIT" | "CREDIT" | "SETTLED";
     availableCredit: string;
@@ -162,6 +168,7 @@ export declare function useUpdateCustomer(id: string): import("@tanstack/react-q
     status?: "ACTIVE" | "INACTIVE" | "BLOCKED" | undefined;
     creditLimit?: string | undefined;
     paymentTermDays?: number | undefined;
+    paymentDueDate?: string | undefined;
 }, unknown>;
 export declare function useArchiveCustomer(): import("@tanstack/react-query").UseMutationResult<void, Error, string, unknown>;
 //# sourceMappingURL=api.d.ts.map

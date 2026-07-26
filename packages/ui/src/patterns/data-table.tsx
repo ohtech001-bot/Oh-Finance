@@ -35,11 +35,14 @@ export interface DataTableProps<T> {
 
   onRowClick?: (row: T) => void;
   rowClassName?: (row: T) => string | undefined;
+  /** عرض مخصص للصف على الهاتف؛ يبقى الجدول كما هو من md فما فوق. */
+  mobileRender?: (row: T, index: number) => React.ReactNode;
 
   /** وصف الجدول لقارئ الشاشة — إلزامي للوصول. */
   caption: string;
 
   className?: string;
+  tableClassName?: string;
 }
 
 const ALIGN_CLASS = {
@@ -81,8 +84,10 @@ export function DataTable<T>({
   onSortChange,
   onRowClick,
   rowClassName,
+  mobileRender,
   caption,
   className,
+  tableClassName,
 }: DataTableProps<T>) {
   if (loading) {
     return (
@@ -117,10 +122,24 @@ export function DataTable<T>({
   }
 
   return (
-    <div className={cn('rounded-card border border-border bg-card shadow-card', className)}>
+    <div
+      className={cn(
+        'rounded-card border border-border bg-card shadow-card',
+        mobileRender && 'border-0 bg-transparent shadow-none md:border md:bg-card md:shadow-card',
+        className,
+      )}
+    >
+      {mobileRender ? (
+        <div className="space-y-3 md:hidden">
+          {rows.map((row, rowIndex) => (
+            <div key={rowKey(row)}>{mobileRender(row, rowIndex)}</div>
+          ))}
+        </div>
+      ) : null}
+
       {/* الجدول يتمرّر داخل حاويته — لا تتمرّر الصفحة أفقيًا. */}
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+      <div className={cn('overflow-x-auto', mobileRender && 'hidden md:block')}>
+        <table className={cn('w-full border-collapse text-sm', tableClassName)}>
           <caption className="sr-only">{caption}</caption>
 
           <thead>

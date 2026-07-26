@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, CreditCard, Download, Printer, ShoppingBag, TrendingUp, User, Users, Wallet } from 'lucide-react';
+import { BarChart3, ShoppingBag, User, Users, Wallet } from 'lucide-react';
 import { PAYMENT_METHOD_LABELS } from '@oh/contracts';
 import { formatMoney, type CurrencyCode } from '@oh/money';
 import {
-  Button,
   Card,
   CardBody,
   CardHeader,
@@ -19,7 +18,6 @@ import { useAuth } from '@/app/auth-context';
 import { RangePicker, type RangeValue } from '@/features/dashboard/range-picker';
 import { useReports } from './api';
 import { PaymentMethodsDonut, SalesPaymentsLine, WeekdayBars } from './reports-charts';
-import { downloadReportCsv, printReport } from './export';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -33,7 +31,9 @@ export function ReportsPage() {
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
   const [range, setRange] = useState<RangeValue>({ preset: 'last_30_days' });
   const ready = range.preset !== 'custom' || Boolean(range.from && range.to);
-  const { data, isLoading, isError, error, refetch } = useReports(ready ? range : { preset: 'last_30_days' });
+  const { data, isLoading, isError, error, refetch } = useReports(
+    ready ? range : { preset: 'last_30_days' },
+  );
 
   return (
     <div className="space-y-6">
@@ -42,16 +42,6 @@ export function ReportsPage() {
         icon={BarChart3}
         breadcrumbs={[{ label: 'الرئيسية', href: '/' }, { label: 'التقارير' }]}
         linkAs={Link}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={printReport} disabled={!data}>
-              <Printer aria-hidden /> طباعة
-            </Button>
-            <Button variant="brand" onClick={() => data && downloadReportCsv(data)} disabled={!data}>
-              <Download aria-hidden /> تصدير التقرير
-            </Button>
-          </div>
-        }
       />
 
       <Card>
@@ -61,7 +51,7 @@ export function ReportsPage() {
       </Card>
 
       {isLoading ? (
-        <StatCardsSkeleton count={5} />
+        <StatCardsSkeleton count={3} />
       ) : isError ? (
         <Card>
           <ErrorState
@@ -73,28 +63,32 @@ export function ReportsPage() {
       ) : data ? (
         <>
           {/* ── المؤشرات ─────────────────────────────────────────────── */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <StatCard label="المبلغ المتبقي (الديون)" money={data.kpis.outstanding.value} currency={currency} moneyTone="debit" icon={Wallet} tone="debit" />
-            <StatCard label="إجمالي المدفوعات" money={data.kpis.payments.value} currency={currency} moneyTone="credit" icon={CreditCard} tone="credit" />
-            <StatCard label="إجمالي المبيعات (الطلبات)" money={data.kpis.sales.value} currency={currency} icon={ShoppingBag} tone="brand" sublabel={`عدد الطلبات: ${data.kpis.ordersCount.value}`} />
-            <StatCard label="عدد الزبائن النشطين" value={data.kpis.activeCustomers.value} icon={Users} tone="purple" sublabel={`من أصل ${data.kpis.totalCustomers} زبون`} />
-            <StatCard label="متوسط قيمة الطلب" money={data.kpis.averageOrderValue.value} currency={currency} icon={TrendingUp} tone="orange" />
+          <div className="space-y-3 sm:space-y-4">
+            <StatCard
+              label="المبلغ المتبقي (الديون)"
+              money={data.kpis.outstanding.value}
+              currency={currency}
+              moneyTone="debit"
+              icon={Wallet}
+              tone="debit"
+            />
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <StatCard
+                label="إجمالي الطلبات"
+                value={Number(data.kpis.ordersCount.value)}
+                icon={ShoppingBag}
+                tone="brand"
+              />
+              <StatCard
+                label="عدد الزبائن الكلي"
+                value={data.kpis.totalCustomers}
+                icon={Users}
+                tone="purple"
+              />
+            </div>
           </div>
 
-          {/* ── صف المخططات الثلاثة ──────────────────────────────────── */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <Card>
-              <CardHeader title="توزيع المبيعات حسب الفئات" />
-              <CardBody>
-                {/* مؤجَّل بحالة صريحة — لا بيانات وهمية. */}
-                <div className="flex h-[220px] flex-col items-center justify-center gap-2 text-center text-[13px] text-fg-muted">
-                  <BarChart3 className="size-8 text-fg-subtle" aria-hidden />
-                  <p>يتطلب تصنيف المنتجات</p>
-                  <p className="text-xs text-fg-subtle">{data.salesByCategory.reason}</p>
-                </div>
-              </CardBody>
-            </Card>
-
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader title="المبيعات والمدفوعات" />
               <CardBody>
@@ -121,11 +115,21 @@ export function ReportsPage() {
                   <ol className="space-y-1">
                     {data.topCustomers.map((c, i) => (
                       <li key={c.id}>
-                        <Link to={`/customers/${c.id}`} className="flex items-center justify-between gap-2 rounded-ctrl px-2 py-2 hover:bg-card-muted">
-                          <MoneyText value={c.purchases} currency={currency} tone="plain" size="sm" />
+                        <Link
+                          to={`/customers/${c.id}`}
+                          className="rounded-ctrl hover:bg-card-muted flex items-center justify-between gap-2 px-2 py-2"
+                        >
+                          <MoneyText
+                            value={c.purchases}
+                            currency={currency}
+                            tone="plain"
+                            size="sm"
+                          />
                           <div className="flex flex-1 items-center justify-end gap-2.5">
-                            <span className="truncate text-[13px] font-medium text-fg">{c.name}</span>
-                            <span className="w-4 text-center text-xs text-fg-subtle">{i + 1}</span>
+                            <span className="text-fg truncate text-[13px] font-medium">
+                              {c.name}
+                            </span>
+                            <span className="text-fg-subtle w-4 text-center text-xs">{i + 1}</span>
                           </div>
                         </Link>
                       </li>
@@ -143,15 +147,18 @@ export function ReportsPage() {
                 ) : (
                   <ol className="space-y-1">
                     {data.topProducts.map((p, i) => (
-                      <li key={p.name} className="flex items-center justify-between gap-2 rounded-ctrl px-2 py-2">
+                      <li
+                        key={p.name}
+                        className="rounded-ctrl flex items-center justify-between gap-2 px-2 py-2"
+                      >
                         <MoneyText value={p.sales} currency={currency} tone="plain" size="sm" />
-                        <span className="text-xs text-fg-muted tabular-nums" dir="ltr">
+                        <span className="text-fg-muted text-xs tabular-nums" dir="ltr">
                           {Number(p.quantity)}
                         </span>
                         <div className="flex flex-1 items-center justify-end gap-2.5">
-                          <span className="truncate text-[13px] text-fg">{p.name}</span>
-                          <ShoppingBag className="size-4 text-fg-subtle" aria-hidden />
-                          <span className="w-4 text-center text-xs text-fg-subtle">{i + 1}</span>
+                          <span className="text-fg truncate text-[13px]">{p.name}</span>
+                          <ShoppingBag className="text-fg-subtle size-4" aria-hidden />
+                          <span className="text-fg-subtle w-4 text-center text-xs">{i + 1}</span>
                         </div>
                       </li>
                     ))}
@@ -164,14 +171,21 @@ export function ReportsPage() {
               <CardHeader title="ملخص طرق الدفع" />
               <CardBody>
                 <PaymentMethodsDonut data={data.paymentMethods} currency={currency} />
-                <ul className="mt-3 space-y-2 border-t border-border pt-3">
+                <ul className="border-border mt-3 space-y-2 border-t pt-3">
                   {data.paymentMethods.map((m) => (
-                    <li key={m.method} className="flex items-center justify-between gap-2 text-[13px]">
-                      <span className="tabular-nums text-fg-muted" dir="ltr">
+                    <li
+                      key={m.method}
+                      className="flex items-center justify-between gap-2 text-[13px]"
+                    >
+                      <span className="text-fg-muted tabular-nums" dir="ltr">
                         {formatMoney(m.amount, { currency, withSymbol: false })}
                       </span>
-                      <span className="flex-1 text-end text-fg-muted">{PAYMENT_METHOD_LABELS[m.method]}</span>
-                      <span className="tabular-nums font-semibold text-fg" dir="ltr">{m.pct}%</span>
+                      <span className="text-fg-muted flex-1 text-end">
+                        {PAYMENT_METHOD_LABELS[m.method]}
+                      </span>
+                      <span className="text-fg font-semibold tabular-nums" dir="ltr">
+                        {m.pct}%
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -186,15 +200,31 @@ export function ReportsPage() {
               <CardBody>
                 <ul className="space-y-1">
                   {data.employeePerformance.map((e) => (
-                    <li key={e.userId ?? 'system'} className="flex items-center justify-between gap-3 rounded-ctrl px-2 py-2">
+                    <li
+                      key={e.userId ?? 'system'}
+                      className="rounded-ctrl flex items-center justify-between gap-3 px-2 py-2"
+                    >
                       <div className="flex items-center gap-4">
-                        <span className="text-[13px] text-fg-muted">مبيعات: <MoneyText value={e.sales} currency={currency} tone="plain" size="sm" /></span>
-                        <span className="text-[13px] text-fg-muted">مقبوضات: <MoneyText value={e.payments} currency={currency} tone="credit" size="sm" /></span>
-                        <span className="text-[13px] text-fg-muted tabular-nums">{e.orders} طلب</span>
+                        <span className="text-fg-muted text-[13px]">
+                          مبيعات:{' '}
+                          <MoneyText value={e.sales} currency={currency} tone="plain" size="sm" />
+                        </span>
+                        <span className="text-fg-muted text-[13px]">
+                          مقبوضات:{' '}
+                          <MoneyText
+                            value={e.payments}
+                            currency={currency}
+                            tone="credit"
+                            size="sm"
+                          />
+                        </span>
+                        <span className="text-fg-muted text-[13px] tabular-nums">
+                          {e.orders} طلب
+                        </span>
                       </div>
                       <div className="flex flex-1 items-center justify-end gap-2.5">
-                        <span className="truncate text-[13px] font-medium text-fg">{e.name}</span>
-                        <User className="size-4 text-fg-subtle" aria-hidden />
+                        <span className="text-fg truncate text-[13px] font-medium">{e.name}</span>
+                        <User className="text-fg-subtle size-4" aria-hidden />
                       </div>
                     </li>
                   ))}
@@ -209,5 +239,5 @@ export function ReportsPage() {
 }
 
 function Empty({ text }: { text: string }) {
-  return <p className="py-8 text-center text-[13px] text-fg-subtle">{text}</p>;
+  return <p className="text-fg-subtle py-8 text-center text-[13px]">{text}</p>;
 }

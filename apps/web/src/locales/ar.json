@@ -123,6 +123,18 @@
     "yes": "نعم",
     "no": "لا"
   },
+  "notificationFeed": {
+    "loadError": "تعذّر تحميل الإشعارات.",
+    "empty": "لا توجد إشعارات جديدة",
+    "orderCreated": "تم إدخال طلبية جديدة",
+    "paymentReceived": "تم استلام دفعة",
+    "orderDescription": "الطلب رقم {{number}} للزبون {{customer}} بقيمة {{amount}}",
+    "paymentDescription": "{{customer}} دفع مبلغ {{amount}}",
+    "dueSoonTitle": "اقترب موعد سداد {{name}}",
+    "dueTodayTitle": "موعد سداد {{name}} اليوم",
+    "dueSoonDescription": "متبقي 5 أيام على موعد سداد الدين. الرصيد المستحق: {{balance}}",
+    "dueTodayDescription": "موعد سداد الدين اليوم. الرصيد المستحق: {{balance}}"
+  },
   "errors": {
     "generic": "حدث خطأ غير متوقع.",
     "network": "تعذّر الاتصال بالخادم. تحقّق من اتصالك بالإنترنت.",

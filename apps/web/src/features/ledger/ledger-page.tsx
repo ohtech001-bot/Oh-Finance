@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Download, ListOrdered, Printer } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Download, ListOrdered, Printer } from 'lucide-react';
 import { LEDGER_TYPE_LABELS, type LedgerEntry, type LedgerListQuery } from '@oh/contracts';
 import { negate, toMoneyString, type CurrencyCode } from '@oh/money';
 import {
@@ -188,9 +188,9 @@ export function LedgerPage() {
       render: (row) => (
         <span className={row.isReversed ? 'line-through opacity-50' : ''}>
           <MoneyText
-            value={customerId ? toMoneyString(negate(row.runningBalance), 2) : row.runningBalance}
+            value={row.runningBalance}
             currency={currency}
-            tone={customerId ? 'auto' : 'balance'}
+            tone="auto"
             withSymbol={false}
           />
         </span>
@@ -234,7 +234,7 @@ export function LedgerPage() {
 
       {customerId && totals && list.data && list.data.total > 0 ? (
         <Card>
-          <CardBody className="grid grid-cols-1 gap-6 py-5 text-center sm:grid-cols-3">
+          <CardBody className="grid grid-cols-3 gap-3 py-5 text-center sm:gap-6">
             <Totals
               label="إجمالي الدين"
               value={totals.totalDebit}
@@ -318,6 +318,72 @@ export function LedgerPage() {
           empty={{
             title: 'لا توجد حركات مالية بعد',
             description: 'تظهر الحركات هنا عند تأكيد الطلبات وتسجيل الدفعات.',
+          }}
+          mobileRender={(row) => {
+            const isDebit = row.debit !== '0.00';
+            const occurredAt = new Date(row.occurredAt);
+            return (
+              <article className="border-border bg-card rounded-card shadow-card border p-4">
+                <div className="flex items-start gap-3">
+                  <span
+                    className={
+                      isDebit
+                        ? 'bg-danger-soft text-danger rounded-icon flex size-10 shrink-0 items-center justify-center'
+                        : 'bg-success-soft text-success rounded-icon flex size-10 shrink-0 items-center justify-center'
+                    }
+                  >
+                    {isDebit ? (
+                      <ArrowDownLeft className="size-5" aria-hidden />
+                    ) : (
+                      <ArrowUpRight className="size-5" aria-hidden />
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-fg truncate text-sm font-bold">
+                      {row.customerName || LEDGER_TYPE_LABELS[row.entryType]}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <StatusBadge tone={TYPE_TONE[row.entryType] ?? 'neutral'}>
+                        {LEDGER_TYPE_LABELS[row.entryType]}
+                      </StatusBadge>
+                      {row.refNumber ? (
+                        <span className="text-fg-muted text-xs">{row.refNumber}</span>
+                      ) : null}
+                    </div>
+                    <p className="text-fg-muted mt-2 text-xs">
+                      {new Intl.DateTimeFormat(locale, {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                      }).format(occurredAt)}
+                      {' · '}
+                      <span dir="ltr">
+                        {occurredAt.toLocaleTimeString('en-GB', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </p>
+                  </div>
+                  <div className="text-end">
+                    <MoneyText
+                      value={isDebit ? row.debit : row.credit}
+                      currency={currency}
+                      tone={isDebit ? 'debit' : 'credit'}
+                      size="lg"
+                    />
+                    <p className="text-fg-muted mt-1 text-[11px]">الرصيد بعد الحركة</p>
+                    <MoneyText
+                      value={row.runningBalance}
+                      currency={currency}
+                      tone="auto"
+                      withSymbol={false}
+                      size="sm"
+                    />
+                  </div>
+                </div>
+              </article>
+            );
           }}
         />
 

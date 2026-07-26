@@ -46,7 +46,9 @@ export function DashboardPage() {
   const countTrends = data?.trends.filter((s) => s.unit === 'count') ?? [];
   const scope = data?.meta.scope;
   const collectionRate = data?.kpis.find((metric) => metric.id === 'collection_rate');
-  const cardKpis = data?.kpis.filter((metric) => metric.id !== 'collection_rate') ?? [];
+  const cardKpis =
+    data?.kpis.filter((metric) => metric.id !== 'collection_rate' && metric.id !== 'payments') ??
+    [];
 
   return (
     <div className="space-y-6">
@@ -61,7 +63,7 @@ export function DashboardPage() {
       </div>
 
       {isLoading ? (
-        <StatCardsSkeleton count={4} />
+        <StatCardsSkeleton count={3} />
       ) : isError ? (
         <Card>
           <ErrorState
@@ -77,7 +79,7 @@ export function DashboardPage() {
           {/* ── المؤشرات ─────────────────────────────────────────────── */}
           {cardKpis.length > 0 || collectionRate ? (
             <section aria-label="المؤشرات المالية">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
                 {cardKpis.map((m) => (
                   <KpiCard key={m.id} metric={m} currency={currency} />
                 ))}

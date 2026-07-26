@@ -1,12 +1,8 @@
 import {
   BarChart3,
   CreditCard,
-  FileText,
-  History,
   LayoutDashboard,
   ListOrdered,
-  MessageCircle,
-  Package,
   Settings,
   ShoppingBag,
   Users,
@@ -54,17 +50,12 @@ export const TENANT_NAV: NavItem[] = [
     mobile: true,
   },
   {
-    to: '/activity',
-    labelKey: 'nav.activity',
-    icon: History,
-    permission: PERMISSIONS.ACTIVITY_READ,
-  },
-  {
     to: '/orders',
     labelKey: 'nav.orders',
     icon: ShoppingBag,
     permission: PERMISSIONS.ORDERS_READ,
     phase: 'المرحلة 4',
+    mobile: true,
   },
   {
     to: '/payments',
@@ -86,27 +77,6 @@ export const TENANT_NAV: NavItem[] = [
     icon: BarChart3,
     permission: PERMISSIONS.REPORTS_READ,
     phase: 'المرحلة 6',
-    mobile: true,
-  },
-  {
-    to: '/documents',
-    labelKey: 'nav.documents',
-    icon: FileText,
-    permission: PERMISSIONS.DOCUMENTS_PRINT,
-    phase: 'المرحلة 6',
-  },
-  {
-    to: '/messages',
-    labelKey: 'nav.messages',
-    icon: MessageCircle,
-    permission: PERMISSIONS.MESSAGES_READ,
-    phase: 'المرحلة 7',
-  },
-  {
-    to: '/products',
-    labelKey: 'nav.products',
-    icon: Package,
-    phase: 'المرحلة 4',
   },
   {
     to: '/employees',
@@ -121,12 +91,6 @@ export const TENANT_NAV: NavItem[] = [
     icon: Settings,
     permission: PERMISSIONS.SETTINGS_READ,
     phase: 'المرحلة 8',
-  },
-  {
-    to: '/subscription',
-    labelKey: 'nav.subscription',
-    icon: CreditCard,
-    permission: PERMISSIONS.SUBSCRIPTION_READ,
   },
 ];
 

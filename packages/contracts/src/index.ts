@@ -9,6 +9,7 @@ export * from './customer.js';
 export * from './order.js';
 export * from './ledger.js';
 export * from './payment.js';
+export * from './worker.js';
 
 // ── المرحلة 3: لوحة التحكم ──
 export * from './dashboard.js';

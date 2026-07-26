@@ -37,9 +37,13 @@ export interface DataTableProps<T> {
     };
     onSortChange?: (key: string) => void;
     onRowClick?: (row: T) => void;
+    rowClassName?: (row: T) => string | undefined;
+    /** عرض مخصص للصف على الهاتف؛ يبقى الجدول كما هو من md فما فوق. */
+    mobileRender?: (row: T, index: number) => React.ReactNode;
     /** وصف الجدول لقارئ الشاشة — إلزامي للوصول. */
     caption: string;
     className?: string;
+    tableClassName?: string;
 }
 /**
  * أساس الجداول — مطابق للمرجع البصري.
@@ -53,5 +57,5 @@ export interface DataTableProps<T> {
  *  • `aria-sort` على العمود المفروز.
  *  • التمرير الأفقي في حاوية مستقلة — الصفحة نفسها لا تتمرّر أفقيًا أبدًا.
  */
-export declare function DataTable<T>({ columns, rows, rowKey, loading, error, onRetry, empty, isFiltered, onResetFilters, sort, onSortChange, onRowClick, caption, className, }: DataTableProps<T>): import("react").JSX.Element;
+export declare function DataTable<T>({ columns, rows, rowKey, loading, error, onRetry, empty, isFiltered, onResetFilters, sort, onSortChange, onRowClick, rowClassName, mobileRender, caption, className, tableClassName, }: DataTableProps<T>): import("react").JSX.Element;
 //# sourceMappingURL=data-table.d.ts.map

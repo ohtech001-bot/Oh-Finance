@@ -123,6 +123,18 @@
     "yes": "Yes",
     "no": "No"
   },
+  "notificationFeed": {
+    "loadError": "Notifications could not be loaded.",
+    "empty": "No new notifications",
+    "orderCreated": "A new order was entered",
+    "paymentReceived": "Payment received",
+    "orderDescription": "Order #{{number}} for {{customer}}, total {{amount}}",
+    "paymentDescription": "{{customer}} paid {{amount}}",
+    "dueSoonTitle": "{{name}}'s payment is due soon",
+    "dueTodayTitle": "{{name}}'s payment is due today",
+    "dueSoonDescription": "5 days remain until the debt is due. Outstanding balance: {{balance}}",
+    "dueTodayDescription": "The debt is due today. Outstanding balance: {{balance}}"
+  },
   "errors": {
     "generic": "Something went wrong.",
     "network": "Could not reach the server. Check your connection.",

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createCustomerSchema,
   createTenantSchema,
   createPlatformStaffInviteSchema,
   dateRangeSchema,
@@ -11,6 +12,19 @@ import {
   positiveMoneySchema,
   setTenantStatusSchema,
 } from './index.js';
+
+describe('createCustomerSchema — بيانات التواصل الإلزامية', () => {
+  const valid = { name: 'زبون جديد', phone: '0501234567', city: 'الرياض' };
+
+  it('يقبل الزبون عند وجود الهاتف والمدينة', () => {
+    expect(createCustomerSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('يرفض غياب الهاتف أو المدينة', () => {
+    expect(createCustomerSchema.safeParse({ ...valid, phone: '' }).success).toBe(false);
+    expect(createCustomerSchema.safeParse({ ...valid, city: '' }).success).toBe(false);
+  });
+});
 
 describe('moneySchema — المبالغ نصوص لا أرقام', () => {
   it('يقبل النصوص العشرية الصالحة', () => {
@@ -118,9 +132,14 @@ describe('createTenantSchema — إنشاء محل من لوحة المدير ا
 
 describe('createPlatformStaffInviteSchema', () => {
   const valid = {
-    name: 'موظف جديد', email: 'staff@example.com', phone: '0501234567',
-    dateOfBirth: '1995-05-10', identityNumber: '123456789', jobTitle: 'خدمة العملاء',
-    platformRole: 'EMPLOYEE', locale: 'ar',
+    name: 'موظف جديد',
+    email: 'staff@example.com',
+    phone: '0501234567',
+    dateOfBirth: '1995-05-10',
+    identityNumber: '123456789',
+    jobTitle: 'خدمة العملاء',
+    platformRole: 'EMPLOYEE',
+    locale: 'ar',
   } as const;
 
   it('يقبل كل الحقول الإلزامية', () => {
@@ -128,8 +147,12 @@ describe('createPlatformStaffInviteSchema', () => {
   });
 
   it('يرفض هاتفًا لا يبدأ بـ05 أو لا يتكون من 10 أرقام', () => {
-    expect(createPlatformStaffInviteSchema.safeParse({ ...valid, phone: '0401234567' }).success).toBe(false);
-    expect(createPlatformStaffInviteSchema.safeParse({ ...valid, phone: '050123456' }).success).toBe(false);
+    expect(
+      createPlatformStaffInviteSchema.safeParse({ ...valid, phone: '0401234567' }).success,
+    ).toBe(false);
+    expect(
+      createPlatformStaffInviteSchema.safeParse({ ...valid, phone: '050123456' }).success,
+    ).toBe(false);
   });
 });
 

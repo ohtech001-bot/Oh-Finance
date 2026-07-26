@@ -1,8 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle2, Pencil, Plus, Printer, ShoppingBag, Wallet } from 'lucide-react';
-import type { Order, OrderDetail, OrderListQuery } from '@oh/contracts';
+import {
+  CalendarDays,
+  CheckCircle2,
+  ChevronLeft,
+  Pencil,
+  Plus,
+  Printer,
+  ShoppingBag,
+  Wallet,
+} from 'lucide-react';
+import type { Order, OrderDetail, OrderListQuery, SessionUser } from '@oh/contracts';
 import type { CurrencyCode } from '@oh/money';
 import {
   Button,
@@ -25,6 +34,7 @@ import { useAuth } from '@/app/auth-context';
 import { CreateOrderDialog } from './create-order-dialog';
 import { OrderDetailsDialog } from './order-details-dialog';
 import { useOrderStats, useOrders } from './api';
+import { displayOrderNumber } from './order-number';
 import { printOrder } from './print-order';
 
 export function OrdersPage() {
@@ -36,6 +46,7 @@ export function OrdersPage() {
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
   const [paymentState, setPaymentState] = useState('');
+  const [classification, setClassification] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [sort, setSort] = useState<{ key: string; order: 'asc' | 'desc' }>({
@@ -60,6 +71,12 @@ export function OrdersPage() {
     search: search || undefined,
     status: paymentState === 'paid' ? 'PAID' : undefined,
     unpaidOnly: paymentState === 'unpaid' ? true : undefined,
+    classification:
+      classification === 'draft'
+        ? 'DRAFT'
+        : classification === 'confirmed'
+          ? 'CONFIRMED'
+          : undefined,
     from: from || undefined,
     to: to || undefined,
     sortBy: sort.key as OrderListQuery['sortBy'],
@@ -67,7 +84,8 @@ export function OrdersPage() {
   };
   const list = useOrders(query);
   const stats = useOrderStats({});
-  const isFiltered = search !== '' || paymentState !== '' || from !== '' || to !== '';
+  const isFiltered =
+    search !== '' || paymentState !== '' || classification !== '' || from !== '' || to !== '';
 
   const setDetailOrder = (id?: string) => {
     const next = new URLSearchParams(searchParams);
@@ -89,13 +107,20 @@ export function OrdersPage() {
   };
 
   const runPrint = async (row: Order) => {
-    const printWindow = window.open('', '_blank', 'width=900,height=720');
+    const printWindow = window.open('', '_blank', 'width=420,height=720');
     if (!printWindow) {
       toast.error('اسمح بفتح نافذة الطباعة من المتصفح.');
       return;
     }
     try {
-      printOrder(await loadOrder(row.id), currency, printWindow);
+      const [order, freshUser] = await Promise.all([
+        loadOrder(row.id),
+        api.get<SessionUser>('/auth/me'),
+      ]);
+      printOrder(order, currency, {
+        store: freshUser.store,
+        targetWindow: printWindow,
+      });
     } catch (error) {
       printWindow.close();
       if (error instanceof ApiRequestError) toast.apiError(error.message, error.requestId);
@@ -114,7 +139,9 @@ export function OrdersPage() {
     {
       key: 'number',
       header: 'رقم الطلب',
-      render: (row) => <span className="text-accent font-semibold">{row.number}</span>,
+      render: (row) => (
+        <span className="text-accent font-semibold">{displayOrderNumber(row.number)}</span>
+      ),
     },
     {
       header: 'الزبون',
@@ -134,7 +161,30 @@ export function OrdersPage() {
       key: 'total',
       header: 'تكلفة الطلب',
       align: 'end',
-      render: (row) => <MoneyText value={row.total} currency={currency} />,
+      render: (row) => {
+        const isDraft = row.status === 'DRAFT' || row.status === 'QUOTE';
+        const isPaid = row.status === 'PAID' || row.remainingAmount === '0.00';
+        return (
+          <div className="space-y-1">
+            <MoneyText
+              value={row.total}
+              currency={currency}
+              tone={isDraft ? 'neutral' : isPaid ? 'credit' : 'debit'}
+            />
+            <p
+              className={
+                isDraft
+                  ? 'text-fg-muted text-xs'
+                  : isPaid
+                    ? 'text-success text-xs font-medium'
+                    : 'text-danger text-xs font-medium'
+              }
+            >
+              {isDraft ? 'مسودة' : isPaid ? 'مدفوع' : 'غير مدفوع'}
+            </p>
+          </div>
+        );
+      },
     },
     {
       header: 'المدفوع',
@@ -160,8 +210,20 @@ export function OrdersPage() {
       header: 'الحالة',
       align: 'center',
       render: (row) => (
-        <StatusBadge tone={row.remainingAmount === '0.00' ? 'credit' : 'debit'}>
-          {row.remainingAmount === '0.00' ? 'مدفوع' : 'غير مدفوع'}
+        <StatusBadge
+          tone={
+            row.status === 'DRAFT' || row.status === 'QUOTE'
+              ? 'neutral'
+              : row.remainingAmount === '0.00'
+                ? 'credit'
+                : 'debit'
+          }
+        >
+          {row.status === 'DRAFT' || row.status === 'QUOTE'
+            ? 'مسودة'
+            : row.remainingAmount === '0.00'
+              ? 'مدفوع'
+              : 'غير مدفوع'}
         </StatusBadge>
       ),
     },
@@ -219,7 +281,7 @@ export function OrdersPage() {
       {stats.isLoading ? (
         <StatCardsSkeleton count={4} />
       ) : summary ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
           <StatCard label="إجمالي الطلبات" value={summary.total} icon={ShoppingBag} tone="accent" />
           <StatCard label="مدفوع" value={summary.paid} icon={CheckCircle2} tone="credit" />
           <StatCard label="غير مدفوع" value={unpaidCount} icon={Wallet} tone="debit" />
@@ -247,6 +309,7 @@ export function OrdersPage() {
           value={paymentState}
           onChange={(value) => {
             setPaymentState(value);
+            if (value) setClassification('confirmed');
             setPage(1);
           }}
           allLabel="كل الحالات"
@@ -254,6 +317,20 @@ export function OrdersPage() {
           options={[
             { value: 'paid', label: 'مدفوع' },
             { value: 'unpaid', label: 'غير مدفوع' },
+          ]}
+        />
+        <SelectFilter
+          value={classification}
+          onChange={(value) => {
+            setClassification(value);
+            if (value === 'draft') setPaymentState('');
+            setPage(1);
+          }}
+          allLabel="كل التصنيفات"
+          label="التصنيف"
+          options={[
+            { value: 'draft', label: 'مسودة' },
+            { value: 'confirmed', label: 'مؤكدة' },
           ]}
         />
         <DateRangeFilter
@@ -294,6 +371,7 @@ export function OrdersPage() {
           onResetFilters={() => {
             setSearch('');
             setPaymentState('');
+            setClassification('');
             setFrom('');
             setTo('');
             setPage(1);
@@ -308,6 +386,72 @@ export function OrdersPage() {
           sort={sort}
           onSortChange={toggleSort}
           onRowClick={(row) => setDetailOrder(row.id)}
+          mobileRender={(row) => {
+            const editable = row.status === 'DRAFT' || row.status === 'QUOTE';
+            const isDraft = row.status === 'DRAFT' || row.status === 'QUOTE';
+            const isPaid = row.status === 'PAID' || row.remainingAmount === '0.00';
+            return (
+              <article
+                className="border-border bg-card rounded-card shadow-card border p-4"
+                onClick={() => setDetailOrder(row.id)}
+              >
+                <div className="flex items-start gap-3">
+                  <ChevronLeft className="text-fg-subtle mt-1 size-5 shrink-0" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-fg font-bold">{displayOrderNumber(row.number)}</p>
+                      <StatusBadge tone={isDraft ? 'neutral' : isPaid ? 'credit' : 'debit'}>
+                        {isDraft ? 'مسودة' : isPaid ? 'مدفوع' : 'غير مدفوع'}
+                      </StatusBadge>
+                    </div>
+                    <p className="text-fg mt-1 truncate text-sm font-medium">{row.customerName}</p>
+                    <p className="text-fg-muted mt-1 flex items-center gap-1.5 text-xs">
+                      <CalendarDays className="size-3.5" aria-hidden />
+                      <span dir="ltr">{row.issuedAt.slice(0, 10)}</span>
+                    </p>
+                  </div>
+                  <div className="text-end">
+                    <MoneyText
+                      value={row.total}
+                      currency={currency}
+                      tone={isDraft ? 'neutral' : isPaid ? 'credit' : 'debit'}
+                      size="lg"
+                    />
+                    <p
+                      className={
+                        isDraft
+                          ? 'text-fg-muted mt-1 text-xs'
+                          : isPaid
+                            ? 'text-success mt-1 text-xs font-medium'
+                            : 'text-danger mt-1 text-xs font-medium'
+                      }
+                    >
+                      {isDraft ? 'مسودة' : isPaid ? 'مدفوع' : 'غير مدفوع'}
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className="border-border-subtle mt-3 flex justify-end gap-2 border-t pt-3"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!editable || !can('orders.update')}
+                    onClick={() => void openEdit(row)}
+                  >
+                    <Pencil aria-hidden />
+                    تعديل
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => void runPrint(row)}>
+                    <Printer aria-hidden />
+                    طباعة
+                  </Button>
+                </div>
+              </article>
+            );
+          }}
         />
 
         {list.data && list.data.total > 0 ? (

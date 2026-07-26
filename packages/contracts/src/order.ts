@@ -172,7 +172,7 @@ export const createOrderSchema = z.object({
   status: createOrderStatusSchema.default('DRAFT'),
 
   issuedAt: isoDateSchema.optional(),
-  /** إن غاب: يُحسب من `paymentTermDays` للزبون عند التأكيد. */
+  /** إن غاب: يستخدم تاريخ السداد المتفق عليه مع الزبون. */
   dueAt: isoDateSchema.optional(),
 
   /** خصم على مستوى الطلب (فوق خصومات البنود). */
@@ -251,6 +251,7 @@ export const orderListQuerySchema = paginationQuerySchema.extend({
   /** بحث برقم الطلب أو اسم الزبون (المتطلب 13). */
   search: z.string().trim().max(120).optional(),
   status: orderStatusSchema.optional(),
+  classification: z.enum(['DRAFT', 'CONFIRMED']).optional(),
   customerId: uuidSchema.optional(),
 
   /** تصفية حسب التاريخ (المتطلب 14). */

@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import type { Customer, OrderDetail, OrderItemInput, PaginatedResult } from '@oh/contracts';
-import { greaterThan, negate, toMoneyString, type CurrencyCode } from '@oh/money';
+import {
+  add,
+  greaterThan,
+  max,
+  multiply,
+  subtract,
+  toMoneyString,
+  zero,
+  type CurrencyCode,
+} from '@oh/money';
 import {
   Button,
   Dialog,
@@ -21,22 +30,23 @@ import { ApiRequestError, api } from '@/lib/api';
 import { useUnsavedChangesWarning } from '@/lib/use-unsaved-changes';
 import { useAuth } from '@/app/auth-context';
 import { useCreatePayment } from '@/features/payments/api';
-import { useCreateOrder, usePreviewOrder, useUpdateOrder } from './api';
+import { useCreateOrder, useUpdateOrder } from './api';
+import { displayOrderNumber } from './order-number';
 
 interface DraftItem {
   name: string;
   quantity: string;
   unitPrice: string;
   discount: string;
-  taxRate: string;
+  collapsed: boolean;
 }
 
 const emptyItem = (): DraftItem => ({
   name: '',
   quantity: '1',
   unitPrice: '',
-  discount: '0',
-  taxRate: '0',
+  discount: '',
+  collapsed: false,
 });
 
 export interface CreateOrderDialogProps {
@@ -47,11 +57,8 @@ export interface CreateOrderDialogProps {
 }
 
 /**
- * إنشاء طلب — إدخال بنود يدوي (المتطلب 5)، مع معاينة حيّة.
- *
- * ⚠️ الواجهة **لا تحسب الإجمالي**. ترسل البنود إلى `/orders/preview` ويعيد
- *    الخادم الأرقام. فما يراه المستخدم هو بالضبط ما سيُحفظ — لا فرق تقريب،
- *    ولا مبلغ يمكن تزويره.
+ * إنشاء طلب — إدخال منتجات يدويًا مع مجموع حيّ باستخدام طبقة المال العشرية.
+ * يعيد الخادم الحساب نفسه عند الحفظ، ويبقى المرجع النهائي للمبالغ المحفوظة.
  *
  * الحفظ: مسودة أو تأكيد مباشر (يولّد قيدًا مدينًا).
  */
@@ -74,7 +81,6 @@ export function CreateOrderDialog({
   const create = useCreateOrder();
   const update = useUpdateOrder(order?.id ?? '');
   const createPayment = useCreatePayment();
-  const preview = usePreviewOrder();
 
   const customersQuery = useQuery({
     queryKey: ['customers', 'picker'],
@@ -82,12 +88,6 @@ export function CreateOrderDialog({
       api.get<PaginatedResult<Customer>>('/customers?pageSize=100&sortBy=name&sortOrder=asc'),
     enabled: open && !fixedCustomerId && !order,
   });
-  const fixedCustomerQuery = useQuery({
-    queryKey: ['customers', fixedCustomerId ?? order?.customerId],
-    queryFn: () => api.get<Customer>(`/customers/${fixedCustomerId ?? order?.customerId}`),
-    enabled: open && Boolean(fixedCustomerId ?? order?.customerId),
-  });
-
   useEffect(() => {
     if (open) {
       setCustomerId(order?.customerId ?? fixedCustomerId ?? '');
@@ -97,8 +97,8 @@ export function CreateOrderDialog({
               name: item.name,
               quantity: item.quantity,
               unitPrice: item.unitPrice,
-              discount: item.discount,
-              taxRate: item.taxRate,
+              discount: /^0(?:\.0+)?$/.test(item.discount) ? '' : item.discount,
+              collapsed: false,
             }))
           : [emptyItem()],
       );
@@ -106,9 +106,7 @@ export function CreateOrderDialog({
       setNotes(order?.notes ?? '');
       setPaidAmount('0');
       setPaymentKey(crypto.randomUUID());
-      preview.reset();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, fixedCustomerId, order]);
 
   // متسخ = المستخدم أدخل شيئًا ذا قيمة (زبون، بند مُسمّى، خصم، أو ملاحظة).
@@ -137,23 +135,16 @@ export function CreateOrderDialog({
           quantity: it.quantity,
           unitPrice: it.unitPrice,
           discount: it.discount || '0',
-          taxRate: it.taxRate || '0',
+          taxRate: '0',
         })),
     [items],
   );
 
-  const { mutate: previewOrder, reset: resetPreview } = preview;
-  useEffect(() => {
-    if (!open) return;
-    const timer = window.setTimeout(() => {
-      if (validItems.length === 0) {
-        resetPreview();
-        return;
-      }
-      previewOrder({ items: validItems, discountAmount: discount || '0' });
-    }, 150);
-    return () => window.clearTimeout(timer);
-  }, [discount, open, previewOrder, resetPreview, validItems]);
+  const liveLineTotals = useMemo(() => items.map(calculateLineTotal), [items]);
+  const liveTotal = useMemo(
+    () => calculateOrderTotal(liveLineTotals, discount),
+    [discount, liveLineTotals],
+  );
 
   const updateItem = (index: number, patch: Partial<DraftItem>) =>
     setItems((prev) => prev.map((it, i) => (i === index ? { ...it, ...patch } : it)));
@@ -164,7 +155,7 @@ export function CreateOrderDialog({
       return;
     }
     if (validItems.length === 0) {
-      toast.error('أضف بندًا واحدًا صحيحًا على الأقل.');
+      toast.error('أضف منتجًا واحدًا صحيحًا على الأقل.');
       return;
     }
     if (order) {
@@ -178,7 +169,7 @@ export function CreateOrderDialog({
         },
         {
           onSuccess: (updated) => {
-            toast.success(`حُفظت تعديلات الطلب ${updated.number}`);
+            toast.success(`حُفظت تعديلات الطلب ${displayOrderNumber(updated.number)}`);
             onOpenChange(false);
           },
           onError: (e) => {
@@ -199,11 +190,11 @@ export function CreateOrderDialog({
       toast.error('سجّل الطلب كمؤكد حتى يمكن حفظ الدفعة معه.');
       return;
     }
-    if (greaterThan(paymentAmount, '0') && !totals) {
+    if (greaterThan(paymentAmount, '0') && !liveTotal) {
       toast.error('انتظر ظهور إجمالي الطلب قبل تسجيل الدفعة.');
       return;
     }
-    if (totals && greaterThan(paymentAmount, totals.total)) {
+    if (liveTotal && greaterThan(paymentAmount, liveTotal)) {
       toast.error('المبلغ المدفوع لا يمكن أن يتجاوز إجمالي الطلب.');
       return;
     }
@@ -231,7 +222,9 @@ export function CreateOrderDialog({
               },
               {
                 onSuccess: () => {
-                  toast.success(`حُفظ الطلب ${createdOrder.number} وسُجّلت الدفعة النقدية`);
+                  toast.success(
+                    `حُفظ الطلب ${displayOrderNumber(createdOrder.number)} وسُجّلت الدفعة النقدية`,
+                  );
                   onOpenChange(false);
                 },
                 onError: (e) => {
@@ -247,8 +240,8 @@ export function CreateOrderDialog({
           } else {
             toast.success(
               confirm
-                ? `أُكِّد الطلب ${createdOrder.number}`
-                : `حُفظ الطلب ${createdOrder.number} كمسودة`,
+                ? `أُكِّد الطلب ${displayOrderNumber(createdOrder.number)}`
+                : `حُفظ الطلب ${displayOrderNumber(createdOrder.number)} كمسودة`,
               confirm ? `الإجمالي: ${createdOrder.total}` : undefined,
             );
             onOpenChange(false);
@@ -263,11 +256,6 @@ export function CreateOrderDialog({
   };
 
   const customers = customersQuery.data?.items ?? [];
-  const selectedCustomer =
-    fixedCustomerId || order
-      ? fixedCustomerQuery.data
-      : customers.find((customer) => customer.id === customerId);
-  const totals = preview.data;
   const cellClass =
     'h-10 rounded-ctrl border border-border bg-card px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
@@ -275,7 +263,9 @@ export function CreateOrderDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="xl">
         <DialogHeader>
-          <DialogTitle>{order ? `تعديل الطلب ${order.number}` : 'إضافة طلب جديد'}</DialogTitle>
+          <DialogTitle>
+            {order ? `تعديل الطلب ${displayOrderNumber(order.number)}` : 'إضافة طلب جديد'}
+          </DialogTitle>
         </DialogHeader>
 
         <DialogBody className="space-y-5">
@@ -299,106 +289,167 @@ export function CreateOrderDialog({
             </Field>
           ) : null}
 
-          {/* البنود */}
+          {/* المنتجات */}
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-fg text-[13px] font-semibold">البنود</h3>
+              <h3 className="text-fg text-[13px] font-semibold">المنتجات</h3>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setItems((p) => [...p, emptyItem()])}
+                onClick={() =>
+                  setItems((previous) => [
+                    ...previous.map((item) => ({ ...item, collapsed: true })),
+                    emptyItem(),
+                  ])
+                }
               >
                 <Plus aria-hidden />
-                إضافة بند
+                إضافة منتج
               </Button>
             </div>
 
             <div className="space-y-2">
               {/* رؤوس الأعمدة */}
-              <div className="text-fg-muted hidden grid-cols-[1fr_70px_90px_80px_70px_90px_36px] gap-2 px-1 text-[11px] font-medium sm:grid">
-                <span>الوصف</span>
+              <div className="text-fg-muted hidden grid-cols-[1fr_70px_90px_80px_120px] gap-2 px-1 text-[11px] font-medium sm:grid">
+                <span>اسم المنتج</span>
                 <span className="text-center">الكمية</span>
-                <span className="text-center">السعر</span>
-                <span className="text-center">الخصم</span>
-                <span className="text-center">ضريبة%</span>
-                <span className="text-end">الإجمالي</span>
-                <span />
+                <span className="text-center">السعر للوحدة</span>
+                <span className="text-center">خصم المنتج</span>
+                <span className="text-end">المجموع</span>
               </div>
 
               {items.map((item, i) => {
-                const lineTotal = totals?.lineTotals[i];
+                const lineTotal = liveLineTotals[i];
+                if (item.collapsed) {
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() =>
+                        setItems((previous) =>
+                          previous.map((current, index) => ({
+                            ...current,
+                            collapsed: index !== i,
+                          })),
+                        )
+                      }
+                      className="border-border bg-card hover:bg-card-muted rounded-ctrl flex h-11 w-full items-center gap-2 border px-3 text-start transition-colors"
+                      aria-expanded="false"
+                    >
+                      <ChevronDown className="text-fg-muted size-4 shrink-0" aria-hidden />
+                      <span className="text-fg min-w-0 flex-1 truncate text-sm font-semibold">
+                        {item.name.trim() || `منتج ${i + 1}`}
+                      </span>
+                      {lineTotal ? (
+                        <MoneyText value={lineTotal} currency={currency} tone="plain" size="sm" />
+                      ) : null}
+                    </button>
+                  );
+                }
                 return (
                   <div
                     key={i}
-                    className="rounded-ctrl border-border-subtle grid grid-cols-2 gap-2 border p-2 sm:grid-cols-[1fr_70px_90px_80px_70px_90px_36px] sm:border-0 sm:p-0"
+                    className="rounded-ctrl border-accent/40 bg-card grid grid-cols-2 gap-2 border-2 p-3 shadow-sm sm:grid-cols-[1fr_70px_90px_80px_120px]"
                   >
-                    <input
-                      value={item.name}
-                      onChange={(e) => updateItem(i, { name: e.target.value })}
-                      placeholder="اسم البند"
-                      className={`${cellClass} col-span-2 sm:col-span-1`}
-                    />
-                    <input
-                      value={item.quantity}
-                      onChange={(e) => updateItem(i, { quantity: e.target.value })}
-                      dir="ltr"
-                      inputMode="decimal"
-                      placeholder="الكمية"
-                      className={`${cellClass} text-center`}
-                    />
-                    <input
-                      value={item.unitPrice}
-                      onChange={(e) => updateItem(i, { unitPrice: e.target.value })}
-                      dir="ltr"
-                      inputMode="decimal"
-                      placeholder="السعر"
-                      className={`${cellClass} text-center`}
-                    />
-                    <input
-                      value={item.discount}
-                      onChange={(e) => updateItem(i, { discount: e.target.value })}
-                      dir="ltr"
-                      inputMode="decimal"
-                      className={`${cellClass} text-center`}
-                    />
-                    <input
-                      value={item.taxRate}
-                      onChange={(e) => updateItem(i, { taxRate: e.target.value })}
-                      dir="ltr"
-                      inputMode="decimal"
-                      className={`${cellClass} text-center`}
-                    />
-                    <div className="flex items-center justify-end px-1">
-                      {lineTotal ? (
-                        <MoneyText
-                          value={lineTotal}
-                          currency={currency}
-                          tone="plain"
-                          withSymbol={false}
-                          size="sm"
-                        />
-                      ) : (
-                        <span className="text-fg-subtle text-xs">—</span>
-                      )}
-                    </div>
                     <button
                       type="button"
-                      onClick={() => {
-                        setItems((p) => (p.length > 1 ? p.filter((_, idx) => idx !== i) : p));
-                      }}
-                      className="rounded-ctrl text-fg-muted hover:bg-danger-soft hover:text-danger flex items-center justify-center"
-                      aria-label="حذف البند"
+                      onClick={() => updateItem(i, { collapsed: true })}
+                      className="text-fg-muted hover:text-fg col-span-2 flex items-center gap-1.5 py-0.5 text-xs sm:col-span-5"
+                      aria-expanded="true"
                     >
-                      <Trash2 className="size-4" />
+                      <ChevronUp className="size-4" aria-hidden />
+                      <span>{item.name.trim() || `تفاصيل المنتج ${i + 1}`}</span>
+                      <span className="ms-auto">إخفاء التفاصيل</span>
                     </button>
+                    <label className="col-span-2 sm:col-span-1">
+                      <span className="text-fg-muted mb-1 block text-xs sm:hidden">اسم المنتج</span>
+                      <input
+                        value={item.name}
+                        onChange={(e) => updateItem(i, { name: e.target.value })}
+                        placeholder="شوال رمل"
+                        className={`${cellClass} w-full`}
+                      />
+                    </label>
+                    <label>
+                      <span className="text-fg-muted mb-1 block text-xs sm:hidden">الكمية</span>
+                      <input
+                        value={item.quantity}
+                        onChange={(e) => updateItem(i, { quantity: e.target.value })}
+                        dir="ltr"
+                        inputMode="decimal"
+                        placeholder="1"
+                        className={`${cellClass} w-full text-center`}
+                      />
+                    </label>
+                    <label>
+                      <span className="text-fg-muted mb-1 block text-xs sm:hidden">
+                        السعر للوحدة
+                      </span>
+                      <input
+                        value={item.unitPrice}
+                        onChange={(e) => updateItem(i, { unitPrice: e.target.value })}
+                        dir="ltr"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        className={`${cellClass} w-full text-center`}
+                      />
+                    </label>
+                    <label>
+                      <span className="text-fg-muted mb-1 block text-xs sm:hidden">خصم المنتج</span>
+                      <input
+                        value={item.discount}
+                        onChange={(e) => updateItem(i, { discount: e.target.value })}
+                        onFocus={() => {
+                          if (/^0(?:\.0+)?$/.test(item.discount)) {
+                            updateItem(i, { discount: '' });
+                          }
+                        }}
+                        dir="ltr"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        className={`${cellClass} w-full text-center`}
+                      />
+                    </label>
+                    <div className="flex items-end justify-between gap-2 px-1">
+                      <div className="flex min-w-0 flex-1 flex-col justify-end">
+                        <span className="text-fg-muted mb-1 text-xs sm:hidden">المجموع</span>
+                        {lineTotal ? (
+                          <MoneyText
+                            value={lineTotal}
+                            currency={currency}
+                            tone="plain"
+                            withSymbol={false}
+                            size="sm"
+                          />
+                        ) : (
+                          <span className="text-fg-subtle text-xs">—</span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setItems((p) => (p.length > 1 ? p.filter((_, idx) => idx !== i) : p));
+                        }}
+                        className="rounded-ctrl text-fg-muted hover:bg-danger-soft hover:text-danger flex size-9 shrink-0 items-center justify-center"
+                        aria-label="حذف المنتج"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </div>
                   </div>
                 );
               })}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="خصم على الطلب">
+          <div
+            className={
+              order
+                ? 'border-border grid grid-cols-1 gap-4 border-t pt-5'
+                : 'border-border grid grid-cols-2 gap-3 border-t pt-5 sm:gap-4'
+            }
+          >
+            <Field label="خصم على الطلب" hint="أدخل قيمة الخصم على كامل الطلب">
               {(p) => (
                 <Input
                   {...p}
@@ -410,52 +461,90 @@ export function CreateOrderDialog({
                 />
               )}
             </Field>
-            <Field label="ملاحظات">
-              {(p) => <Input {...p} value={notes} onChange={(e) => setNotes(e.target.value)} />}
-            </Field>
+            {!order ? (
+              <Field label="المبلغ المدفوع الآن" hint="المبلغ النقدي الذي دفعه الزبون لهذا الطلب">
+                {(p) => (
+                  <Input
+                    {...p}
+                    value={paidAmount}
+                    onChange={(event) => setPaidAmount(event.target.value)}
+                    dir="ltr"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                  />
+                )}
+              </Field>
+            ) : null}
           </div>
 
-          {selectedCustomer ? (
-            <div className="rounded-ctrl border-border bg-card flex items-center justify-between border px-4 py-3">
-              <span className="text-fg-muted text-sm">الرصيد الحالي</span>
-              <MoneyText
-                value={toMoneyString(negate(selectedCustomer.balance), 2)}
-                currency={currency}
-                tone="auto"
-                size="lg"
+          <Field label="ملاحظات" hint="اكتب أي تفاصيل إضافية تخص الطلب">
+            {(p) => (
+              <Input
+                {...p}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="ملاحظات اختيارية"
               />
-            </div>
-          ) : null}
+            )}
+          </Field>
 
-          {!order ? (
-            <Field label="المبلغ المدفوع الآن" hint="اختياري، ويُسجّل كدفعة نقدية لهذا الطلب">
-              {(p) => (
-                <Input
-                  {...p}
-                  value={paidAmount}
-                  onChange={(event) => setPaidAmount(event.target.value)}
-                  dir="ltr"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                />
-              )}
-            </Field>
-          ) : null}
-
-          {/* الإجماليات — من الخادم */}
-          {totals ? (
-            <div className="rounded-card border-border bg-card-muted border p-4">
-              <dl className="space-y-1.5 text-sm">
-                <Row label="المجموع الفرعي" value={totals.subtotal} currency={currency} />
-                <Row label="الخصم" value={totals.discountAmount} currency={currency} />
-                <Row label="الضريبة" value={totals.taxAmount} currency={currency} />
-                <div className="border-border flex items-center justify-between border-t pt-2">
-                  <dt className="text-fg font-semibold">الإجمالي</dt>
-                  <dd>
-                    <MoneyText value={totals.total} currency={currency} tone="plain" size="lg" />
-                  </dd>
-                </div>
-              </dl>
+          {/* تفاصيل الطلب والمجموع الحي */}
+          {liveTotal && validItems.length > 0 ? (
+            <div>
+              <h3 className="text-fg mb-3 text-sm font-bold">تفاصيل الطلب</h3>
+              <div className="border-border rounded-ctrl overflow-hidden border">
+                <table className="w-full table-fixed border-collapse text-[11px] sm:text-xs">
+                  <colgroup>
+                    <col className="w-[40%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[22%]" />
+                    <col className="w-[24%]" />
+                  </colgroup>
+                  <thead className="bg-card-muted text-fg-muted">
+                    <tr className="border-border border-b">
+                      <th className="px-2 py-2.5 text-start font-semibold">المنتج</th>
+                      <th className="px-1 py-2.5 text-center font-semibold">الكمية</th>
+                      <th className="px-1 py-2.5 text-center font-semibold">سعر الوحدة</th>
+                      <th className="px-2 py-2.5 text-end font-semibold">السعر الكلي</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {validItems.map((item, index) => (
+                      <tr
+                        key={`${item.name}-${index}`}
+                        className="border-border-subtle even:bg-card-muted/50 border-b last:border-b-0"
+                      >
+                        <td className="text-fg break-words px-2 py-3 font-semibold">{item.name}</td>
+                        <td className="text-fg px-1 py-3 text-center tabular-nums">
+                          {item.quantity}
+                        </td>
+                        <td className="px-1 py-3 text-center">
+                          <MoneyText
+                            value={item.unitPrice}
+                            currency={currency}
+                            tone="plain"
+                            withSymbol={false}
+                            className="w-full text-center text-[11px] sm:text-xs"
+                          />
+                        </td>
+                        <td className="px-2 py-3 text-end">
+                          <MoneyText
+                            value={calculateLineTotal(item) ?? '0.00'}
+                            currency={currency}
+                            tone="plain"
+                            withSymbol={false}
+                            className="w-full text-end text-[11px] font-bold sm:text-xs"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="border-border mt-3 flex items-center justify-between border-t pt-3">
+                <span className="text-fg font-bold">المجموع</span>
+                <MoneyText value={liveTotal} currency={currency} tone="plain" size="lg" />
+              </div>
             </div>
           ) : null}
         </DialogBody>
@@ -485,7 +574,7 @@ export function CreateOrderDialog({
           )}
           <DialogClose asChild>
             <Button
-              variant="ghost"
+              variant="outline"
               disabled={create.isPending || update.isPending || createPayment.isPending}
             >
               إلغاء
@@ -497,13 +586,31 @@ export function CreateOrderDialog({
   );
 }
 
-function Row({ label, value, currency }: { label: string; value: string; currency: CurrencyCode }) {
-  return (
-    <div className="flex items-center justify-between">
-      <dt className="text-fg-muted">{label}</dt>
-      <dd>
-        <MoneyText value={value} currency={currency} tone="plain" withSymbol={false} />
-      </dd>
-    </div>
-  );
+export function calculateLineTotal(
+  item: Pick<DraftItem, 'quantity' | 'unitPrice' | 'discount'>,
+): string | undefined {
+  if (!/^\d+(\.\d{1,4})?$/.test(item.quantity) || !/^\d+(\.\d{1,4})?$/.test(item.unitPrice)) {
+    return undefined;
+  }
+  try {
+    const base = multiply(item.unitPrice, item.quantity);
+    return toMoneyString(max(subtract(base, item.discount || '0'), zero()), 2);
+  } catch {
+    return undefined;
+  }
+}
+
+export function calculateOrderTotal(
+  lineTotals: Array<string | undefined>,
+  discount: string,
+): string | undefined {
+  try {
+    const productsTotal = lineTotals.reduce(
+      (sum, value) => (value ? add(sum, value) : sum),
+      zero(),
+    );
+    return toMoneyString(max(subtract(productsTotal, discount || '0'), zero()), 2);
+  } catch {
+    return undefined;
+  }
 }

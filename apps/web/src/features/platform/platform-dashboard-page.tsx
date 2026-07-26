@@ -53,7 +53,7 @@ export function PlatformDashboardPage() {
       {isLoading ? (
         <StatCardsSkeleton count={4} />
       ) : isError ? (
-        <div className="rounded-card border border-border bg-card">
+        <div className="rounded-card border-border bg-card border">
           <ErrorState
             message={
               error instanceof ApiRequestError ? error.message : 'تعذّر تحميل إحصاءات المنصة.'
@@ -65,7 +65,7 @@ export function PlatformDashboardPage() {
       ) : data ? (
         <>
           <section aria-label="إحصاءات المنصة">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4">
               <StatCard
                 label={t('platform.totalTenants')}
                 value={data.totalTenants}
@@ -100,7 +100,7 @@ export function PlatformDashboardPage() {
           </section>
 
           <section aria-label="حالات المحلات">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-4">
               <StatCard
                 label={t('platform.activeTenants')}
                 value={data.activeTenants}
@@ -126,7 +126,7 @@ export function PlatformDashboardPage() {
             <Button variant="outline" asChild>
               <Link to="/platform/tenants">
                 {t('platform.tenantsList')}
-                <ArrowLeft className="rtl:rotate-0 ltr:rotate-180" aria-hidden />
+                <ArrowLeft className="ltr:rotate-180 rtl:rotate-0" aria-hidden />
               </Link>
             </Button>
           </div>

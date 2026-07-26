@@ -69,6 +69,10 @@ export const sessionUserSchema = z.object({
       name: z.string(),
       currency: z.string(),
       logoUrl: z.string().nullable(),
+      phone: z.string().nullable(),
+      taxEnabled: z.boolean(),
+      taxRate: z.number().min(0).max(100),
+      timezone: z.string(),
     })
     .nullable(),
 });

@@ -1,3 +1,4 @@
+export declare const UNAUTHENTICATED_EVENT = "oh:unauthenticated";
 export declare class ApiRequestError extends Error {
     readonly status: number;
     readonly code: string;
@@ -8,6 +9,8 @@ export declare class ApiRequestError extends Error {
     get isForbidden(): boolean;
     get isValidation(): boolean;
 }
+/** يعيد حالة البوابة في الاختبارات، ولا يُستخدم في تدفق التطبيق. */
+export declare function resetApiSessionStateForTests(): void;
 interface RequestOptions extends Omit<RequestInit, 'body'> {
     body?: unknown;
     /** مفتاح منع التكرار — إلزامي للدفعات (المرحلة 5). */

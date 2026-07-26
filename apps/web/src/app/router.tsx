@@ -1,5 +1,5 @@
 import { createBrowserRouter } from 'react-router-dom';
-import { CreditCard, FileText, MessageCircle, Package, Settings, Users } from 'lucide-react';
+import { CreditCard, Settings } from 'lucide-react';
 import { AppShell } from '@/components/layout/app-shell';
 import {
   RedirectIfAuthenticated,
@@ -17,8 +17,6 @@ import { LoginPage } from '@/features/auth/login-page';
 import { ForgotPasswordPage } from '@/features/auth/forgot-password-page';
 import { ChangeInitialPasswordPage } from '@/features/auth/change-initial-password-page';
 import { DashboardPage } from '@/features/dashboard/dashboard-page';
-import { ActivityPage } from '@/features/activity/activity-page';
-import { SubscriptionPage } from '@/features/subscription/subscription-page';
 import { PlatformDashboardPage } from '@/features/platform/platform-dashboard-page';
 import { TenantsListPage } from '@/features/platform/tenants-list-page';
 import { TenantFormPage } from '@/features/platform/tenant-form-page';
@@ -36,6 +34,7 @@ import { OrdersPage } from '@/features/orders/orders-page';
 import { OrderDetailsPage } from '@/features/orders/order-details-page';
 import { LedgerPage } from '@/features/ledger/ledger-page';
 import { PaymentsPage } from '@/features/payments/payments-page';
+import { EmployeesPage } from '@/features/employees/employees-page';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -86,13 +85,6 @@ export const router = createBrowserRouter([
                 children: [
                   { index: true, element: <DashboardPage /> },
                   {
-                    path: 'activity',
-                    element: <RequirePermission permission="activity.read" />,
-                    children: [{ index: true, element: <ActivityPage /> }],
-                  },
-
-                  { path: 'subscription', element: <SubscriptionPage /> },
-                  {
                     path: 'support',
                     element: <RequireNotGeneralManager />,
                     children: [{ index: true, element: <SupportPage /> }],
@@ -114,48 +106,9 @@ export const router = createBrowserRouter([
                     children: [{ index: true, element: <ReportsPage /> }],
                   },
                   {
-                    path: 'documents',
-                    element: (
-                      <PlaceholderPage
-                        titleKey="nav.documents"
-                        icon={FileText}
-                        description="طباعة الطلبات وعروض الأسعار وكشوف الحساب بالعربية والعبرية."
-                        phase="المرحلة 6"
-                      />
-                    ),
-                  },
-                  {
-                    path: 'messages',
-                    element: (
-                      <PlaceholderPage
-                        titleKey="nav.messages"
-                        icon={MessageCircle}
-                        description="إرسال الرصيد الحالي للزبون عبر واتساب أو SMS أو البريد."
-                        phase="المرحلة 7"
-                      />
-                    ),
-                  },
-                  {
-                    path: 'products',
-                    element: (
-                      <PlaceholderPage
-                        titleKey="nav.products"
-                        icon={Package}
-                        description="كتالوج منتجات اختياري. إدخال بنود الطلب يدويًا يعمل بدونه."
-                        phase="المرحلة 4"
-                      />
-                    ),
-                  },
-                  {
                     path: 'employees',
-                    element: (
-                      <PlaceholderPage
-                        titleKey="nav.employees"
-                        icon={Users}
-                        description="الموظفون والأدوار والصلاحيات."
-                        phase="المرحلة 8"
-                      />
-                    ),
+                    element: <RequirePermission permission="employees.read" />,
+                    children: [{ index: true, element: <EmployeesPage /> }],
                   },
                   {
                     path: 'settings',

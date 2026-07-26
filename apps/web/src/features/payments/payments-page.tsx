@@ -1,23 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Banknote, Plus, Undo2, Wallet } from 'lucide-react';
+import { Banknote, CalendarDays, ChevronLeft, Plus, Wallet } from 'lucide-react';
 import { PAYMENT_METHOD_LABELS, type Payment, type PaymentListQuery } from '@oh/contracts';
 import type { CurrencyCode } from '@oh/money';
 import {
   Button,
   DataTable,
-  Dialog,
-  DialogBody,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   DateRangeFilter,
-  Field,
   FilterBar,
-  Input,
   MoneyText,
   PageHeader,
   Pagination,
@@ -25,12 +16,11 @@ import {
   StatCard,
   StatCardsSkeleton,
   StatusBadge,
-  toast,
   type Column,
 } from '@oh/ui';
 import { ApiRequestError } from '@/lib/api';
 import { useAuth } from '@/app/auth-context';
-import { usePayments, usePaymentStats, useReversePayment } from './api';
+import { usePayments, usePaymentStats } from './api';
 import { RecordPaymentDialog } from './record-payment-dialog';
 
 export function PaymentsPage() {
@@ -46,8 +36,6 @@ export function PaymentsPage() {
 
   const [recordOpen, setRecordOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [reverseTarget, setReverseTarget] = useState<Payment | null>(null);
-  const [reverseReason, setReverseReason] = useState('');
 
   // اختصار Ctrl+P: يفتح حوار تسجيل الدفعة عبر ?new=1 ثم يمسح المَعلمة.
   useEffect(() => {
@@ -68,7 +56,6 @@ export function PaymentsPage() {
 
   const list = usePayments(query);
   const stats = usePaymentStats({ from: from || undefined, to: to || undefined });
-  const reverse = useReversePayment(reverseTarget?.id ?? '');
 
   const isFiltered = search !== '' || from !== '' || to !== '';
   const resetFilters = () => {
@@ -76,24 +63,6 @@ export function PaymentsPage() {
     setFrom('');
     setTo('');
     setPage(1);
-  };
-
-  const doReverse = () => {
-    if (!reverseTarget || reverseReason.trim().length < 5) return;
-    reverse.mutate(
-      { reason: reverseReason.trim() },
-      {
-        onSuccess: () => {
-          toast.success('عُكست الدفعة');
-          setReverseTarget(null);
-          setReverseReason('');
-        },
-        onError: (e) => {
-          if (e instanceof ApiRequestError) toast.apiError(e.message, e.requestId);
-          else toast.error('تعذّر عكس الدفعة.');
-        },
-      },
-    );
   };
 
   const columns: Column<Payment>[] = [
@@ -168,21 +137,7 @@ export function PaymentsPage() {
         row.status === 'REVERSED' ? (
           <StatusBadge tone="debit">معكوسة</StatusBadge>
         ) : (
-          <StatusBadge tone="credit">مُسجَّلة</StatusBadge>
-        ),
-    },
-    {
-      header: t('common.actions'),
-      align: 'end',
-      width: '130px',
-      render: (row) =>
-        can('payments.reverse') && row.status === 'POSTED' ? (
-          <Button variant="outline" size="sm" onClick={() => setReverseTarget(row)}>
-            <Undo2 className="text-danger" aria-hidden />
-            عكس الدفعة
-          </Button>
-        ) : (
-          <span className="text-fg-subtle">—</span>
+          <StatusBadge tone="credit">مقبوضة</StatusBadge>
         ),
     },
   ];
@@ -209,7 +164,7 @@ export function PaymentsPage() {
       {stats.isLoading ? (
         <StatCardsSkeleton count={2} />
       ) : s ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <StatCard
             label="إجمالي المدفوعات"
             money={s.totalAmount}
@@ -282,6 +237,45 @@ export function PaymentsPage() {
               ? { label: 'تسجيل دفعة', onClick: () => setRecordOpen(true) }
               : undefined,
           }}
+          mobileRender={(row) => {
+            const paidAt = new Date(row.paidAt);
+            return (
+              <article className="border-border bg-card rounded-card shadow-card border p-4">
+                <div className="flex items-start gap-3">
+                  <ChevronLeft className="text-fg-subtle mt-1 size-5 shrink-0" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      to={`/customers/${row.customerId}`}
+                      className="text-fg block truncate text-base font-bold hover:underline"
+                    >
+                      {row.customerName}
+                    </Link>
+                    <p className="text-fg-muted mt-0.5 text-xs">{row.number}</p>
+                    <div className="text-fg-muted mt-2 flex items-center gap-1.5 text-xs">
+                      <CalendarDays className="size-3.5" aria-hidden />
+                      <span dir="ltr">{row.paidAt.slice(0, 10)}</span>
+                      <span dir="ltr">
+                        {paidAt.toLocaleTimeString('en-GB', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-end">
+                    <MoneyText value={row.amount} currency={currency} tone="credit" size="lg" />
+                    <StatusBadge tone={row.status === 'REVERSED' ? 'debit' : 'credit'}>
+                      {row.status === 'REVERSED' ? 'معكوسة' : 'مقبوضة'}
+                    </StatusBadge>
+                  </div>
+                </div>
+
+                <div className="border-border-subtle mt-3 flex items-center justify-between gap-3 border-t pt-3">
+                  <StatusBadge tone="credit">{PAYMENT_METHOD_LABELS[row.method]}</StatusBadge>
+                </div>
+              </article>
+            );
+          }}
         />
 
         {list.data && list.data.total > 0 ? (
@@ -303,64 +297,6 @@ export function PaymentsPage() {
       </div>
 
       <RecordPaymentDialog open={recordOpen} onOpenChange={setRecordOpen} />
-
-      {/* حوار عكس الدفعة — السبب إلزامي */}
-      <Dialog
-        open={reverseTarget !== null}
-        onOpenChange={(o) => {
-          if (!o) {
-            setReverseTarget(null);
-            setReverseReason('');
-          }
-        }}
-      >
-        <DialogContent size="sm" onOpenAutoFocus={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle>عكس الدفعة {reverseTarget?.number}</DialogTitle>
-          </DialogHeader>
-          <DialogBody>
-            <p className="text-fg-muted mb-4 text-sm">
-              يُنشأ قيد عكس مضاد يعيد أثر الدفعة على رصيد الزبون. تبقى الدفعة مرئية بحالة «معكوسة»
-              ولا تُحذف.
-            </p>
-            <Field
-              label="سبب العكس"
-              hint="يُسجَّل في سجل التدقيق."
-              error={
-                reverseReason.length > 0 && reverseReason.trim().length < 5
-                  ? '5 أحرف على الأقل.'
-                  : undefined
-              }
-              required
-            >
-              {(p) => (
-                <Input
-                  {...p}
-                  value={reverseReason}
-                  onChange={(e) => setReverseReason(e.target.value)}
-                  placeholder="مثال: دفعة مسجّلة بالخطأ"
-                  autoFocus
-                />
-              )}
-            </Field>
-          </DialogBody>
-          <DialogFooter>
-            <Button
-              variant="danger"
-              onClick={doReverse}
-              loading={reverse.isPending}
-              disabled={reverseReason.trim().length < 5}
-            >
-              عكس الدفعة
-            </Button>
-            <DialogClose asChild>
-              <Button variant="outline" disabled={reverse.isPending}>
-                إلغاء
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

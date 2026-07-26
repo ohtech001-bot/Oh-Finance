@@ -68,3 +68,35 @@ export type CustomerActivityQuery = ActivityFilters;
 export interface ActivityQuery extends ActivityFilters {
   customerId?: string;
 }
+
+export const notificationKindSchema = z.enum([
+  'ORDER_CREATED',
+  'PAYMENT_RECEIVED',
+  'PAYMENT_DUE_SOON',
+  'PAYMENT_DUE_TODAY',
+]);
+export type NotificationKind = z.infer<typeof notificationKindSchema>;
+
+export const notificationSeveritySchema = z.enum(['info', 'success', 'warning', 'danger']);
+export type NotificationSeverity = z.infer<typeof notificationSeveritySchema>;
+
+export const notificationItemSchema = z.object({
+  id: z.string(),
+  kind: notificationKindSchema,
+  severity: notificationSeveritySchema,
+  title: z.string(),
+  description: z.string(),
+  customerName: z.string().optional(),
+  amount: z.string().optional(),
+  orderNumber: z.string().optional(),
+  balance: z.string().optional(),
+  occurredAt: z.string(),
+  href: z.string(),
+});
+export type NotificationItem = z.infer<typeof notificationItemSchema>;
+
+export const notificationFeedSchema = z.object({
+  items: z.array(notificationItemSchema),
+  total: z.number().int().nonnegative(),
+});
+export type NotificationFeed = z.infer<typeof notificationFeedSchema>;

@@ -521,6 +521,7 @@ model Customer {
   /// هذا ليس رصيدًا، بل **قيد** على الرصيد المشتق.
   creditLimit     Decimal @default(0) @map("credit_limit") @db.Decimal(18, 4)
   paymentTermDays Int     @default(30) @map("payment_term_days")
+  paymentDueDate  DateTime? @map("payment_due_date") @db.Date
 
   status CustomerStatus @default(ACTIVE)
 

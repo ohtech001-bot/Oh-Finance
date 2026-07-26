@@ -1,7 +1,7 @@
 import type { NavItem } from './nav-items';
 export interface SidebarProps {
     items: NavItem[];
-    /** اسم المحل + رقمه في الترويسة (أو «المنصة» للمدير العام). */
+    /** اسم المحل في الترويسة (أو «المنصة» للمدير العام). */
     title: string;
     subtitle: string;
     onNavigate?: () => void;

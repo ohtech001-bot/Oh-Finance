@@ -10,6 +10,7 @@ import { NumberingService } from '../src/core/numbering/numbering.service.js';
 import { AuditService } from '../src/core/audit/audit.service.js';
 import type { PrismaService } from '../src/core/prisma/prisma.service.js';
 import { TenantContext } from '../src/core/tenancy/tenant-context.js';
+import { isoDateInTimeZone } from '../src/core/time/iso-date-in-timezone.js';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -21,7 +22,6 @@ import { TenantContext } from '../src/core/tenancy/tenant-context.js';
  */
 
 if (!HAS_TEST_DB) {
-
   console.warn(`\n⚠  ${SKIP_REASON}\n`);
 }
 
@@ -65,13 +65,24 @@ function orderPayload(
     status: 'CONFIRMED',
     discountAmount: '0',
     ...dates,
-    items: [{ sourceType: 'MANUAL', name: 'بند', quantity: '1', unitPrice, discount: '0', taxRate: '0' }],
+    items: [
+      { sourceType: 'MANUAL', name: 'بند', quantity: '1', unitPrice, discount: '0', taxRate: '0' },
+    ],
   } as CreateOrderRequest;
 }
 
-const daysAgo = (n: number): string => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+const dateFromToday = (days: number): string => {
+  const today = isoDateInTimeZone(new Date(), 'Asia/Jerusalem');
+  return new Date(new Date(`${today}T00:00:00.000Z`).getTime() + days * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+};
 
-function customerPayload(name: string, openingBalance: string): CreateCustomerRequest {
+function customerPayload(
+  name: string,
+  openingBalance: string,
+  paymentDueDate?: string,
+): CreateCustomerRequest {
   return {
     name,
     company: '',
@@ -84,6 +95,7 @@ function customerPayload(name: string, openingBalance: string): CreateCustomerRe
     tags: [],
     creditLimit: '1500',
     paymentTermDays: 30,
+    paymentDueDate,
     status: 'ACTIVE',
     openingBalance,
   };
@@ -98,7 +110,12 @@ describe.skipIf(!HAS_TEST_DB)('ملخّص الزبون', () => {
     await resetAll();
     t = await createTestTenant('cust-summary');
     const prisma = fakePrisma();
-    customers = new CustomersService(prisma, new LedgerService(), new NumberingService(), new AuditService());
+    customers = new CustomersService(
+      prisma,
+      new LedgerService(),
+      new NumberingService(),
+      new AuditService(),
+    );
     orders = new OrdersService(
       prisma,
       new LedgerService(),
@@ -166,13 +183,25 @@ describe.skipIf(!HAS_TEST_DB)('ملخّص الزبون', () => {
     expect(s.customerHealth).toBe('WARNING');
   });
 
-  it('طلب متأخر عن الاستحقاق: صحّة متعثّرة', async () => {
-    const id = await createTestCustomer(t, 'متأخر', { creditLimit: '5000' });
-    // طلب أُصدر قبل 60 يومًا واستحق قبل 30 — متأخر وغير مسدَّد.
-    await asUser(t, () => orders.create(orderPayload(id, '1000', { issuedAt: daysAgo(60), dueAt: daysAgo(30) })));
+  it('يظهر استحقاق الحساب في اليوم المتفق عليه ما دام الرصيد دينًا دون ربطه بطلب', async () => {
+    const customer = await asUser(t, () =>
+      customers.create(customerPayload('مستحق اليوم', '-1000', dateFromToday(0))),
+    );
 
-    const s = await asUser(t, () => customers.summary(id));
-    expect(s.overdueOrders).toBe(1);
-    expect(s.customerHealth).toBe('AT_RISK');
+    const s = await asUser(t, () => customers.summary(customer.id));
+    expect(s.totalOrders).toBe(0);
+    expect(s.overdueOrders).toBe(0);
+    expect(s.paymentDueReached).toBe(true);
+    expect(s.paymentDueAmount).toBe('1000.00');
+  });
+
+  it('لا يظهر استحقاق الحساب قبل التاريخ المتفق عليه', async () => {
+    const customer = await asUser(t, () =>
+      customers.create(customerPayload('موعده لاحقًا', '-1000', dateFromToday(1))),
+    );
+
+    const s = await asUser(t, () => customers.summary(customer.id));
+    expect(s.paymentDueReached).toBe(false);
+    expect(s.paymentDueAmount).toBe('0.00');
   });
 });

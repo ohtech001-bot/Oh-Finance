@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { SettingsSection, StoreSettings } from '@oh/contracts';
+import type { SessionUser, SettingsSection, StoreSettings } from '@oh/contracts';
 import { api } from '@/lib/api';
 
 const KEY = ['settings'];
@@ -19,6 +19,19 @@ export function useUpdateSettingsSection() {
       api.patch<StoreSettings>(`/settings/${section}`, data),
     onSuccess: (fresh) => {
       qc.setQueryData(KEY, fresh);
+      qc.setQueryData<SessionUser | null>(['auth', 'me'], (current) =>
+        current?.store
+          ? {
+              ...current,
+              store: {
+                ...current.store,
+                currency: fresh.financial.currency,
+                taxEnabled: fresh.financial.tax.enabled,
+                taxRate: fresh.financial.tax.rate,
+              },
+            }
+          : current,
+      );
     },
   });
 }

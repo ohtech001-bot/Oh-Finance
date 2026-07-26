@@ -123,6 +123,18 @@
     "yes": "כן",
     "no": "לא"
   },
+  "notificationFeed": {
+    "loadError": "לא ניתן לטעון את ההתראות.",
+    "empty": "אין התראות חדשות",
+    "orderCreated": "התקבלה הזמנה חדשה",
+    "paymentReceived": "התקבל תשלום",
+    "orderDescription": "הזמנה מספר {{number}} עבור {{customer}}, בסך {{amount}}",
+    "paymentDescription": "{{customer}} שילם {{amount}}",
+    "dueSoonTitle": "מועד התשלום של {{name}} מתקרב",
+    "dueTodayTitle": "מועד התשלום של {{name}} הוא היום",
+    "dueSoonDescription": "נותרו 5 ימים עד למועד תשלום החוב. יתרה לתשלום: {{balance}}",
+    "dueTodayDescription": "מועד תשלום החוב הוא היום. יתרה לתשלום: {{balance}}"
+  },
   "errors": {
     "generic": "אירעה שגיאה בלתי צפויה.",
     "network": "לא ניתן להתחבר לשרת. בדוק את חיבור האינטרנט.",

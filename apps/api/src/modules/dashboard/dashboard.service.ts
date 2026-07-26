@@ -162,7 +162,9 @@ export class DashboardService {
       const trendScope = (Object.keys(TREND_PERMS) as DashboardTrendId[]).filter(
         (id) => id !== 'revenue' && has(...TREND_PERMS[id]),
       );
-      const listScope = (Object.keys(LIST_PERMS) as ListId[]).filter((id) => has(...LIST_PERMS[id]));
+      const listScope = (Object.keys(LIST_PERMS) as ListId[]).filter((id) =>
+        has(...LIST_PERMS[id]),
+      );
       const basis: TopCustomersBasis = has('orders.read') ? 'sales' : 'collection';
 
       const [kpis, trends, lists, alerts] = await Promise.all([
@@ -250,9 +252,7 @@ export class DashboardService {
             : 'month';
 
     const label =
-      query.preset === 'custom'
-        ? `من ${query.from} إلى ${query.to}`
-        : PRESET_LABEL[query.preset];
+      query.preset === 'custom' ? `من ${query.from} إلى ${query.to}` : PRESET_LABEL[query.preset];
 
     return {
       preset: query.preset,
@@ -454,7 +454,9 @@ export class DashboardService {
     if (want.has('revenue'))
       series.revenue = pointsSeries('revenue', 'money', rows, (r) => toMoneyString(r.revenue, 2));
     if (want.has('payments'))
-      series.payments = pointsSeries('payments', 'money', rows, (r) => toMoneyString(r.payments, 2));
+      series.payments = pointsSeries('payments', 'money', rows, (r) =>
+        toMoneyString(r.payments, 2),
+      );
     if (want.has('orders'))
       series.orders = pointsSeries('orders', 'count', rows, (r) => String(Number(r.orders)));
     if (want.has('new_customers'))
@@ -499,7 +501,9 @@ export class DashboardService {
     now: Date,
     scope: ListId[],
     basis: TopCustomersBasis,
-  ): Promise<Pick<DashboardData, 'topCustomers' | 'topDebtors' | 'recentPayments' | 'recentOrders'>> {
+  ): Promise<
+    Pick<DashboardData, 'topCustomers' | 'topDebtors' | 'recentPayments' | 'recentOrders'>
+  > {
     const want = new Set(scope);
     const out: Pick<
       DashboardData,
@@ -607,9 +611,14 @@ export class DashboardService {
             include: { customer: { select: { id: true, name: true } } },
           });
           // `created_by` عمود UUID بلا علاقة Prisma — نجلب أسماء المسجّلين مرة واحدة.
-          const userIds = [...new Set(rows.map((p) => p.createdBy).filter((v): v is string => !!v))];
+          const userIds = [
+            ...new Set(rows.map((p) => p.createdBy).filter((v): v is string => !!v)),
+          ];
           const users = userIds.length
-            ? await tx.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } })
+            ? await tx.user.findMany({
+                where: { id: { in: userIds } },
+                select: { id: true, name: true },
+              })
             : [];
           const nameById = new Map(users.map((u) => [u.id, u.name]));
           out.recentPayments = rows.map((p) => ({
@@ -731,29 +740,6 @@ export class DashboardService {
           date: r.oldest.toISOString(),
         });
       }
-
-      const [unalloc] = await tx.$queryRawUnsafe<{ amt: string; cnt: bigint }[]>(
-        `SELECT COALESCE(SUM(p.amount - COALESCE(al.total,0)),0)::text AS amt,
-                COUNT(*) FILTER (WHERE p.amount - COALESCE(al.total,0) > 0) AS cnt
-         FROM payments p
-         LEFT JOIN (SELECT payment_id, SUM(amount) total FROM payment_allocations GROUP BY payment_id) al
-           ON al.payment_id = p.id
-         WHERE p.tenant_id = $1::uuid AND p.status = 'POSTED'`,
-        tenantId,
-      );
-      if (unalloc && Number(unalloc.cnt) > 0 && toMoney(unalloc.amt).greaterThan(toMoney('0'))) {
-        alerts.push({
-          id: 'unallocated',
-          kind: 'unallocated_payments',
-          severity: 'info',
-          message: `${Number(unalloc.cnt)} دفعة غير موزّعة بالكامل`,
-          amount: toMoneyString(unalloc.amt, 2),
-          entityType: null,
-          entityId: null,
-          actionHref: '/payments',
-          date: null,
-        });
-      }
     }
 
     if (has('orders.read')) {
@@ -792,7 +778,9 @@ export class DashboardService {
             kind: 'subscription_ending',
             severity: daysLeft <= 3 ? 'critical' : 'warning',
             message:
-              daysLeft <= 0 ? 'انتهى اشتراكك' : `اشتراكك ينتهي خلال ${daysLeft} ${daysLeft === 1 ? 'يوم' : 'أيام'}`,
+              daysLeft <= 0
+                ? 'انتهى اشتراكك'
+                : `اشتراكك ينتهي خلال ${daysLeft} ${daysLeft === 1 ? 'يوم' : 'أيام'}`,
             amount: null,
             entityType: null,
             entityId: null,

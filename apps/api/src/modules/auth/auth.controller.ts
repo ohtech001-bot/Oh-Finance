@@ -31,7 +31,7 @@ export class AuthController {
    */
   @Public()
   @SkipCsrf()
-  @Throttle({ auth: { limit: 5, ttl: 900_000 } })
+  @Throttle({ default: { limit: 5, ttl: 900_000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'تسجيل الدخول — يضع رموز الجلسة في كوكيز HttpOnly.' })
@@ -54,7 +54,7 @@ export class AuthController {
    */
   @Public()
   @SkipCsrf()
-  @Throttle({ auth: { limit: 20, ttl: 900_000 } })
+  @Throttle({ default: { limit: 20, ttl: 900_000 } })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'تجديد الجلسة مع تدوير الرمز وكشف إعادة الاستخدام.' })
@@ -124,7 +124,7 @@ export class AuthController {
    */
   @Public()
   @SkipCsrf()
-  @Throttle({ auth: { limit: 3, ttl: 900_000 } })
+  @Throttle({ default: { limit: 3, ttl: 900_000 } })
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'طلب استعادة كلمة المرور — رد موحّد لمنع تعداد المستخدمين.' })

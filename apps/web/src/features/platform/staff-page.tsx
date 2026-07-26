@@ -3,7 +3,17 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Ban, CheckCircle2, MailCheck, Pencil, Plus, Power, Trash2, UserCog, Users } from 'lucide-react';
+import {
+  Ban,
+  CheckCircle2,
+  MailCheck,
+  Pencil,
+  Plus,
+  Power,
+  Trash2,
+  UserCog,
+  Users,
+} from 'lucide-react';
 import {
   createPlatformStaffInviteSchema,
   updatePlatformStaffSchema,
@@ -27,7 +37,7 @@ import {
   PageHeader,
   toast,
 } from '@oh/ui';
-import { api } from '@/lib/api';
+import { ApiRequestError, api } from '@/lib/api';
 import { useAuth } from '@/app/auth-context';
 
 export function StaffPage() {
@@ -64,6 +74,10 @@ export function StaffPage() {
   const editForm = useForm<UpdatePlatformStaffRequest>({
     resolver: zodResolver(updatePlatformStaffSchema),
   });
+  const showMutationError = (error: unknown, fallback: string) => {
+    if (error instanceof ApiRequestError) toast.apiError(error.message, error.requestId);
+    else toast.error(fallback);
+  };
 
   const invite = useMutation({
     mutationFn: (body: CreatePlatformStaffInviteRequest) =>
@@ -72,6 +86,7 @@ export function StaffPage() {
       setInviteId(data.inviteId);
       toast.success(t('staff.codeSent'));
     },
+    onError: (error) => showMutationError(error, 'تعذّر إرسال رمز التحقق.'),
   });
   const verify = useMutation({
     mutationFn: () =>
@@ -84,6 +99,7 @@ export function StaffPage() {
       setCode('');
       form.reset();
     },
+    onError: (error) => showMutationError(error, 'تعذّر التحقق من الرمز.'),
   });
   const remove = useMutation({
     mutationFn: (id: string) => api.delete<void>(`/platform/staff/${id}`),
@@ -112,6 +128,7 @@ export function StaffPage() {
       setEditConfirmOpen(false);
       toast.success(t('staff.codeSent'));
     },
+    onError: (error) => showMutationError(error, 'تعذّر إرسال رمز التحقق.'),
   });
   const verifyEdit = useMutation({
     mutationFn: () =>
@@ -126,6 +143,7 @@ export function StaffPage() {
       setEditInviteId(null);
       setEditCode('');
     },
+    onError: (error) => showMutationError(error, 'تعذّر اعتماد التعديلات.'),
   });
 
   const openEdit = (staff: PlatformStaff) => {

@@ -28,6 +28,7 @@ import { AuditService } from '../../core/audit/audit.service.js';
 import { NumberingService } from '../../core/numbering/numbering.service.js';
 import { PrismaService } from '../../core/prisma/prisma.service.js';
 import { TenantContext } from '../../core/tenancy/tenant-context.js';
+import { isoDateInTimeZone } from '../../core/time/iso-date-in-timezone.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 
 /** صف الزبون كما نقرأه من Prisma. */
@@ -71,6 +72,9 @@ export class CustomersService {
           tags: dto.tags,
           creditLimit: dto.creditLimit,
           paymentTermDays: dto.paymentTermDays,
+          paymentDueDate: dto.paymentDueDate
+            ? new Date(`${dto.paymentDueDate}T00:00:00.000Z`)
+            : null,
           status: dto.status,
           createdBy: userId,
         },
@@ -104,6 +108,7 @@ export class CustomersService {
           code,
           name: dto.name,
           creditLimit: dto.creditLimit,
+          paymentDueDate: dto.paymentDueDate ?? null,
           openingBalance: dto.openingBalance,
         },
       });
@@ -252,6 +257,14 @@ export class CustomersService {
 
       const balance = await this.ledger.getBalance(tx, tenantId, id);
       const now = new Date();
+      const tenant = await tx.tenant.findUnique({
+        where: { id: tenantId },
+        select: { timezone: true },
+      });
+      const todayText = isoDateInTimeZone(now, tenant?.timezone ?? 'Asia/Jerusalem');
+      const paymentDueDate = row.paymentDueDate?.toISOString().slice(0, 10) ?? null;
+      const paymentDueReached =
+        paymentDueDate !== null && paymentDueDate <= todayText && balance.greaterThan(0);
 
       const [orderAgg, paymentAgg, lastOrder, lastPayment, overdue, avgPay] = await Promise.all([
         tx.order.aggregate({
@@ -343,6 +356,8 @@ export class CustomersService {
         lastPaymentAt: lastPayment?.paidAt.toISOString() ?? null,
         overdueOrders: overdue.length,
         overdueAmount: toMoneyString(overdueAmount, 2),
+        paymentDueReached,
+        paymentDueAmount: toMoneyString(paymentDueReached ? balance : zero(), 2),
         avgPaymentDays,
         creditUsagePct,
         customerHealth,
@@ -371,8 +386,13 @@ export class CustomersService {
           ...(dto.notes !== undefined ? { notes: dto.notes || null } : {}),
           ...(dto.tags !== undefined ? { tags: dto.tags } : {}),
           ...(dto.creditLimit !== undefined ? { creditLimit: dto.creditLimit } : {}),
-          ...(dto.paymentTermDays !== undefined
-            ? { paymentTermDays: dto.paymentTermDays }
+          ...(dto.paymentTermDays !== undefined ? { paymentTermDays: dto.paymentTermDays } : {}),
+          ...(dto.paymentDueDate !== undefined
+            ? {
+                paymentDueDate: dto.paymentDueDate
+                  ? new Date(`${dto.paymentDueDate}T00:00:00.000Z`)
+                  : null,
+              }
             : {}),
           ...(dto.status !== undefined ? { status: dto.status } : {}),
         },
@@ -386,11 +406,13 @@ export class CustomersService {
         before: {
           name: before.name,
           creditLimit: before.creditLimit.toString(),
+          paymentDueDate: before.paymentDueDate?.toISOString().slice(0, 10) ?? null,
           status: before.status,
         },
         after: {
           name: after.name,
           creditLimit: after.creditLimit.toString(),
+          paymentDueDate: after.paymentDueDate?.toISOString().slice(0, 10) ?? null,
           status: after.status,
         },
       });
@@ -428,7 +450,11 @@ export class CustomersService {
       }
 
       const openOrders = await tx.order.count({
-        where: { tenantId, customerId: id, status: { in: ['DRAFT', 'QUOTE', 'CONFIRMED', 'PARTIALLY_PAID'] } },
+        where: {
+          tenantId,
+          customerId: id,
+          status: { in: ['DRAFT', 'QUOTE', 'CONFIRMED', 'PARTIALLY_PAID'] },
+        },
       });
       if (openOrders > 0) {
         throw AppError.conflict(`للزبون ${openOrders} طلب مفتوح. أغلقها أو ألغِها أولًا.`);
@@ -549,6 +575,7 @@ export class CustomersService {
       tags: row.tags,
       creditLimit: toMoneyString(creditLimit, 2),
       paymentTermDays: row.paymentTermDays,
+      paymentDueDate: row.paymentDueDate?.toISOString().slice(0, 10) ?? null,
       status: row.status,
 
       balance: toMoneyString(balance, 2),

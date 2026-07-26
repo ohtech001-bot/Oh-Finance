@@ -660,7 +660,15 @@ export class AuthService {
           role: { select: { name: true } },
           tenant: { select: { id: true, name: true, slug: true, status: true } },
           store: {
-            select: { id: true, code: true, name: true, currency: true, logoUrl: true },
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              currency: true,
+              logoUrl: true,
+              phone: true,
+              settings: true,
+            },
           },
         },
       }),
@@ -681,7 +689,7 @@ export class AuthService {
       mustChangePassword: user.mustChangePassword,
       twoFactorEnabled: user.totpEnabled,
       tenant: user.tenant,
-      store: user.store,
+      store: user.store ? this.sessionStore(user.store) : null,
     } as SessionUser;
   }
 
@@ -718,16 +726,24 @@ export class AuthService {
               where: { isActive: true },
               orderBy: { createdAt: 'asc' },
               take: 1,
-              select: { id: true, code: true, name: true, currency: true, logoUrl: true },
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                currency: true,
+                logoUrl: true,
+                phone: true,
+                settings: true,
+              },
             },
           },
         }),
       ),
     ]);
-    if (!admin || !tenant || !tenant.stores[0])
-      throw AppError.unauthenticated();
+    const store = tenant?.stores[0];
+    if (!admin || !tenant || !store) throw AppError.unauthenticated();
 
-    const { stores, ...tenantInfo } = tenant;
+    const { stores: _stores, ...tenantInfo } = tenant;
     return {
       id: admin.id,
       email: admin.email,
@@ -741,8 +757,44 @@ export class AuthService {
       mustChangePassword: admin.mustChangePassword,
       twoFactorEnabled: admin.totpEnabled,
       tenant: tenantInfo,
-      store: stores[0],
+      store: this.sessionStore(store),
     } as SessionUser;
+  }
+
+  private sessionStore(store: {
+    id: string;
+    code: string;
+    name: string;
+    currency: string;
+    logoUrl: string | null;
+    phone: string | null;
+    settings: unknown;
+  }): NonNullable<SessionUser['store']> {
+    const settings =
+      typeof store.settings === 'object' && store.settings !== null
+        ? (store.settings as Record<string, unknown>)
+        : {};
+    const financial =
+      typeof settings.financial === 'object' && settings.financial !== null
+        ? (settings.financial as Record<string, unknown>)
+        : {};
+    const general =
+      typeof settings.general === 'object' && settings.general !== null
+        ? (settings.general as Record<string, unknown>)
+        : {};
+    const tax =
+      typeof financial.tax === 'object' && financial.tax !== null
+        ? (financial.tax as Record<string, unknown>)
+        : {};
+    const configuredRate = typeof tax.rate === 'number' && Number.isFinite(tax.rate) ? tax.rate : 0;
+    const { settings: _settings, ...publicStore } = store;
+
+    return {
+      ...publicStore,
+      taxEnabled: tax.enabled === true,
+      taxRate: Math.min(100, Math.max(0, configuredRate)),
+      timezone: typeof general.timezone === 'string' ? general.timezone : 'Asia/Jerusalem',
+    };
   }
 
   private platformRoleName(role: 'GENERAL_MANAGER' | 'MANAGER' | 'EMPLOYEE' | null): RoleName {
