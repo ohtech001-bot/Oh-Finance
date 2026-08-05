@@ -556,8 +556,8 @@ enum OrderStatus {
 /// الطلب — **حاوية فقط**.
 ///
 /// المبالغ (subtotal/tax/total) مشتقة من البنود، محسوبة في طبقة الدومين
-/// بـDecimal، ومخزّنة كلقطة ثابتة. paidAmount مشتق من payment_allocations —
-/// لا يُكتب يدويًا أبدًا.
+/// بـDecimal، ومخزّنة كلقطة ثابتة. paidAmount مشتق من payment_allocations
+/// ومن الرصيد السابق الذي اختار المستخدم تطبيقه على الطلب.
 ///
 /// بعد التأكيد يُقفل الطلب (lockedAt): لا تعديل مباشر على مبالغه.
 /// التصحيح يتم بقيد تسوية في الدفتر — لا بتغيير الرقم.
@@ -583,6 +583,9 @@ model Order {
 
   /// مشتق من مجموع التوزيعات. يُحدَّث داخل نفس معاملة الدفعة.
   paidAmount Decimal @default(0) @map("paid_amount") @db.Decimal(18, 4)
+
+  /// الجزء المسدَّد من رصيد سابق للزبون، وليس من نقد مقبوض مع هذا الطلب.
+  creditAppliedAmount Decimal @default(0) @map("credit_applied_amount") @db.Decimal(18, 4)
 
   notes String? @db.Text
 

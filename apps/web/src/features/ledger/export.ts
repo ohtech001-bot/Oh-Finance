@@ -1,4 +1,5 @@
 import { LEDGER_TYPE_LABELS, type LedgerEntry } from '@oh/contracts';
+import { displayOrderNumber } from '@/features/orders/order-number';
 
 /**
  * تصدير وطباعة دفتر الحركات.
@@ -31,11 +32,11 @@ function rowCells(e: LedgerEntry): string[] {
     LEDGER_TYPE_LABELS[e.entryType],
     e.customerName,
     e.customerCode,
-    e.refNumber ?? '',
+    e.refType === 'ORDER' && e.refNumber ? displayOrderNumber(e.refNumber) : (e.refNumber ?? ''),
     e.debit !== '0.00' ? e.debit : '',
     e.credit !== '0.00' ? e.credit : '',
     e.runningBalance,
-    e.notes ?? '',
+    e.refType === 'ORDER' ? (e.notes?.replace(/ORD-?/gi, '') ?? '') : (e.notes ?? ''),
   ];
 }
 
@@ -74,7 +75,12 @@ export function printLedger(rows: LedgerEntry[], title: string): void {
 
   const head = HEADERS.map((h) => `<th>${escapeHtml(h)}</th>`).join('');
   const body = rows
-    .map((e) => `<tr>${rowCells(e).map((c) => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`)
+    .map(
+      (e) =>
+        `<tr>${rowCells(e)
+          .map((c) => `<td>${escapeHtml(c)}</td>`)
+          .join('')}</tr>`,
+    )
     .join('');
 
   win.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8" />

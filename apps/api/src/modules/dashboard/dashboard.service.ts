@@ -144,52 +144,56 @@ export class DashboardService {
     const perms = new Set<string>(ctx.permissions ?? []);
     const has = (...required: readonly string[]) => required.every((p) => perms.has(p));
 
-    return this.prisma.runInTenant(tenantId, async (tx) => {
-      const store = await tx.store.findFirst({
-        where: { id: storeId },
-        select: { name: true, currency: true, tenant: { select: { timezone: true } } },
-      });
-      const timezone = store?.tenant?.timezone ?? 'Asia/Jerusalem';
-      const currency = store?.currency ?? 'ILS';
+    return this.prisma.runInTenant(
+      tenantId,
+      async (tx) => {
+        const store = await tx.store.findFirst({
+          where: { id: storeId },
+          select: { name: true, currency: true, tenant: { select: { timezone: true } } },
+        });
+        const timezone = store?.tenant?.timezone ?? 'Asia/Jerusalem';
+        const currency = store?.currency ?? 'ILS';
 
-      const range = await this.resolveRange(tx, timezone, query);
-      const now = new Date();
+        const range = await this.resolveRange(tx, timezone, query);
+        const now = new Date();
 
-      // نطاق الأقسام المسموح بها.
-      const kpiScope = (Object.keys(KPI_PERMS) as DashboardKpiId[]).filter(
-        (id) => !HIDDEN_KPIS.has(id) && has(...KPI_PERMS[id]),
-      );
-      const trendScope = (Object.keys(TREND_PERMS) as DashboardTrendId[]).filter(
-        (id) => id !== 'revenue' && has(...TREND_PERMS[id]),
-      );
-      const listScope = (Object.keys(LIST_PERMS) as ListId[]).filter((id) =>
-        has(...LIST_PERMS[id]),
-      );
-      const basis: TopCustomersBasis = has('orders.read') ? 'sales' : 'collection';
+        // نطاق الأقسام المسموح بها.
+        const kpiScope = (Object.keys(KPI_PERMS) as DashboardKpiId[]).filter(
+          (id) => !HIDDEN_KPIS.has(id) && has(...KPI_PERMS[id]),
+        );
+        const trendScope = (Object.keys(TREND_PERMS) as DashboardTrendId[]).filter(
+          (id) => id !== 'revenue' && has(...TREND_PERMS[id]),
+        );
+        const listScope = (Object.keys(LIST_PERMS) as ListId[]).filter((id) =>
+          has(...LIST_PERMS[id]),
+        );
+        const basis: TopCustomersBasis = has('orders.read') ? 'sales' : 'collection';
 
-      const [kpis, trends, lists, alerts] = await Promise.all([
-        this.buildKpis(tx, tenantId, range, now, kpiScope),
-        this.buildTrends(tx, tenantId, timezone, range, trendScope),
-        this.buildLists(tx, tenantId, range, now, listScope, basis),
-        this.buildAlerts(tx, tenantId, now, perms),
-      ]);
+        const [kpis, trends, lists, alerts] = await Promise.all([
+          this.buildKpis(tx, tenantId, range, now, kpiScope),
+          this.buildTrends(tx, tenantId, timezone, range, trendScope),
+          this.buildLists(tx, tenantId, range, now, listScope, basis),
+          this.buildAlerts(tx, tenantId, now, perms),
+        ]);
 
-      return {
-        meta: {
-          storeName: store?.name ?? '',
-          currency,
-          timezone,
-          generatedAt: now.toISOString(),
-          range,
-          topCustomersBasis: basis,
-          scope: { kpis: kpiScope, trends: trendScope, lists: listScope },
-        },
-        kpis,
-        trends,
-        ...lists,
-        alerts,
-      } satisfies DashboardData;
-    });
+        return {
+          meta: {
+            storeName: store?.name ?? '',
+            currency,
+            timezone,
+            generatedAt: now.toISOString(),
+            range,
+            topCustomersBasis: basis,
+            scope: { kpis: kpiScope, trends: trendScope, lists: listScope },
+          },
+          kpis,
+          trends,
+          ...lists,
+          alerts,
+        } satisfies DashboardData;
+      },
+      { timeoutMs: 20_000 },
+    );
   }
 
   // ── حلّ الفترة الزمنية (بمنطقة المحل) ──────────────────────────────────────
@@ -280,6 +284,7 @@ export class DashboardService {
     const ce = new Date(range.to);
     const ps = new Date(range.previousFrom);
     const pe = new Date(range.previousTo);
+    const asOf = ce.getTime() < now.getTime() ? ce : now;
     const want = new Set(scope);
 
     // مجاميع الطلبات (إيراد/عدد/مؤكد) للفترتين في مسحة واحدة.
@@ -287,6 +292,8 @@ export class DashboardService {
       {
         rev_cur: string;
         rev_prev: string;
+        collected_cur: string;
+        collected_prev: string;
         conf_cur: bigint;
         conf_prev: bigint;
         ord_cur: bigint;
@@ -296,10 +303,12 @@ export class DashboardService {
       `SELECT
          COALESCE(SUM(total) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $2 AND confirmed_at < $3),0)::text AS rev_cur,
          COALESCE(SUM(total) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $4 AND confirmed_at < $5),0)::text AS rev_prev,
+         COALESCE(SUM(LEAST(paid_amount, total)) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $2 AND confirmed_at < $3),0)::text AS collected_cur,
+         COALESCE(SUM(LEAST(paid_amount, total)) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $4 AND confirmed_at < $5),0)::text AS collected_prev,
          COUNT(*) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $2 AND confirmed_at < $3) AS conf_cur,
          COUNT(*) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $4 AND confirmed_at < $5) AS conf_prev,
-         COUNT(*) FILTER (WHERE ${CONFIRMED_SALE} AND issued_at >= $2 AND issued_at < $3) AS ord_cur,
-         COUNT(*) FILTER (WHERE ${CONFIRMED_SALE} AND issued_at >= $4 AND issued_at < $5) AS ord_prev
+         COUNT(*) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $2 AND confirmed_at < $3) AS ord_cur,
+         COUNT(*) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $4 AND confirmed_at < $5) AS ord_prev
        FROM orders WHERE tenant_id = $1::uuid`,
       tenantId,
       cs,
@@ -333,21 +342,21 @@ export class DashboardService {
       }[]
     >(
       `WITH bal_now AS (
-         SELECT DISTINCT ON (le.customer_id) le.customer_id, le.running_balance
+         SELECT le.customer_id, SUM(le.debit - le.credit) AS running_balance
          FROM ledger_entries le JOIN customers c ON c.id = le.customer_id
-         WHERE le.tenant_id = $1::uuid AND c.archived_at IS NULL
-         ORDER BY le.customer_id, le.seq DESC
+         WHERE le.tenant_id = $1::uuid AND c.archived_at IS NULL AND le.occurred_at < $2
+         GROUP BY le.customer_id
        ),
        bal_start AS (
-         SELECT DISTINCT ON (le.customer_id) le.customer_id, le.running_balance
+         SELECT le.customer_id, SUM(le.debit - le.credit) AS running_balance
          FROM ledger_entries le JOIN customers c ON c.id = le.customer_id
-         WHERE le.tenant_id = $1::uuid AND c.archived_at IS NULL AND le.created_at < $2
-         ORDER BY le.customer_id, le.seq DESC
+         WHERE le.tenant_id = $1::uuid AND c.archived_at IS NULL AND le.occurred_at < $3
+         GROUP BY le.customer_id
        ),
        overdue AS (
          SELECT customer_id, SUM(total - paid_amount) AS due
          FROM orders
-         WHERE tenant_id = $1::uuid AND status IN ('CONFIRMED','PARTIALLY_PAID') AND due_at < $3
+         WHERE tenant_id = $1::uuid AND status IN ('CONFIRMED','PARTIALLY_PAID') AND due_at < $4
          GROUP BY customer_id
        ),
        unalloc AS (
@@ -362,11 +371,12 @@ export class DashboardService {
          (SELECT COALESCE(SUM(running_balance) FILTER (WHERE running_balance > 0),0) FROM bal_start)::text AS outstanding_prev,
          (SELECT COALESCE(SUM(due),0) FROM overdue WHERE due > 0)::text AS overdue_amount,
          (SELECT COUNT(*) FROM overdue WHERE due > 0) AS overdue_customers,
-         (SELECT COUNT(*) FROM customers WHERE tenant_id = $1::uuid AND archived_at IS NULL AND status = 'ACTIVE') AS active_now,
-         (SELECT COUNT(*) FROM customers WHERE tenant_id = $1::uuid AND created_at < $2 AND (archived_at IS NULL OR archived_at >= $2)) AS active_prev,
+         (SELECT COUNT(*) FROM customers WHERE tenant_id = $1::uuid AND created_at < $2 AND (archived_at IS NULL OR archived_at >= $2) AND status = 'ACTIVE') AS active_now,
+         (SELECT COUNT(*) FROM customers WHERE tenant_id = $1::uuid AND created_at < $3 AND (archived_at IS NULL OR archived_at >= $3)) AS active_prev,
          (SELECT amt FROM unalloc)::text AS unallocated`,
       tenantId,
-      cs,
+      asOf,
+      pe,
       now,
     );
 
@@ -377,8 +387,8 @@ export class DashboardService {
     if (!o || !p || !s) throw AppError.internal('تعذّر حساب مؤشرات اللوحة.');
 
     const revCur = o.rev_cur;
-    const collectionCur = ratePct(p.pay_cur, o.rev_cur);
-    const collectionPrev = ratePct(p.pay_prev, o.rev_prev);
+    const collectionCur = ratePct(o.collected_cur, o.rev_cur);
+    const collectionPrev = ratePct(o.collected_prev, o.rev_prev);
 
     const all: Record<DashboardKpiId, KpiMetric> = {
       revenue: money('revenue', o.rev_cur, o.rev_prev),
@@ -415,7 +425,14 @@ export class DashboardService {
     const step = `1 ${unit}`;
 
     const rows = await tx.$queryRawUnsafe<
-      { bucket: string; revenue: string; orders: string; payments: string; new_customers: string }[]
+      {
+        bucket: string;
+        revenue: string;
+        orders: string;
+        payments: string;
+        outstanding_balance: string;
+        new_customers: string;
+      }[]
     >(
       `WITH bk AS (
          SELECT gs AS b_local, gs + interval '${step}' AS b_next_local
@@ -430,18 +447,32 @@ export class DashboardService {
                 (b_local AT TIME ZONE $1) AS b_start,
                 (b_next_local AT TIME ZONE $1) AS b_end
          FROM bk
+       ),
+       balances AS (
+         SELECT b.b_local, le.customer_id, SUM(le.debit - le.credit) AS balance
+         FROM b
+         JOIN ledger_entries le ON le.tenant_id = $4::uuid AND le.occurred_at < b.b_end
+         JOIN customers lc ON lc.id = le.customer_id AND lc.archived_at IS NULL
+         GROUP BY b.b_local, le.customer_id
+       ),
+       debt AS (
+         SELECT b_local, COALESCE(SUM(balance) FILTER (WHERE balance > 0),0) AS outstanding_balance
+         FROM balances
+         GROUP BY b_local
        )
        SELECT
          to_char(b.b_local, 'YYYY-MM-DD') AS bucket,
          COALESCE((SELECT SUM(total) FROM orders o WHERE o.tenant_id = $4::uuid AND ${CONFIRMED_SALE}
                     AND o.confirmed_at >= b.b_start AND o.confirmed_at < b.b_end),0)::text AS revenue,
-         COALESCE((SELECT COUNT(*) FROM orders o WHERE o.tenant_id = $4::uuid AND ${sqlPrefixed(CONFIRMED_SALE, 'o')}
-                    AND o.issued_at >= b.b_start AND o.issued_at < b.b_end),0)::text AS orders,
-         COALESCE((SELECT SUM(amount) FROM payments p WHERE p.tenant_id = $4::uuid AND p.status = 'POSTED'
+          COALESCE((SELECT COUNT(*) FROM orders o WHERE o.tenant_id = $4::uuid AND ${sqlPrefixed(CONFIRMED_SALE, 'o')}
+                    AND o.confirmed_at >= b.b_start AND o.confirmed_at < b.b_end),0)::text AS orders,
+          COALESCE((SELECT SUM(amount) FROM payments p WHERE p.tenant_id = $4::uuid AND p.status = 'POSTED'
                     AND p.paid_at >= b.b_start AND p.paid_at < b.b_end),0)::text AS payments,
+          COALESCE(d.outstanding_balance,0)::text AS outstanding_balance,
          COALESCE((SELECT COUNT(*) FROM customers c WHERE c.tenant_id = $4::uuid
                     AND c.created_at >= b.b_start AND c.created_at < b.b_end),0)::text AS new_customers
-       FROM b ORDER BY b.b_local`,
+       FROM b LEFT JOIN debt d ON d.b_local = b.b_local
+       ORDER BY b.b_local`,
       tz,
       new Date(range.from),
       new Date(range.to),
@@ -464,29 +495,11 @@ export class DashboardService {
         String(Number(r.new_customers)),
       );
 
-    // منحنى الدَّين مشتق: الدَّين بداية الفترة + تراكم (إيراد − مقبوضات) لكل دلو.
-    // دقيق باستثناء قيود التسوية اليدوية النادرة — موثّق في تعريف المؤشر.
+    // كل نقطة مشتقة مباشرة من قيود الدفتر الواقعة قبل نهاية الدلو.
     if (want.has('outstanding_balance')) {
-      const startRow = await tx.$queryRawUnsafe<{ bal: string }[]>(
-        `WITH bal AS (
-           SELECT DISTINCT ON (le.customer_id) le.running_balance
-           FROM ledger_entries le JOIN customers c ON c.id = le.customer_id
-           WHERE le.tenant_id = $1::uuid AND c.archived_at IS NULL AND le.created_at < $2
-           ORDER BY le.customer_id, le.seq DESC
-         )
-         SELECT COALESCE(SUM(running_balance) FILTER (WHERE running_balance > 0),0)::text AS bal FROM bal`,
-        tenantId,
-        new Date(range.from),
+      series.outstanding_balance = pointsSeries('outstanding_balance', 'money', rows, (r) =>
+        toMoneyString(r.outstanding_balance, 2),
       );
-      let running = toMoney(startRow[0]?.bal ?? '0');
-      series.outstanding_balance = {
-        id: 'outstanding_balance',
-        unit: 'money',
-        points: rows.map((r) => {
-          running = running.plus(toMoney(r.revenue)).minus(toMoney(r.payments));
-          return { bucket: r.bucket, value: toMoneyString(running, 2) };
-        }),
-      };
     }
 
     return scope.map((id) => series[id]).filter((s): s is TrendSeries => Boolean(s));
@@ -605,8 +618,12 @@ export class DashboardService {
       jobs.push(
         (async () => {
           const rows = await tx.payment.findMany({
-            where: { tenantId, status: 'POSTED' },
-            orderBy: { createdAt: 'desc' },
+            where: {
+              tenantId,
+              status: 'POSTED',
+              paidAt: { gte: new Date(range.from), lt: new Date(range.to) },
+            },
+            orderBy: { paidAt: 'desc' },
             take: 5,
             include: { customer: { select: { id: true, name: true } } },
           });
@@ -639,8 +656,12 @@ export class DashboardService {
       jobs.push(
         (async () => {
           const rows = await tx.order.findMany({
-            where: { tenantId, status: { not: 'CANCELLED' } },
-            orderBy: { createdAt: 'desc' },
+            where: {
+              tenantId,
+              status: { notIn: ['DRAFT', 'QUOTE', 'CANCELLED'] },
+              confirmedAt: { gte: new Date(range.from), lt: new Date(range.to) },
+            },
+            orderBy: { confirmedAt: 'desc' },
             take: 5,
             include: { customer: { select: { id: true, name: true } } },
           });

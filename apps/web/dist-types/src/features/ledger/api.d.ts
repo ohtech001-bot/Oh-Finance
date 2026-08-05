@@ -2,7 +2,7 @@ import type { LedgerEntry, LedgerListQuery, LedgerTotals, PaginatedResult } from
 type LedgerList = PaginatedResult<LedgerEntry> & {
     totals: LedgerTotals;
 };
-export declare function useLedger(query: Partial<LedgerListQuery>): import("@tanstack/react-query").UseQueryResult<NoInfer<LedgerList>, Error>;
+export declare function useLedger(query: Partial<LedgerListQuery>, enabled?: boolean): import("@tanstack/react-query").UseQueryResult<NoInfer<LedgerList>, Error>;
 /**
  * يجمع **كل** حركات المرشّح الحالي عبر ترقيم الصفحات — للتصدير والطباعة.
  *
@@ -14,42 +14,46 @@ export declare function useStatement(customerId: string | undefined, range?: {
     from?: string;
     to?: string;
 }): import("@tanstack/react-query").UseQueryResult<NoInfer<{
+    customerId: string;
+    customerName: string;
+    customerCode: string;
+    openingBalance: string;
     entries: {
         id: string;
         seq: number;
-        occurredAt: string;
-        createdAt: string;
-        notes: string | null;
-        openingBalance: string;
         customerId: string;
         customerName: string;
         customerCode: string;
-        createdBy: string | null;
-        createdByName: string | null;
         entryType: "OPENING_BALANCE" | "ORDER_DEBIT" | "PAYMENT_CREDIT" | "ADJUSTMENT_DEBIT" | "ADJUSTMENT_CREDIT" | "REVERSAL" | "WRITE_OFF";
+        openingBalance: string;
         debit: string;
         credit: string;
         runningBalance: string;
-        refType: "ORDER" | "PAYMENT" | "CUSTOMER" | "ADJUSTMENT";
+        refType: "CUSTOMER" | "ORDER" | "PAYMENT" | "ADJUSTMENT";
         refId: string | null;
         refNumber: string | null;
         reversesEntryId: string | null;
         isReversed: boolean;
+        notes: string | null;
+        occurredAt: string;
+        createdAt: string;
+        createdBy: string | null;
+        createdByName: string | null;
     }[];
     from: string | null;
     to: string | null;
-    openingBalance: string;
-    customerId: string;
-    customerName: string;
-    customerCode: string;
-    generatedAt: string;
     closingBalance: string;
+    orders: {
+        orderId: string;
+        paymentState: "PAID_FROM_CREDIT" | "PAID" | "PARTIALLY_PAID" | "UNPAID";
+    }[];
     totals: {
         totalDebit: string;
         totalCredit: string;
         currentBalance: string;
         entryCount: number;
     };
+    generatedAt: string;
 }>, Error>;
 export {};
 //# sourceMappingURL=api.d.ts.map

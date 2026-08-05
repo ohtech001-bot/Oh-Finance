@@ -1,6 +1,7 @@
 import type { OrderDetail } from '@oh/contracts';
 import {
   formatMoney,
+  greaterThan,
   percentOf,
   roundMoney,
   subtract,
@@ -48,6 +49,35 @@ export function inclusiveTaxBreakdown(
   };
 }
 
+export function orderSettlementDate(
+  order: Pick<OrderDetail, 'remainingAmount' | 'allocations' | 'confirmedAt'>,
+): Date | null {
+  if (greaterThan(order.remainingAmount, '0')) return null;
+
+  const latestPayment = order.allocations.reduce<Date | null>((latest, allocation) => {
+    const paidAt = new Date(allocation.paidAt);
+    if (Number.isNaN(paidAt.getTime())) return latest;
+    return !latest || paidAt > latest ? paidAt : latest;
+  }, null);
+
+  if (latestPayment) return latestPayment;
+  return order.confirmedAt ? new Date(order.confirmedAt) : null;
+}
+
+export function formatOrderDate(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+export function formatOrderTime(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
 export function printOrder(
   order: OrderDetail,
   currency: CurrencyCode,
@@ -59,18 +89,20 @@ export function printOrder(
   const money = (value: string) => escapeHtml(formatMoney(value, { currency }));
   const orderNumber = escapeHtml(displayOrderNumber(order.number));
   const receivedAt = new Date(order.issuedAt);
-  const orderDate = escapeHtml(
-    new Intl.DateTimeFormat('ar', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(receivedAt),
-  );
-  const orderTime = escapeHtml(
-    receivedAt.toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' }),
-  );
+  const orderDate = escapeHtml(formatOrderDate(receivedAt));
+  const orderTime = escapeHtml(formatOrderTime(receivedAt));
+  const settledAt = orderSettlementDate(order);
+  const settlementDate = settledAt ? escapeHtml(formatOrderDate(settledAt)) : null;
+  const settlementTime = settledAt ? escapeHtml(formatOrderTime(settledAt)) : null;
   const paid = order.remainingAmount === '0.00';
-  const paymentState = paid ? 'مدفوع / שולם' : 'غير مدفوع / לא שולם';
+  const partiallyPaid = order.status === 'PARTIALLY_PAID';
+  const paymentState = paid
+    ? 'مدفوع / שולם'
+    : partiallyPaid
+      ? 'مدفوع جزئيًا / שולם חלקית'
+      : 'غير مدفوع / לא שולם';
+  const paymentColor = paid ? '#16733a' : partiallyPaid ? '#b65d00' : '#c42323';
+  const cashPaid = subtract(order.paidAmount, order.creditAppliedAmount);
   const documentState = order.status === 'DRAFT' ? 'مسودة / טיוטה' : 'طلب مؤكد / הזמנה מאושרת';
   const storeName = escapeHtml(options.store?.name ?? 'OH Finance');
   const taxRate = options.store?.taxEnabled ? options.store.taxRate : 0;
@@ -128,7 +160,7 @@ export function printOrder(
       .section-title{font-size:12px;font-weight:800;margin-bottom:1.5mm}
       .info-row,.total-row{display:flex;align-items:flex-start;justify-content:space-between;gap:3mm;padding:.7mm 0}
       .info-row strong,.total-row strong{text-align:left;direction:ltr}
-      .payment{display:inline-block;border:1px solid currentColor;padding:.8mm 2mm;font-weight:800;color:${paid ? '#16733a' : '#c42323'}}
+      .payment{display:inline-block;border:1px solid currentColor;padding:.8mm 2mm;font-weight:800;color:${paymentColor}}
       table{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:1mm;font-size:9px}
       th,td{padding:1.4mm .7mm;border-bottom:1px solid #ccc;text-align:center;vertical-align:top}
       th{font-weight:800}
@@ -157,9 +189,16 @@ export function printOrder(
       <section class="section">
         <div class="section-title">تفاصيل الطلب</div>
         <div class="info-row"><span>رقم الطلب</span><strong>${orderNumber}</strong></div>
-        <div class="info-row"><span>التاريخ</span><strong>${orderDate}</strong></div>
+        <div class="info-row"><span>تاريخ استلام الطلب</span><strong>${orderDate}</strong></div>
         <div class="info-row"><span>ساعة الاستلام</span><strong>${orderTime}</strong></div>
+        ${settlementDate ? `<div class="info-row"><span>تاريخ السداد</span><strong>${settlementDate}</strong></div>` : ''}
+        ${settlementTime ? `<div class="info-row"><span>ساعة السداد</span><strong>${settlementTime}</strong></div>` : ''}
         <div class="info-row"><span>حالة الدفع</span><span class="payment">${paymentState}</span></div>
+        <div class="info-row"><span>قيمة الطلب</span><strong>${money(order.total)}</strong></div>
+        <div class="info-row"><span>المسحوب من رصيد الزبون</span><strong>${money(order.creditAppliedAmount)}</strong></div>
+        ${greaterThan(cashPaid, '0') ? `<div class="info-row"><span>المدفوع نقدًا</span><strong>${money(cashPaid.toString())}</strong></div>` : ''}
+        <div class="info-row"><span>إجمالي المسدد</span><strong>${money(order.paidAmount)}</strong></div>
+        <div class="info-row"><span>المتبقي للسداد</span><strong>${money(order.remainingAmount)}</strong></div>
       </section>
 
       <section class="section">

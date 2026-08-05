@@ -12,10 +12,12 @@ import {
 import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PERMISSIONS } from '@oh/config';
 import {
+  applyCustomerCreditSchema,
   allocationPreviewRequestSchema,
   createPaymentSchema,
   paymentListQuerySchema,
   reversePaymentSchema,
+  type ApplyCustomerCreditRequest,
   type AllocationPreviewRequest,
   type CreatePaymentRequest,
   type PaymentListQuery,
@@ -55,6 +57,26 @@ export class PaymentsController {
   @ApiOperation({ summary: 'الطلبات غير المسدَّدة لزبون — الأقدم أولًا.' })
   async openOrders(@Param('customerId', ParseUUIDPipe) customerId: string) {
     return this.payments.openOrders(customerId);
+  }
+
+  @Get('customer-credit/:customerId')
+  @RequirePermissions(PERMISSIONS.PAYMENTS_READ)
+  @ApiOperation({ summary: 'الرصيد السابق المتاح لاستخدامه في دفع طلب.' })
+  async customerCredit(@Param('customerId', ParseUUIDPipe) customerId: string) {
+    return this.payments.customerCredit(customerId);
+  }
+
+  @Post('apply-customer-credit')
+  @RequirePermissions(PERMISSIONS.PAYMENTS_CREATE)
+  @Idempotent()
+  @UseInterceptors(IdempotencyInterceptor)
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({ summary: 'استخدام رصيد الزبون السابق لدفع طلب محدد.' })
+  async applyCustomerCredit(
+    @Body(zodBody(applyCustomerCreditSchema)) dto: ApplyCustomerCreditRequest,
+    @Headers('idempotency-key') idempotencyKey: string,
+  ) {
+    return this.payments.applyCustomerCredit(dto, idempotencyKey);
   }
 
   /**

@@ -1,7 +1,8 @@
 import { type CurrencyCode } from '@oh/money';
 import { type KpiMetric, type TrendSeries } from '@oh/contracts';
-export declare function CollectionRateChart({ metric }: {
+export declare function CollectionRateChart({ metric, large, }: {
     metric: KpiMetric;
+    large?: boolean;
 }): import("react").JSX.Element;
 /**
  * منحنى يجمع سلاسل مختارة على محور زمني واحد. السلاسل المالية تُنسّق كعملة،

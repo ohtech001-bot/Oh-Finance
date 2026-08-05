@@ -84,6 +84,7 @@ function customerPayload(name: string): CreateCustomerRequest {
     tags: [],
     creditLimit: '5000',
     paymentTermDays: 30,
+    paymentDueDay: 15,
     status: 'ACTIVE',
     openingBalance: '0',
   } as CreateCustomerRequest;
@@ -235,13 +236,13 @@ describe.skipIf(!HAS_TEST_DB)('موجز النشاط', () => {
     const dueSoon = await asUser(a, () =>
       customers.create({
         ...customerPayload('سداد قريب'),
-        paymentDueDate: jerusalemDay(5),
+        paymentDueDay: Number(jerusalemDay(5).slice(8, 10)),
       }),
     );
     const dueToday = await asUser(a, () =>
       customers.create({
         ...customerPayload('سداد اليوم'),
-        paymentDueDate: jerusalemDay(0),
+        paymentDueDay: Number(jerusalemDay(0).slice(8, 10)),
       }),
     );
     await asUser(a, () => orders.create(orderPayload(dueSoon.id)));

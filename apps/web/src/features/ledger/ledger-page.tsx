@@ -23,6 +23,7 @@ import {
 import { ApiRequestError } from '@/lib/api';
 import { currentLocale } from '@/lib/i18n';
 import { useAuth } from '@/app/auth-context';
+import { displayOrderNumber } from '@/features/orders/order-number';
 import { fetchAllLedger, useLedger } from './api';
 import { exportLedgerCsv, printLedger } from './export';
 
@@ -150,7 +151,9 @@ export function LedgerPage() {
       hideBelow: 'md',
       render: (row) =>
         row.refNumber ? (
-          <span className="text-accent font-medium">{row.refNumber}</span>
+          <span className="text-accent font-medium">
+            {row.refType === 'ORDER' ? displayOrderNumber(row.refNumber) : row.refNumber}
+          </span>
         ) : (
           <span className="text-fg-subtle">—</span>
         ),
@@ -159,7 +162,11 @@ export function LedgerPage() {
       header: 'التفاصيل',
       hideBelow: 'xl',
       render: (row) => (
-        <span className="text-fg-muted line-clamp-1 text-[13px]">{row.notes ?? '—'}</span>
+        <span className="text-fg-muted line-clamp-1 text-[13px]">
+          {row.refType === 'ORDER'
+            ? (row.notes?.replace(/ORD-?/gi, '') ?? '—')
+            : (row.notes ?? '—')}
+        </span>
       ),
     },
     {
@@ -347,7 +354,11 @@ export function LedgerPage() {
                         {LEDGER_TYPE_LABELS[row.entryType]}
                       </StatusBadge>
                       {row.refNumber ? (
-                        <span className="text-fg-muted text-xs">{row.refNumber}</span>
+                        <span className="text-fg-muted text-xs">
+                          {row.refType === 'ORDER'
+                            ? displayOrderNumber(row.refNumber)
+                            : row.refNumber}
+                        </span>
                       ) : null}
                     </div>
                     <p className="text-fg-muted mt-2 text-xs">

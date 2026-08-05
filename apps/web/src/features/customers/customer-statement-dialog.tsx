@@ -5,6 +5,7 @@ import {
   type Customer,
   type LedgerEntry,
   type OrderDetail,
+  type StatementOrderPaymentState,
 } from '@oh/contracts';
 import { abs, isNegative, isPositive, toMoneyString, type CurrencyCode } from '@oh/money';
 import {
@@ -20,6 +21,7 @@ import {
   ErrorState,
   MoneyText,
   Skeleton,
+  StatusBadge,
   toast,
   type Column,
 } from '@oh/ui';
@@ -27,6 +29,7 @@ import { ApiRequestError, api } from '@/lib/api';
 import { currentLocale } from '@/lib/i18n';
 import { useAuth } from '@/app/auth-context';
 import { useStatement } from '@/features/ledger/api';
+import { displayOrderNumber } from '@/features/orders/order-number';
 import { printCustomerStatement } from './print-customer-statement';
 
 interface CustomerStatementDialogProps {
@@ -46,6 +49,9 @@ export function CustomerStatementDialog({
   const locale = currentLocale();
   const statementQuery = useStatement(open ? customer.id : undefined);
   const statement = statementQuery.data;
+  const orderPaymentStates = new Map(
+    statement?.orders.map((order) => [order.orderId, order.paymentState]) ?? [],
+  );
   const [printing, setPrinting] = useState(false);
 
   const handlePrint = async () => {
@@ -96,7 +102,14 @@ export function CustomerStatementDialog({
       render: (row) => (
         <div>
           <p className="text-fg text-sm font-medium">{LEDGER_TYPE_LABELS[row.entryType]}</p>
-          {row.refNumber ? <p className="text-fg-muted text-xs">{row.refNumber}</p> : null}
+          {row.refNumber ? (
+            <p className="text-fg-muted text-xs">
+              {row.refType === 'ORDER' ? displayOrderNumber(row.refNumber) : row.refNumber}
+            </p>
+          ) : null}
+          {row.refType === 'ORDER' && row.refId && orderPaymentStates.has(row.refId) ? (
+            <OrderPaymentBadge state={orderPaymentStates.get(row.refId)!} locale={locale} />
+          ) : null}
         </div>
       ),
     },
@@ -175,6 +188,14 @@ export function CustomerStatementDialog({
                           {LEDGER_TYPE_LABELS[row.entryType]}
                         </p>
                         <StatementDate value={row.occurredAt} locale={locale} />
+                        {row.refType === 'ORDER' &&
+                        row.refId &&
+                        orderPaymentStates.has(row.refId) ? (
+                          <OrderPaymentBadge
+                            state={orderPaymentStates.get(row.refId)!}
+                            locale={locale}
+                          />
+                        ) : null}
                       </div>
                       <MoneyText value={row.runningBalance} currency={currency} tone="auto" />
                     </div>
@@ -212,6 +233,50 @@ export function CustomerStatementDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function OrderPaymentBadge({
+  state,
+  locale,
+}: {
+  state: StatementOrderPaymentState;
+  locale: ReturnType<typeof currentLocale>;
+}) {
+  const labels = {
+    ar: {
+      PAID_FROM_CREDIT: 'مدفوع من رصيد الزبون',
+      PAID: 'مدفوع',
+      PARTIALLY_PAID: 'مدفوع جزئيًا',
+      UNPAID: 'غير مدفوع',
+    },
+    he: {
+      PAID_FROM_CREDIT: 'שולם מיתרת הלקוח',
+      PAID: 'שולם',
+      PARTIALLY_PAID: 'שולם חלקית',
+      UNPAID: 'לא שולם',
+    },
+    en: {
+      PAID_FROM_CREDIT: 'Paid from customer credit',
+      PAID: 'Paid',
+      PARTIALLY_PAID: 'Partially paid',
+      UNPAID: 'Unpaid',
+    },
+  } as const;
+
+  return (
+    <StatusBadge
+      className="mt-1"
+      tone={
+        state === 'PAID' || state === 'PAID_FROM_CREDIT'
+          ? 'credit'
+          : state === 'PARTIALLY_PAID'
+            ? 'partial'
+            : 'debit'
+      }
+    >
+      {labels[locale][state]}
+    </StatusBadge>
   );
 }
 

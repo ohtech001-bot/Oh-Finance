@@ -1,0 +1,1 @@
+{"version":3,"file":"pay-order-dialog.d.ts","sourceRoot":"","sources":["../../../../src/features/orders/pay-order-dialog.tsx"],"names":[],"mappings":"AACA,OAAO,KAAK,EAAE,WAAW,EAAE,MAAM,eAAe,CAAC;AA0BjD,wBAAgB,cAAc,CAAC,EAC7B,KAAK,EACL,IAAI,EACJ,YAAY,GACb,EAAE;IACD,KAAK,CAAC,EAAE,WAAW,CAAC;IACpB,IAAI,EAAE,OAAO,CAAC;IACd,YAAY,EAAE,CAAC,IAAI,EAAE,OAAO,KAAK,IAAI,CAAC;CACvC,+BAwIA"}

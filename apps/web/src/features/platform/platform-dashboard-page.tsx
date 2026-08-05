@@ -40,8 +40,9 @@ export function PlatformDashboardPage() {
         title={t('platform.title')}
         icon={LayoutDashboard}
         description={t('platform.subtitle')}
+        className="max-sm:flex-col"
         actions={
-          <Button variant="brand" asChild>
+          <Button variant="brand" className="max-sm:w-full" asChild>
             <Link to="/platform/tenants/new">
               <Building2 aria-hidden />
               {t('platform.addTenant')}
@@ -65,7 +66,7 @@ export function PlatformDashboardPage() {
       ) : data ? (
         <>
           <section aria-label="إحصاءات المنصة">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <StatCard
                 label={t('platform.totalTenants')}
                 value={data.totalTenants}
@@ -100,7 +101,7 @@ export function PlatformDashboardPage() {
           </section>
 
           <section aria-label="حالات المحلات">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <StatCard
                 label={t('platform.activeTenants')}
                 value={data.activeTenants}
@@ -123,7 +124,7 @@ export function PlatformDashboardPage() {
           </section>
 
           <div className="flex justify-center">
-            <Button variant="outline" asChild>
+            <Button variant="outline" className="max-sm:w-full" asChild>
               <Link to="/platform/tenants">
                 {t('platform.tenantsList')}
                 <ArrowLeft className="ltr:rotate-180 rtl:rotate-0" aria-hidden />

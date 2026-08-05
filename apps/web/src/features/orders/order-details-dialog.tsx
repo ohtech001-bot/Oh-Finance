@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Pencil, Printer, Trash2 } from 'lucide-react';
+import { Check, Pencil, Printer, Trash2, WalletCards } from 'lucide-react';
 import type { OrderDetail, SessionUser } from '@oh/contracts';
 import type { CurrencyCode } from '@oh/money';
 import {
@@ -25,7 +25,29 @@ import { useCustomer } from '@/features/customers/api';
 import { useConfirmOrder, useDeleteOrder, useOrder } from './api';
 import { CreateOrderDialog } from './create-order-dialog';
 import { displayOrderNumber } from './order-number';
-import { printOrder } from './print-order';
+import { formatOrderDate, formatOrderTime, orderSettlementDate, printOrder } from './print-order';
+import { PayOrderDialog } from './pay-order-dialog';
+
+const DATE_COPY = {
+  ar: {
+    receivedDate: 'تاريخ استلام الطلب',
+    receivedTime: 'ساعة استلام الطلب',
+    settlementDate: 'تاريخ السداد',
+    settlementTime: 'ساعة السداد',
+  },
+  he: {
+    receivedDate: 'תאריך קבלת ההזמנה',
+    receivedTime: 'שעת קבלת ההזמנה',
+    settlementDate: 'תאריך התשלום',
+    settlementTime: 'שעת התשלום',
+  },
+  en: {
+    receivedDate: 'Order received date',
+    receivedTime: 'Order received time',
+    settlementDate: 'Payment date',
+    settlementTime: 'Payment time',
+  },
+} as const;
 
 export function OrderDetailsDialog({
   orderId,
@@ -46,10 +68,14 @@ export function OrderDetailsDialog({
   const editable = order?.status === 'DRAFT' || order?.status === 'QUOTE';
   const isDraft = order?.status === 'DRAFT';
   const paid = order?.remainingAmount === '0.00';
+  const partiallyPaid = order?.status === 'PARTIALLY_PAID';
   const locale = currentLocale();
+  const dateCopy = DATE_COPY[locale];
+  const settledAt = order ? orderSettlementDate(order) : null;
   const [editingOrder, setEditingOrder] = useState<OrderDetail>();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
   const confirmOrder = useConfirmOrder(order?.id ?? '');
   const deleteOrder = useDeleteOrder();
 
@@ -154,20 +180,35 @@ export function OrderDetailsDialog({
                     <h3 className="text-fg mb-3 text-sm font-semibold">تفاصيل الطلب</h3>
                     <dl className="space-y-2 text-sm">
                       <Info label="رقم الطلب" value={displayOrderNumber(order.number)} ltr />
-                      <Info label="التاريخ" value={order.issuedAt.slice(0, 10)} ltr />
                       <Info
-                        label="ساعة استلام الطلب"
-                        value={new Date(order.issuedAt).toLocaleTimeString(locale, {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        label={dateCopy.receivedDate}
+                        value={formatOrderDate(order.issuedAt)}
                         ltr
                       />
+                      <Info
+                        label={dateCopy.receivedTime}
+                        value={formatOrderTime(order.issuedAt)}
+                        ltr
+                      />
+                      {settledAt ? (
+                        <>
+                          <Info
+                            label={dateCopy.settlementDate}
+                            value={formatOrderDate(settledAt)}
+                            ltr
+                          />
+                          <Info
+                            label={dateCopy.settlementTime}
+                            value={formatOrderTime(settledAt)}
+                            ltr
+                          />
+                        </>
+                      ) : null}
                       <div className="flex items-center justify-between gap-3">
                         <dt className="text-fg-muted">حالة الدفع</dt>
                         <dd>
-                          <StatusBadge tone={paid ? 'credit' : 'debit'}>
-                            {paid ? 'مدفوع' : 'غير مدفوع'}
+                          <StatusBadge tone={paid ? 'credit' : partiallyPaid ? 'partial' : 'debit'}>
+                            {paid ? 'مدفوع' : partiallyPaid ? 'مدفوع جزئيًا' : 'غير مدفوع'}
                           </StatusBadge>
                         </dd>
                       </div>
@@ -210,7 +251,27 @@ export function OrderDetailsDialog({
                 </section>
 
                 <section className="border-border border-t pt-5">
-                  <Amount label="قيمة الطلب" value={order.total} currency={currency} />
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <Amount label="قيمة الطلب" value={order.total} currency={currency} />
+                    <Amount
+                      label="المسحوب من رصيد الزبون"
+                      value={order.creditAppliedAmount}
+                      currency={currency}
+                      tone="credit"
+                    />
+                    <Amount
+                      label="إجمالي المسدد"
+                      value={order.paidAmount}
+                      currency={currency}
+                      tone="credit"
+                    />
+                    <Amount
+                      label="المتبقي للسداد"
+                      value={order.remainingAmount}
+                      currency={currency}
+                      tone={paid ? 'plain' : 'debit'}
+                    />
+                  </div>
                 </section>
               </>
             )}
@@ -269,6 +330,15 @@ export function OrderDetailsDialog({
                 </div>
               ) : null}
 
+              {order &&
+              (order.status === 'CONFIRMED' || order.status === 'PARTIALLY_PAID') &&
+              can('payments.create') ? (
+                <Button variant="brand" onClick={() => setPayOpen(true)}>
+                  <WalletCards aria-hidden />
+                  دفع الطلب
+                </Button>
+              ) : null}
+
               {order ? (
                 <Button variant="outline" onClick={() => void handlePrint()}>
                   <Printer aria-hidden />
@@ -286,6 +356,7 @@ export function OrderDetailsDialog({
         }}
         order={editingOrder}
       />
+      <PayOrderDialog order={order} open={payOpen} onOpenChange={setPayOpen} />
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}

@@ -74,6 +74,7 @@ export const notificationKindSchema = z.enum([
   'PAYMENT_RECEIVED',
   'PAYMENT_DUE_SOON',
   'PAYMENT_DUE_TODAY',
+  'PAYMENT_DUE_OVERDUE',
 ]);
 export type NotificationKind = z.infer<typeof notificationKindSchema>;
 

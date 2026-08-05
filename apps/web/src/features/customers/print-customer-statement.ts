@@ -10,6 +10,8 @@ import {
   formatMoney,
   isNegative,
   isPositive,
+  isZero,
+  subtract,
   toMoneyString,
   type CurrencyCode,
 } from '@oh/money';
@@ -51,6 +53,14 @@ const labels = {
     unitPrice: 'سعر الوحدة',
     lineTotal: 'السعر الكلي',
     orderTotal: 'قيمة الطلب',
+    paymentStatus: 'حالة الدفع',
+    statusPaid: 'مدفوع',
+    statusPaidFromCredit: 'مدفوع من رصيد الزبون',
+    statusPartiallyPaid: 'مدفوع جزئيًا',
+    statusUnpaid: 'غير مدفوع',
+    creditApplied: 'المسحوب من الرصيد',
+    totalSettled: 'إجمالي المسدد',
+    remaining: 'المتبقي للسداد',
     financialMovements: 'الحركات المالية',
     date: 'التاريخ',
     time: 'الساعة',
@@ -86,6 +96,14 @@ const labels = {
     unitPrice: 'מחיר ליחידה',
     lineTotal: 'מחיר כולל',
     orderTotal: 'סכום ההזמנה',
+    paymentStatus: 'מצב תשלום',
+    statusPaid: 'שולם',
+    statusPaidFromCredit: 'שולם מיתרת הלקוח',
+    statusPartiallyPaid: 'שולם חלקית',
+    statusUnpaid: 'לא שולם',
+    creditApplied: 'נוכה מהיתרה',
+    totalSettled: 'סה״כ שולם',
+    remaining: 'נותר לתשלום',
     financialMovements: 'תנועות כספיות',
     date: 'תאריך',
     time: 'שעה',
@@ -121,6 +139,14 @@ const labels = {
     unitPrice: 'Unit price',
     lineTotal: 'Line total',
     orderTotal: 'Order total',
+    paymentStatus: 'Payment status',
+    statusPaid: 'Paid',
+    statusPaidFromCredit: 'Paid from customer credit',
+    statusPartiallyPaid: 'Partially paid',
+    statusUnpaid: 'Unpaid',
+    creditApplied: 'Applied from credit',
+    totalSettled: 'Total paid',
+    remaining: 'Remaining',
     financialMovements: 'Financial movements',
     date: 'Date',
     time: 'Time',
@@ -228,11 +254,22 @@ export function printCustomerStatement({
       `${formatDate(statement.generatedAt)} ${formatTime(statement.generatedAt)}`,
     ),
     detail(text.debtLimit, money(customer.creditLimit)),
-    customer.paymentDueDate ? detail(text.dueDate, formatDate(customer.paymentDueDate)) : '',
+    detail(text.dueDate, formatMonthlyDueDay(customer.paymentDueDay, locale)),
   ].join('');
   const orderDetails = [...orders]
     .sort((a, b) => a.issuedAt.localeCompare(b.issuedAt))
     .map((order) => {
+      const paidEntirelyFromCredit =
+        isPositive(order.creditAppliedAmount) &&
+        isZero(subtract(order.paidAmount, order.creditAppliedAmount));
+      const paymentStatus =
+        order.remainingAmount === '0.00'
+          ? paidEntirelyFromCredit
+            ? text.statusPaidFromCredit
+            : text.statusPaid
+          : order.status === 'PARTIALLY_PAID'
+            ? text.statusPartiallyPaid
+            : text.statusUnpaid;
       const products = order.items
         .map(
           (item) => `<tr>
@@ -248,6 +285,12 @@ export function printCustomerStatement({
           <strong>${escapeHtml(text.orderNumber)}: <span dir="ltr">${escapeHtml(order.number.replace(/^ORD-/, ''))}</span></strong>
           <span>${formatDate(order.issuedAt)} · ${formatTime(order.issuedAt)}</span>
           <strong>${escapeHtml(text.orderTotal)}: ${money(order.total)}</strong>
+        </div>
+        <div class="order-payment">
+          <span>${escapeHtml(text.paymentStatus)}: <strong>${escapeHtml(paymentStatus)}</strong></span>
+          <span>${escapeHtml(text.creditApplied)}: <strong>${money(order.creditAppliedAmount)}</strong></span>
+          <span>${escapeHtml(text.totalSettled)}: <strong>${money(order.paidAmount)}</strong></span>
+          <span>${escapeHtml(text.remaining)}: <strong>${money(order.remainingAmount)}</strong></span>
         </div>
         <h3>${escapeHtml(text.products)}</h3>
         <table class="products-table">
@@ -271,7 +314,7 @@ export function printCustomerStatement({
         <td>${entry.debit !== '0.00' ? money(entry.debit) : text.noValue}</td>
         <td>${entry.credit !== '0.00' ? money(entry.credit) : text.noValue}</td>
         <td>${money(entry.runningBalance)}</td>
-        <td>${optional(entry.refNumber)}</td>
+        <td>${optional(entry.refType === 'ORDER' ? entry.refNumber?.replace(/^ORD-?/i, '') : entry.refNumber)}</td>
       </tr>`,
     )
     .join('');
@@ -303,6 +346,7 @@ export function printCustomerStatement({
     .order-card{border:1px solid #98a2b3;border-radius:6px;padding:12px;margin-bottom:12px;break-inside:avoid}
     .order-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;margin-bottom:10px}
     .order-head strong:last-child{text-align:${dir === 'rtl' ? 'left' : 'right'}}
+    .order-payment{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;background:#f9fafb;border:1px solid #e4e7ec;border-radius:4px;padding:8px;margin-bottom:10px;font-size:11px}
     h3{font-size:12px;margin:8px 0}
     table{width:100%;border-collapse:collapse;font-size:11px}
     th,td{border:1px solid #d0d5dd;padding:7px;text-align:${dir === 'rtl' ? 'right' : 'left'};vertical-align:top}
@@ -363,4 +407,10 @@ export function printCustomerStatement({
   win.focus();
   win.addEventListener('load', () => win.print(), { once: true });
   window.setTimeout(() => win.print(), 500);
+}
+
+function formatMonthlyDueDay(day: number, locale: 'ar' | 'he' | 'en'): string {
+  if (locale === 'ar') return `يوم ${day} من كل شهر`;
+  if (locale === 'he') return `בכל ${day} בחודש`;
+  return `Day ${day} of every month`;
 }

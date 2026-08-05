@@ -9,6 +9,8 @@ export declare class ApiRequestError extends Error {
     get isForbidden(): boolean;
     get isValidation(): boolean;
 }
+/** A readable CSRF cookie is the browser-side hint that an HttpOnly session exists. */
+export declare function hasSessionHint(): boolean;
 /** يعيد حالة البوابة في الاختبارات، ولا يُستخدم في تدفق التطبيق. */
 export declare function resetApiSessionStateForTests(): void;
 interface RequestOptions extends Omit<RequestInit, 'body'> {

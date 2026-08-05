@@ -3,6 +3,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle,
+  ArchiveRestore,
+  CalendarClock,
   CalendarDays,
   ChevronLeft,
   MessageCircle,
@@ -62,9 +64,9 @@ export function CustomersPage() {
       header: 'استخدام حد الدين',
       used: 'المستخدم',
       remaining: 'المتبقي',
-      dueDate: 'تاريخ السداد',
+      dueDate: 'يوم السداد الشهري',
       messageTitle: 'إرسال تذكير بالسداد',
-      paymentDueToday: 'موعد السداد اليوم وما زال الحساب مديونًا',
+      paymentDueToday: 'حلّ أو تجاوز موعد السداد وما زال الحساب مديونًا',
       allAccounts: 'كل الحسابات',
       accountState: 'حالة الحساب',
       debit: 'مديون',
@@ -75,9 +77,9 @@ export function CustomersPage() {
       header: 'ניצול המסגרת',
       used: 'נוצל',
       remaining: 'נותר',
-      dueDate: 'תאריך תשלום',
+      dueDate: 'יום תשלום חודשי',
       messageTitle: 'שליחת תזכורת לתשלום',
-      paymentDueToday: 'מועד התשלום היום והחשבון עדיין בחובה',
+      paymentDueToday: 'מועד התשלום הגיע או עבר והחשבון עדיין בחובה',
       allAccounts: 'כל החשבונות',
       accountState: 'מצב החשבון',
       debit: 'חייב',
@@ -88,9 +90,9 @@ export function CustomersPage() {
       header: 'Debt limit usage',
       used: 'Used',
       remaining: 'Remaining',
-      dueDate: 'Payment due date',
+      dueDate: 'Monthly payment day',
       messageTitle: 'Send payment reminder',
-      paymentDueToday: 'Payment is due today and the account still has debt',
+      paymentDueToday: 'Payment is due or overdue and the account still has debt',
       allAccounts: 'All accounts',
       accountState: 'Account status',
       debit: 'Owes money',
@@ -177,7 +179,7 @@ export function CustomersPage() {
       key: 'name',
       header: 'الاسم',
       render: (row) => {
-        const dueToday = isPaymentDueToday(row, today);
+        const dueToday = isPaymentDue(row, today);
         return (
           <div className="min-w-0">
             <div className="flex min-w-0 items-center gap-1.5">
@@ -187,6 +189,25 @@ export function CustomersPage() {
                   className="text-danger size-4 shrink-0"
                   aria-label={debtUsageLabels.paymentDueToday}
                 />
+              ) : null}
+              {dueToday && whatsappPhone(row.phone) ? (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="size-7"
+                  title={debtUsageLabels.messageTitle}
+                  asChild
+                >
+                  <a
+                    href={whatsappReminderUrl(row, currency, locale, 'DUE_TODAY')}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`${debtUsageLabels.messageTitle}: ${row.name}`}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <MessageCircle className="text-success" aria-hidden />
+                  </a>
+                </Button>
               ) : null}
             </div>
             {row.company ? <p className="text-fg-muted truncate text-xs">{row.company}</p> : null}
@@ -213,14 +234,9 @@ export function CustomersPage() {
     },
     {
       header: debtUsageLabels.dueDate,
-      render: (row) =>
-        row.paymentDueDate ? (
-          <span className="text-fg tabular-nums" dir="ltr">
-            {row.paymentDueDate}
-          </span>
-        ) : (
-          <span className="text-fg-subtle">—</span>
-        ),
+      render: (row) => (
+        <span className="text-fg tabular-nums">{formatDueDay(row.paymentDueDay, locale)}</span>
+      ),
     },
     {
       key: 'balance',
@@ -266,7 +282,7 @@ export function CustomersPage() {
       header: t('common.actions'),
       align: 'end',
       render: (row) => {
-        const dueToday = isPaymentDueToday(row, today);
+        const dueToday = isPaymentDue(row, today);
         const overLimit =
           greaterThan(row.creditLimit, '0') && greaterThanOrEqual(row.balance, row.creditLimit);
         const reminderReason = dueToday ? 'DUE_TODAY' : 'OVER_LIMIT';
@@ -275,7 +291,7 @@ export function CustomersPage() {
             className="flex items-center justify-end gap-1"
             onClick={(event) => event.stopPropagation()}
           >
-            {dueToday || overLimit ? (
+            {!dueToday && overLimit ? (
               whatsappPhone(row.phone) ? (
                 <Button variant="outline" size="icon" title={debtUsageLabels.messageTitle} asChild>
                   <a
@@ -329,20 +345,28 @@ export function CustomersPage() {
         breadcrumbs={[{ label: t('nav.dashboard'), href: '/' }, { label: t('nav.customers') }]}
         linkAs={Link}
         actions={
-          can('customers.write') ? (
-            <Button variant="accent" onClick={openAdd}>
-              <Plus aria-hidden />
-              إضافة زبون جديد
+          <>
+            <Button variant="outline" asChild>
+              <Link to="/customers/archive">
+                <ArchiveRestore aria-hidden />
+                {t('nav.customerArchive')}
+              </Link>
             </Button>
-          ) : undefined
+            {can('customers.write') ? (
+              <Button variant="accent" onClick={openAdd}>
+                <Plus aria-hidden />
+                إضافة زبون جديد
+              </Button>
+            ) : null}
+          </>
         }
       />
 
       {/* بطاقات الإحصاء */}
       {stats.isLoading ? (
-        <StatCardsSkeleton count={3} />
+        <StatCardsSkeleton count={4} />
       ) : stats.data ? (
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
           <StatCard label="إجمالي الزبائن" value={stats.data.total} icon={Users} tone="accent" />
           <StatCard
             label="إجمالي الديون"
@@ -352,6 +376,12 @@ export function CustomersPage() {
             icon={Wallet}
             tone="debit"
             sublabel={`${stats.data.withDebt} زبون مدين`}
+          />
+          <StatCard
+            label="تجاوزوا موعد السداد"
+            value={stats.data.overduePaymentCustomers}
+            icon={CalendarClock}
+            tone="orange"
           />
           <StatCard
             label="تجاوزوا حد الائتمان"
@@ -438,11 +468,24 @@ export function CustomersPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 items-center gap-1.5">
                     <p className="text-fg truncate text-base font-bold">{row.name}</p>
-                    {isPaymentDueToday(row, today) ? (
+                    {isPaymentDue(row, today) ? (
                       <AlertTriangle
                         className="text-danger size-4 shrink-0"
                         aria-label={debtUsageLabels.paymentDueToday}
                       />
+                    ) : null}
+                    {isPaymentDue(row, today) && whatsappPhone(row.phone) ? (
+                      <Button variant="outline" size="icon" className="size-8" asChild>
+                        <a
+                          href={whatsappReminderUrl(row, currency, locale, 'DUE_TODAY')}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label={`${debtUsageLabels.messageTitle}: ${row.name}`}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <MessageCircle className="text-success" aria-hidden />
+                        </a>
+                      </Button>
                     ) : null}
                   </div>
                   <p className="text-fg-muted mt-1 text-sm tabular-nums" dir="ltr">
@@ -462,25 +505,20 @@ export function CustomersPage() {
                   <CalendarDays className="size-4 shrink-0" aria-hidden />
                   <span>{debtUsageLabels.dueDate}</span>
                   <span className="text-fg tabular-nums" dir="ltr">
-                    {row.paymentDueDate ?? '—'}
+                    {formatDueDay(row.paymentDueDay, locale)}
                   </span>
                 </div>
                 <div
                   className="flex shrink-0 items-center gap-1"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  {isPaymentDueToday(row, today) ||
-                  (greaterThan(row.creditLimit, '0') &&
-                    greaterThanOrEqual(row.balance, row.creditLimit)) ? (
+                  {!isPaymentDue(row, today) &&
+                  greaterThan(row.creditLimit, '0') &&
+                  greaterThanOrEqual(row.balance, row.creditLimit) ? (
                     whatsappPhone(row.phone) ? (
                       <Button variant="outline" size="icon" asChild>
                         <a
-                          href={whatsappReminderUrl(
-                            row,
-                            currency,
-                            locale,
-                            isPaymentDueToday(row, today) ? 'DUE_TODAY' : 'OVER_LIMIT',
-                          )}
+                          href={whatsappReminderUrl(row, currency, locale, 'OVER_LIMIT')}
                           target="_blank"
                           rel="noreferrer"
                           aria-label={`${debtUsageLabels.messageTitle}: ${row.name}`}
@@ -548,13 +586,14 @@ export function CustomersPage() {
       <ConfirmDialog
         open={archiveTarget !== null}
         onOpenChange={(o) => !o && setArchiveTarget(null)}
-        title="أرشفة الزبون"
+        title="نقل الزبون إلى الأرشيف"
         description={
           archiveTarget
-            ? `سيُؤرشف "${archiveTarget.name}". يُرفض إن كان له رصيد قائم أو طلبات مفتوحة. لا يُحذف تاريخه.`
+            ? `سيُنقل "${archiveTarget.name}" إلى الأرشيف لمدة 30 يومًا ويمكن استعادته خلالها. يجب أن يكون رصيده صفرًا وألا توجد طلبات مستقبلية أو مسودات باسمه.`
             : ''
         }
-        confirmLabel="أرشفة"
+        confirmLabel="موافق"
+        cancelLabel="إلغاء"
         variant="danger"
         loading={archive.isPending}
         onConfirm={doArchive}
@@ -596,8 +635,20 @@ function whatsappReminderUrl(
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 
-function isPaymentDueToday(customer: Customer, today: string): boolean {
-  return customer.accountState === 'DEBIT' && customer.paymentDueDate === today;
+function isPaymentDue(customer: Customer, today: string): boolean {
+  const year = Number(today.slice(0, 4));
+  const month = Number(today.slice(5, 7));
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return (
+    customer.accountState === 'DEBIT' &&
+    Number(today.slice(8, 10)) >= Math.min(customer.paymentDueDay, lastDay)
+  );
+}
+
+function formatDueDay(day: number, locale: 'ar' | 'he' | 'en'): string {
+  if (locale === 'ar') return `يوم ${day} من كل شهر`;
+  if (locale === 'he') return `בכל ${day} בחודש`;
+  return `Day ${day} of every month`;
 }
 
 function isoDateInTimeZone(date: Date, timeZone: string): string {

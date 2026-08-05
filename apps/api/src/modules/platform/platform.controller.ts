@@ -84,6 +84,15 @@ export class PlatformController {
     return this.staff.list();
   }
 
+  @Post('staff')
+  @RequirePermissions(PERMISSIONS.PLATFORM_STAFF_MANAGE)
+  async createStaff(
+    @Body(zodBody(createPlatformStaffInviteSchema)) dto: CreatePlatformStaffInviteRequest,
+    @CurrentUser() actor: AccessTokenPayload,
+  ) {
+    return this.staff.create(dto, actor.sub);
+  }
+
   @Post('staff/invitations')
   @RequirePermissions(PERMISSIONS.PLATFORM_STAFF_MANAGE)
   async inviteStaff(

@@ -23,7 +23,9 @@ export function useCustomers(query: Partial<CustomerListQuery>) {
   return useQuery({
     queryKey: [KEY, 'list', query],
     queryFn: () =>
-      api.get<PaginatedResult<Customer>>(`/customers${buildQuery(query as Record<string, string>)}`),
+      api.get<PaginatedResult<Customer>>(
+        `/customers${buildQuery(query as Record<string, string>)}`,
+      ),
   });
 }
 
@@ -54,7 +56,7 @@ export function useCreateCustomer() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateCustomerRequest) => api.post<Customer>('/customers', body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
+    onSuccess: () => invalidateCustomerScope(qc),
   });
 }
 
@@ -62,7 +64,7 @@ export function useUpdateCustomer(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: UpdateCustomerRequest) => api.patch<Customer>(`/customers/${id}`, body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
+    onSuccess: () => invalidateCustomerScope(qc),
   });
 }
 
@@ -70,6 +72,19 @@ export function useArchiveCustomer() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.delete<void>(`/customers/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
+    onSuccess: () => invalidateCustomerScope(qc),
   });
+}
+
+export function useRestoreCustomer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<Customer>(`/customers/${id}/restore`, {}),
+    onSuccess: () => invalidateCustomerScope(qc),
+  });
+}
+
+function invalidateCustomerScope(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: [KEY] });
+  void qc.invalidateQueries({ queryKey: ['dashboard'] });
 }

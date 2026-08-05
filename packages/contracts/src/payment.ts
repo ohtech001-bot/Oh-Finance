@@ -134,6 +134,28 @@ export const createPaymentSchema = z
   });
 export type CreatePaymentRequest = z.infer<typeof createPaymentSchema>;
 
+// ── استخدام رصيد الزبون ────────────────────────────────────────────────────
+
+export const customerCreditSchema = z.object({
+  availableAmount: nonNegativeMoneySchema,
+});
+export type CustomerCredit = z.infer<typeof customerCreditSchema>;
+
+export const applyCustomerCreditSchema = z.object({
+  orderId: uuidSchema,
+  amount: positiveMoneySchema,
+});
+export type ApplyCustomerCreditRequest = z.infer<typeof applyCustomerCreditSchema>;
+
+export const applyCustomerCreditResultSchema = z.object({
+  orderId: uuidSchema,
+  appliedAmount: positiveMoneySchema,
+  paidAmount: nonNegativeMoneySchema,
+  remainingAmount: nonNegativeMoneySchema,
+  status: z.enum(['PARTIALLY_PAID', 'PAID']),
+});
+export type ApplyCustomerCreditResult = z.infer<typeof applyCustomerCreditResultSchema>;
+
 /**
  * عكس دفعة.
  *

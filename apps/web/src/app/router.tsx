@@ -1,6 +1,6 @@
+import { lazy } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import { CreditCard, Settings } from 'lucide-react';
-import { AppShell } from '@/components/layout/app-shell';
 import {
   RedirectIfAuthenticated,
   RequireAuth,
@@ -9,32 +9,93 @@ import {
   RequireSuperAdmin,
   RequireTenant,
 } from './guards';
-import { ReportsPage } from '@/features/reports/reports-page';
-import { SettingsPage } from '@/features/settings/settings-page';
-import { ShortcutsLayout } from './shortcuts-layout';
 
 import { LoginPage } from '@/features/auth/login-page';
 import { ForgotPasswordPage } from '@/features/auth/forgot-password-page';
 import { ChangeInitialPasswordPage } from '@/features/auth/change-initial-password-page';
-import { DashboardPage } from '@/features/dashboard/dashboard-page';
-import { PlatformDashboardPage } from '@/features/platform/platform-dashboard-page';
-import { TenantsListPage } from '@/features/platform/tenants-list-page';
-import { TenantFormPage } from '@/features/platform/tenant-form-page';
-import { StaffPage } from '@/features/platform/staff-page';
-import { PlatformSubscriptionsPage } from '@/features/platform/subscriptions-page';
-import { SupportPage } from '@/features/support/support-page';
+import { ResetPasswordPage } from '@/features/auth/reset-password-page';
 import { LegalPage } from '@/features/legal/legal-page';
 import { PlaceholderPage } from '@/features/placeholder/placeholder-page';
 import { ForbiddenPage, NotFoundPage, RouteErrorPage } from '@/features/errors/error-pages';
 
-// ── المرحلة 2: النواة المالية ──
-import { CustomersPage } from '@/features/customers/customers-page';
-import { CustomerDetailPage } from '@/features/customers/customer-detail-page';
-import { OrdersPage } from '@/features/orders/orders-page';
-import { OrderDetailsPage } from '@/features/orders/order-details-page';
-import { LedgerPage } from '@/features/ledger/ledger-page';
-import { PaymentsPage } from '@/features/payments/payments-page';
-import { EmployeesPage } from '@/features/employees/employees-page';
+const AppShell = lazy(() =>
+  import('@/components/layout/app-shell').then((module) => ({ default: module.AppShell })),
+);
+const ShortcutsLayout = lazy(() =>
+  import('./shortcuts-layout').then((module) => ({ default: module.ShortcutsLayout })),
+);
+
+const DashboardPage = lazy(() =>
+  import('@/features/dashboard/dashboard-page').then((module) => ({
+    default: module.DashboardPage,
+  })),
+);
+const CustomersPage = lazy(() =>
+  import('@/features/customers/customers-page').then((module) => ({
+    default: module.CustomersPage,
+  })),
+);
+const CustomerArchivePage = lazy(() =>
+  import('@/features/customers/customer-archive-page').then((module) => ({
+    default: module.CustomerArchivePage,
+  })),
+);
+const CustomerDetailPage = lazy(() =>
+  import('@/features/customers/customer-detail-page').then((module) => ({
+    default: module.CustomerDetailPage,
+  })),
+);
+const OrdersPage = lazy(() =>
+  import('@/features/orders/orders-page').then((module) => ({ default: module.OrdersPage })),
+);
+const OrderDetailsPage = lazy(() =>
+  import('@/features/orders/order-details-page').then((module) => ({
+    default: module.OrderDetailsPage,
+  })),
+);
+const LedgerPage = lazy(() =>
+  import('@/features/ledger/ledger-page').then((module) => ({ default: module.LedgerPage })),
+);
+const PaymentsPage = lazy(() =>
+  import('@/features/payments/payments-page').then((module) => ({ default: module.PaymentsPage })),
+);
+const EmployeesPage = lazy(() =>
+  import('@/features/employees/employees-page').then((module) => ({
+    default: module.EmployeesPage,
+  })),
+);
+const ReportsPage = lazy(() =>
+  import('@/features/reports/reports-page').then((module) => ({ default: module.ReportsPage })),
+);
+const SettingsPage = lazy(() =>
+  import('@/features/settings/settings-page').then((module) => ({ default: module.SettingsPage })),
+);
+const SupportPage = lazy(() =>
+  import('@/features/support/support-page').then((module) => ({ default: module.SupportPage })),
+);
+const PlatformDashboardPage = lazy(() =>
+  import('@/features/platform/platform-dashboard-page').then((module) => ({
+    default: module.PlatformDashboardPage,
+  })),
+);
+const TenantsListPage = lazy(() =>
+  import('@/features/platform/tenants-list-page').then((module) => ({
+    default: module.TenantsListPage,
+  })),
+);
+const TenantFormPage = lazy(() =>
+  import('@/features/platform/tenant-form-page').then((module) => ({
+    default: module.TenantFormPage,
+  })),
+);
+const StaffPage = lazy(() =>
+  import('@/features/platform/staff-page').then((module) => ({ default: module.StaffPage })),
+);
+const PlatformSubscriptionsPage = lazy(() =>
+  import('@/features/platform/subscriptions-page').then((module) => ({
+    default: module.PlatformSubscriptionsPage,
+  })),
+);
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -51,6 +112,7 @@ import { EmployeesPage } from '@/features/employees/employees-page';
  */
 export const router = createBrowserRouter([
   { path: '/privacy', element: <LegalPage kind="privacy" />, errorElement: <RouteErrorPage /> },
+  { path: '/reset-password', element: <ResetPasswordPage />, errorElement: <RouteErrorPage /> },
   {
     path: '/site-policy',
     element: <LegalPage kind="sitePolicy" />,
@@ -95,6 +157,7 @@ export const router = createBrowserRouter([
                   // صريحة. لا بيانات وهمية ولا أزرار ميتة.
                   // ── المرحلة 2: موصولة ببيانات حقيقية ──
                   { path: 'customers', element: <CustomersPage /> },
+                  { path: 'customers/archive', element: <CustomerArchivePage /> },
                   { path: 'customers/:id', element: <CustomerDetailPage /> },
                   { path: 'orders', element: <OrdersPage /> },
                   { path: 'orders/:id', element: <OrderDetailsPage /> },

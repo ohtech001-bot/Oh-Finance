@@ -12,10 +12,11 @@ const KEY = 'ledger';
 
 type LedgerList = PaginatedResult<LedgerEntry> & { totals: LedgerTotals };
 
-export function useLedger(query: Partial<LedgerListQuery>) {
+export function useLedger(query: Partial<LedgerListQuery>, enabled = true) {
   return useQuery({
     queryKey: [KEY, 'list', query],
     queryFn: () => api.get<LedgerList>(`/ledger${buildQuery(query as Record<string, string>)}`),
+    enabled,
   });
 }
 

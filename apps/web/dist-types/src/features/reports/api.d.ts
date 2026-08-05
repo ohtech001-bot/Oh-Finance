@@ -49,8 +49,8 @@ export declare function useReports(query: Partial<ReportsQuery>): import("@tanst
         avgPaymentDurationDays: number | null;
     };
     topCustomers: {
-        id: string;
         code: string;
+        id: string;
         name: string;
         purchases: string;
     }[];
@@ -60,9 +60,9 @@ export declare function useReports(query: Partial<ReportsQuery>): import("@tanst
         timezone: string;
         generatedAt: string;
         range: {
+            preset: "today" | "yesterday" | "last_7_days" | "last_30_days" | "this_month" | "previous_month" | "this_year" | "custom";
             from: string;
             to: string;
-            preset: "custom" | "today" | "yesterday" | "last_7_days" | "last_30_days" | "this_month" | "previous_month" | "this_year";
             granularity: "day" | "week" | "month";
             previousFrom: string;
             previousTo: string;
@@ -71,8 +71,8 @@ export declare function useReports(query: Partial<ReportsQuery>): import("@tanst
         scope: string[];
     };
     salesVsPayments: {
-        date: string;
         payments: string;
+        date: string;
         sales: string;
     }[];
     ordersByWeekday: {
@@ -82,34 +82,34 @@ export declare function useReports(query: Partial<ReportsQuery>): import("@tanst
     }[];
     ordersByStatus: {
         status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
-        amount: string;
         count: number;
+        amount: string;
     }[];
     paymentMethods: {
-        method: "CASH" | "BANK_TRANSFER" | "CARD" | "CHECK";
-        amount: string;
         count: number;
+        amount: string;
+        method: "CASH" | "BANK_TRANSFER" | "CARD" | "CHECK";
         pct: number;
     }[];
     topProducts: {
         name: string;
-        quantity: string;
         sales: string;
+        quantity: string;
     }[];
     employeePerformance: {
-        name: string;
         payments: string;
         orders: number;
+        name: string;
         sales: string;
         userId: string | null;
     }[];
     salesByCategory: {
-        reason: string;
         available: boolean;
+        reason: string;
     };
     branchReports: {
-        reason: string;
         available: boolean;
+        reason: string;
     };
 }>, Error>;
 //# sourceMappingURL=api.d.ts.map

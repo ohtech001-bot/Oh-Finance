@@ -1,13 +1,13 @@
-import type { CreatePaymentRequest, PaginatedResult, PaymentListQuery } from '@oh/contracts';
-export declare function usePayments(query: Partial<PaymentListQuery>): import("@tanstack/react-query").UseQueryResult<NoInfer<PaginatedResult<{
+import type { ApplyCustomerCreditRequest, CreatePaymentRequest, PaginatedResult, PaymentListQuery } from '@oh/contracts';
+export declare function usePayments(query: Partial<PaymentListQuery>, enabled?: boolean): import("@tanstack/react-query").UseQueryResult<NoInfer<PaginatedResult<{
     number: string;
-    status: "POSTED" | "REVERSED";
     id: string;
     createdAt: string;
-    notes: string | null;
+    status: "POSTED" | "REVERSED";
     customerId: string;
     customerName: string;
     customerCode: string;
+    notes: string | null;
     allocations: {
         amount: string;
         orderId: string;
@@ -51,13 +51,13 @@ export declare function usePaymentStats(query: Partial<PaymentListQuery>): impor
 }>, Error>;
 export declare function usePayment(id: string | undefined): import("@tanstack/react-query").UseQueryResult<NoInfer<{
     number: string;
-    status: "POSTED" | "REVERSED";
     id: string;
     createdAt: string;
-    notes: string | null;
+    status: "POSTED" | "REVERSED";
     customerId: string;
     customerName: string;
     customerCode: string;
+    notes: string | null;
     allocations: {
         amount: string;
         orderId: string;
@@ -76,16 +76,6 @@ export declare function usePayment(id: string | undefined): import("@tanstack/re
     createdBy: string | null;
     createdByName: string | null;
 }>, Error>;
-export declare function useOpenOrders(customerId: string | undefined): import("@tanstack/react-query").UseQueryResult<NoInfer<{
-    number: string;
-    total: string;
-    id: string;
-    issuedAt: string;
-    dueAt: string | null;
-    paidAmount: string;
-    isOverdue: boolean;
-    remaining: string;
-}[]>, Error>;
 /**
  * تسجيل دفعة.
  *
@@ -95,13 +85,13 @@ export declare function useOpenOrders(customerId: string | undefined): import("@
  */
 export declare function useCreatePayment(): import("@tanstack/react-query").UseMutationResult<{
     number: string;
-    status: "POSTED" | "REVERSED";
     id: string;
     createdAt: string;
-    notes: string | null;
+    status: "POSTED" | "REVERSED";
     customerId: string;
     customerName: string;
     customerCode: string;
+    notes: string | null;
     allocations: {
         amount: string;
         orderId: string;
@@ -123,33 +113,28 @@ export declare function useCreatePayment(): import("@tanstack/react-query").UseM
     body: CreatePaymentRequest;
     idempotencyKey: string;
 }, unknown>;
-export declare function usePreviewAllocation(): import("@tanstack/react-query").UseMutationResult<{
-    allocations: {
-        orderId: string;
-        orderNumber: string;
-        orderTotal: string;
-        alreadyPaid: string;
-        remaining: string;
-        willAllocate: string;
-        remainingAfter: string;
-    }[];
-    balanceBefore: string;
-    balanceAfter: string;
-    unallocatedAmount: string;
+export declare function useCustomerCredit(customerId: string | undefined, enabled?: boolean): import("@tanstack/react-query").UseQueryResult<NoInfer<{
+    availableAmount: string;
+}>, Error>;
+export declare function useApplyCustomerCredit(): import("@tanstack/react-query").UseMutationResult<{
+    status: "PARTIALLY_PAID" | "PAID";
+    paidAmount: string;
+    remainingAmount: string;
+    orderId: string;
+    appliedAmount: string;
 }, Error, {
-    customerId: string;
-    amount: string;
-    strategy: "MANUAL" | "AUTO_OLDEST_FIRST" | "NONE";
+    body: ApplyCustomerCreditRequest;
+    idempotencyKey: string;
 }, unknown>;
 export declare function useReversePayment(id: string): import("@tanstack/react-query").UseMutationResult<{
     number: string;
-    status: "POSTED" | "REVERSED";
     id: string;
     createdAt: string;
-    notes: string | null;
+    status: "POSTED" | "REVERSED";
     customerId: string;
     customerName: string;
     customerCode: string;
+    notes: string | null;
     allocations: {
         amount: string;
         orderId: string;

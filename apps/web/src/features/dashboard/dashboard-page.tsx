@@ -79,11 +79,13 @@ export function DashboardPage() {
           {/* ── المؤشرات ─────────────────────────────────────────────── */}
           {cardKpis.length > 0 || collectionRate ? (
             <section aria-label="المؤشرات المالية">
-              <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
-                {cardKpis.map((m) => (
-                  <KpiCard key={m.id} metric={m} currency={currency} />
-                ))}
-                {collectionRate ? <CollectionRateChart metric={collectionRate} /> : null}
+              <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                  {cardKpis.map((m) => (
+                    <KpiCard key={m.id} metric={m} currency={currency} />
+                  ))}
+                </div>
+                {collectionRate ? <CollectionRateChart metric={collectionRate} large /> : null}
               </div>
             </section>
           ) : null}

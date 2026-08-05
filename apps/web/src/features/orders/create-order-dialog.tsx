@@ -6,6 +6,7 @@ import {
   add,
   greaterThan,
   max,
+  min,
   multiply,
   subtract,
   toMoneyString,
@@ -29,7 +30,7 @@ import {
 import { ApiRequestError, api } from '@/lib/api';
 import { useUnsavedChangesWarning } from '@/lib/use-unsaved-changes';
 import { useAuth } from '@/app/auth-context';
-import { useCreatePayment } from '@/features/payments/api';
+import { useCreatePayment, useCustomerCredit } from '@/features/payments/api';
 import { useCreateOrder, useUpdateOrder } from './api';
 import { displayOrderNumber } from './order-number';
 
@@ -81,6 +82,7 @@ export function CreateOrderDialog({
   const create = useCreateOrder();
   const update = useUpdateOrder(order?.id ?? '');
   const createPayment = useCreatePayment();
+  const customerCredit = useCustomerCredit(customerId || undefined, open && !order);
 
   const customersQuery = useQuery({
     queryKey: ['customers', 'picker'],
@@ -145,6 +147,12 @@ export function CreateOrderDialog({
     () => calculateOrderTotal(liveLineTotals, discount),
     [discount, liveLineTotals],
   );
+  const automaticCreditAmount = liveTotal
+    ? toMoneyString(min(customerCredit.data?.availableAmount ?? '0', liveTotal), 2)
+    : '0.00';
+  const remainingAfterCredit = liveTotal
+    ? toMoneyString(subtract(liveTotal, automaticCreditAmount), 2)
+    : '0.00';
 
   const updateItem = (index: number, patch: Partial<DraftItem>) =>
     setItems((prev) => prev.map((it, i) => (i === index ? { ...it, ...patch } : it)));
@@ -209,14 +217,20 @@ export function CreateOrderDialog({
       {
         onSuccess: (createdOrder) => {
           if (confirm && greaterThan(paymentAmount, '0')) {
+            const allocationAmount = toMoneyString(
+              min(paymentAmount, createdOrder.remainingAmount),
+              2,
+            );
             createPayment.mutate(
               {
                 body: {
                   customerId,
                   amount: paymentAmount,
                   method: 'CASH',
-                  strategy: 'MANUAL',
-                  allocations: [{ orderId: createdOrder.id, amount: paymentAmount }],
+                  strategy: greaterThan(allocationAmount, '0') ? 'MANUAL' : 'NONE',
+                  allocations: greaterThan(allocationAmount, '0')
+                    ? [{ orderId: createdOrder.id, amount: allocationAmount }]
+                    : undefined,
                 },
                 idempotencyKey: paymentKey,
               },
@@ -476,6 +490,22 @@ export function CreateOrderDialog({
               </Field>
             ) : null}
           </div>
+
+          {!order && customerId && greaterThan(automaticCreditAmount, '0') ? (
+            <div className="rounded-ctrl border-success/30 bg-success-soft border p-4">
+              <p className="text-fg text-sm font-semibold">سيُستخدم رصيد الزبون تلقائيًا</p>
+              <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="text-fg-muted block">المسحوب من الرصيد</span>
+                  <MoneyText value={automaticCreditAmount} currency={currency} tone="credit" />
+                </div>
+                <div>
+                  <span className="text-fg-muted block">المتبقي بعد الرصيد</span>
+                  <MoneyText value={remainingAfterCredit} currency={currency} tone="debit" />
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <Field label="ملاحظات" hint="اكتب أي تفاصيل إضافية تخص الطلب">
             {(p) => (

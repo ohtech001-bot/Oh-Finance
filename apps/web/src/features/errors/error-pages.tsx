@@ -1,8 +1,8 @@
-import { Component, useState, type ErrorInfo, type ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Link, useNavigate, useRouteError } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AlertOctagon, FileQuestion, Home, RefreshCw, ShieldX } from 'lucide-react';
-import { Button, toast } from '@oh/ui';
+import { Button } from '@oh/ui';
 import { useOptionalAuth } from '@/app/auth-context';
 
 interface ErrorPageShellProps {
@@ -29,16 +29,19 @@ function ErrorPageShell({
   }[tone];
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center bg-bg px-6 py-16 text-center">
-      <div className={`flex size-16 items-center justify-center rounded-full ${toneClass}`} aria-hidden>
+    <div className="bg-bg flex min-h-dvh flex-col items-center justify-center px-6 py-16 text-center">
+      <div
+        className={`flex size-16 items-center justify-center rounded-full ${toneClass}`}
+        aria-hidden
+      >
         <Icon className="size-8" />
       </div>
 
-      <p className="mt-6 text-5xl font-bold tabular-nums text-fg-subtle" dir="ltr">
+      <p className="text-fg-subtle mt-6 text-5xl font-bold tabular-nums" dir="ltr">
         {code}
       </p>
-      <h1 className="mt-3 text-page-title text-fg">{title}</h1>
-      <p className="mt-2 max-w-md text-sm text-fg-muted">{description}</p>
+      <h1 className="text-page-title text-fg mt-3">{title}</h1>
+      <p className="text-fg-muted mt-2 max-w-md text-sm">{description}</p>
 
       <div className="mt-8 flex flex-wrap items-center justify-center gap-3">{children}</div>
     </div>
@@ -75,20 +78,10 @@ export function ForbiddenPage() {
   const navigate = useNavigate();
   const auth = useOptionalAuth();
   const user = auth?.user;
-  const [isExiting, setIsExiting] = useState(false);
 
-  const goToCorrectHome = async () => {
-    if (isExiting) return;
+  const goToCorrectHome = () => {
     if (user?.supportMode) {
-      setIsExiting(true);
-      try {
-        await auth?.exitTenantSupport();
-        navigate('/platform/tenants', { replace: true });
-      } catch {
-        toast.error(t('platform.exitSupportFailed'));
-      } finally {
-        setIsExiting(false);
-      }
+      navigate('/', { replace: true });
       return;
     }
     navigate(user?.isSuperAdmin ? '/platform' : '/', { replace: true });
@@ -102,11 +95,11 @@ export function ForbiddenPage() {
       description={t('errors.forbiddenDescription')}
       tone="danger"
     >
-      <Button variant="brand" loading={isExiting} onClick={() => void goToCorrectHome()}>
+      <Button variant="brand" onClick={goToCorrectHome}>
         <Home aria-hidden />
         {t('errors.goHome')}
       </Button>
-      <Button variant="outline" disabled={isExiting} onClick={() => void goToCorrectHome()}>
+      <Button variant="outline" onClick={goToCorrectHome}>
         {t('common.back')}
       </Button>
     </ErrorPageShell>
@@ -175,15 +168,17 @@ export class AppErrorBoundary extends Component<{ children: ReactNode }, ErrorBo
   override render(): ReactNode {
     if (this.state.error) {
       return (
-        <div className="flex min-h-dvh flex-col items-center justify-center bg-bg px-6 text-center">
-          <div className="flex size-16 items-center justify-center rounded-full bg-danger-soft" aria-hidden>
-            <AlertOctagon className="size-8 text-danger" />
+        <div className="bg-bg flex min-h-dvh flex-col items-center justify-center px-6 text-center">
+          <div
+            className="bg-danger-soft flex size-16 items-center justify-center rounded-full"
+            aria-hidden
+          >
+            <AlertOctagon className="text-danger size-8" />
           </div>
 
-          <h1 className="mt-6 text-page-title text-fg">حدث خطأ في التطبيق</h1>
-          <p className="mt-2 max-w-md text-sm text-fg-muted">
-            نعتذر — حدث خطأ غير متوقع أثناء عرض الصفحة. بياناتك محفوظة ولم يتأثر
-            شيء منها.
+          <h1 className="text-page-title text-fg mt-6">حدث خطأ في التطبيق</h1>
+          <p className="text-fg-muted mt-2 max-w-md text-sm">
+            نعتذر — حدث خطأ غير متوقع أثناء عرض الصفحة. بياناتك محفوظة ولم يتأثر شيء منها.
           </p>
 
           <div className="mt-8 flex gap-3">
@@ -200,7 +195,7 @@ export class AppErrorBoundary extends Component<{ children: ReactNode }, ErrorBo
           {import.meta.env.DEV ? (
             <pre
               dir="ltr"
-              className="mt-8 max-w-2xl overflow-x-auto rounded-card border border-border bg-card p-4 text-start text-xs text-danger"
+              className="rounded-card border-border bg-card text-danger mt-8 max-w-2xl overflow-x-auto border p-4 text-start text-xs"
             >
               {this.state.error.stack ?? this.state.error.message}
             </pre>

@@ -64,6 +64,7 @@ export const customerSchema = z.object({
 
   creditLimit: nonNegativeMoneySchema,
   paymentTermDays: z.number().int(),
+  paymentDueDay: z.number().int().min(1).max(31),
   paymentDueDate: isoDateSchema.nullable(),
   status: customerStatusSchema,
 
@@ -151,6 +152,8 @@ export const createCustomerSchema = z.object({
 
   creditLimit: nonNegativeMoneySchema.default('1500'),
   paymentTermDays: z.number().int().min(0).max(365).default(30),
+  paymentDueDay: z.coerce.number().int().min(1).max(31).default(15),
+  /** @deprecated Compatibility input for older clients. */
   paymentDueDate: isoDateSchema.optional(),
   status: customerStatusSchema.default('ACTIVE'),
 
@@ -194,6 +197,7 @@ export const customerListQuerySchema = paginationQuerySchema.extend({
   overCreditLimit: z.coerce.boolean().optional(),
 
   includeArchived: z.coerce.boolean().default(false),
+  archivedOnly: z.coerce.boolean().default(false),
 
   sortBy: customerSortSchema.default('createdAt'),
   sortOrder: sortOrderSchema,
@@ -207,5 +211,6 @@ export const customerStatsSchema = z.object({
   withDebt: z.number().int(),
   totalDebt: nonNegativeMoneySchema,
   overCreditLimit: z.number().int(),
+  overduePaymentCustomers: z.number().int(),
 });
 export type CustomerStats = z.infer<typeof customerStatsSchema>;

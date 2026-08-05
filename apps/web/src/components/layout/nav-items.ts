@@ -1,4 +1,5 @@
 import {
+  ArchiveRestore,
   BarChart3,
   CreditCard,
   LayoutDashboard,
@@ -48,6 +49,12 @@ export const TENANT_NAV: NavItem[] = [
     permission: PERMISSIONS.CUSTOMERS_READ,
     phase: 'المرحلة 4',
     mobile: true,
+  },
+  {
+    to: '/customers/archive',
+    labelKey: 'nav.customerArchive',
+    icon: ArchiveRestore,
+    permission: PERMISSIONS.CUSTOMERS_READ,
   },
   {
     to: '/orders',

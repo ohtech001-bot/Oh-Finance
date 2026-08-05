@@ -8,7 +8,7 @@ import {
   type Order,
   type Payment,
 } from '@oh/contracts';
-import { negate, toMoneyString, type CurrencyCode } from '@oh/money';
+import { formatMoney, negate, toMoneyString, type CurrencyCode } from '@oh/money';
 import {
   Button,
   Card,
@@ -33,6 +33,7 @@ import {
   ArrowLeft,
   CreditCard,
   FileText,
+  MessageCircle,
   Pencil,
   Plus,
   ShoppingBag,
@@ -81,12 +82,13 @@ export function CustomerDetailPage() {
   const [orderOpen, setOrderOpen] = useState(false);
   const [statementOpen, setStatementOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string>();
+  const [activeTab, setActiveTab] = useState('orders');
 
   const customerQuery = useCustomer(id);
   const summaryQuery = useCustomerSummary(id);
-  const ledgerQuery = useLedger({ customerId: id, pageSize: 25 });
-  const ordersQuery = useOrders({ customerId: id, pageSize: 25 });
-  const paymentsQuery = usePayments({ customerId: id, pageSize: 25 });
+  const ledgerQuery = useLedger({ customerId: id, pageSize: 25 }, activeTab === 'ledger');
+  const ordersQuery = useOrders({ customerId: id, pageSize: 25 }, activeTab === 'orders');
+  const paymentsQuery = usePayments({ customerId: id, pageSize: 25 }, activeTab === 'payments');
 
   if (customerQuery.isLoading) {
     return (
@@ -329,7 +331,10 @@ export function CustomerDetailPage() {
               {customer.taxNumber ? (
                 <Info label="الرقم الضريبي" value={customer.taxNumber} ltr />
               ) : null}
-              <Info label="تاريخ السداد" value={customer.paymentDueDate ?? '—'} ltr />
+              <Info
+                label="يوم السداد الشهري"
+                value={formatDueDay(customer.paymentDueDay, locale)}
+              />
             </dl>
           </CardBody>
         </Card>
@@ -380,18 +385,29 @@ export function CustomerDetailPage() {
           ) : null}
 
           {summary?.paymentDueReached ? (
-            <div className="rounded-card border-danger/30 bg-danger-soft mt-4 border px-4 py-3">
+            <div className="rounded-card border-danger/30 bg-danger-soft mt-4 flex flex-wrap items-center justify-between gap-3 border px-4 py-3">
               <p className="text-danger text-sm font-semibold">
-                {paymentDueMessage}
-                {customer.paymentDueDate ? ` (${customer.paymentDueDate})` : ''} —{' '}
-                {outstandingBalanceLabel}:{' '}
-                <MoneyText
-                  value={summary.paymentDueAmount}
-                  currency={currency}
-                  tone="debit"
-                  withSymbol={false}
-                />
+                {paymentDueMessage} — {outstandingBalanceLabel}:{' '}
+                <MoneyText value={summary.paymentDueAmount} currency={currency} tone="debit" />
               </p>
+              {whatsappPhone(customer.phone) ? (
+                <Button variant="outline" size="sm" asChild>
+                  <a
+                    href={whatsappPaymentReminderUrl(
+                      customer.phone!,
+                      customer.name,
+                      summary.paymentDueAmount,
+                      currency,
+                      locale,
+                    )}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <MessageCircle className="text-success" aria-hidden />
+                    إرسال تذكير
+                  </a>
+                </Button>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -437,7 +453,7 @@ export function CustomerDetailPage() {
 
       {/* ── تفاصيل حساب الزبون ─────────────────────────────────────────── */}
       <Card>
-        <Tabs defaultValue="orders">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="overflow-x-auto px-5 pt-2">
             <TabsList>
               <TabsTrigger value="orders">الطلبات</TabsTrigger>
@@ -569,4 +585,33 @@ function Info({ label, value, ltr }: { label: string; value: string; ltr?: boole
       </dd>
     </div>
   );
+}
+
+function formatDueDay(day: number, locale: 'ar' | 'he' | 'en'): string {
+  if (locale === 'ar') return `يوم ${day} من كل شهر`;
+  if (locale === 'he') return `בכל ${day} בחודש`;
+  return `Day ${day} of every month`;
+}
+
+function whatsappPhone(phone: string | null): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 9) return null;
+  return digits.startsWith('0') ? `972${digits.slice(1)}` : digits;
+}
+
+function whatsappPaymentReminderUrl(
+  phone: string,
+  customerName: string,
+  balance: string,
+  currency: CurrencyCode,
+  locale: 'ar' | 'he' | 'en',
+): string {
+  const amount = formatMoney(balance, { currency });
+  const message = {
+    ar: `مرحبًا ${customerName}، نود تذكيرك بأن موعد سداد الحساب قد حل، والرصيد المستحق حاليًا هو ${amount}. نرجو لطفًا المبادرة إلى السداد. شكرًا لتعاونك.`,
+    he: `שלום ${customerName}, ברצוננו להזכיר שמועד תשלום החשבון הגיע, והיתרה לתשלום כעת היא ${amount}. נשמח להסדרת התשלום. תודה על שיתוף הפעולה.`,
+    en: `Hello ${customerName}, this is a kind reminder that your account payment is due. The current outstanding balance is ${amount}. Please arrange payment at your earliest convenience. Thank you.`,
+  }[locale];
+  return `https://wa.me/${whatsappPhone(phone) ?? ''}?text=${encodeURIComponent(message)}`;
 }

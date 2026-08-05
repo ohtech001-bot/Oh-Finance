@@ -20,6 +20,8 @@ import { COOKIE_NAMES, TokenService, type AccessTokenPayload } from '../token.se
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  private readonly pendingSessionChecks = new Map<string, Promise<boolean>>();
+
   constructor(
     private readonly reflector: Reflector,
     private readonly tokens: TokenService,
@@ -54,9 +56,10 @@ export class JwtAuthGuard implements CanActivate {
      * البيانات. هذا يكلّف استعلامًا لكل طلب، وهو الثمن العادل لإمكانية
      * **الإبطال الفوري**. بدونه، رمز مسروق يبقى صالحًا حتى انتهائه مهما فعلنا.
      */
-    const active = await this.prisma.runUnscoped((tx) =>
-      this.tokens.isSessionActive(tx, payload.sid),
-    );
+    // This is a single pre-tenant lookup by a unique session id. Running it
+    // directly preserves immediate revocation without paying BEGIN/COMMIT on
+    // every authenticated API request.
+    const active = await this.checkSession(payload.sid);
     if (!active) {
       throw AppError.tokenExpired();
     }
@@ -75,6 +78,19 @@ export class JwtAuthGuard implements CanActivate {
     });
 
     return true;
+  }
+
+  private checkSession(sessionId: string): Promise<boolean> {
+    const pending = this.pendingSessionChecks.get(sessionId);
+    if (pending) return pending;
+
+    const check = this.tokens.isSessionActive(this.prisma.raw, sessionId).finally(() => {
+      if (this.pendingSessionChecks.get(sessionId) === check) {
+        this.pendingSessionChecks.delete(sessionId);
+      }
+    });
+    this.pendingSessionChecks.set(sessionId, check);
+    return check;
   }
 
   /**

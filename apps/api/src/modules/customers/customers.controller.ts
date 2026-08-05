@@ -103,4 +103,11 @@ export class CustomersController {
   async archive(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
     await this.customers.archive(id);
   }
+
+  @Post(':id/restore')
+  @RequirePermissions(PERMISSIONS.CUSTOMERS_DELETE)
+  @ApiOperation({ summary: 'استعادة زبون من الأرشيف خلال 30 يومًا.' })
+  async restore(@Param('id', ParseUUIDPipe) id: string) {
+    return this.customers.restore(id);
+  }
 }

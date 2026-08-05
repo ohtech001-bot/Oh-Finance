@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo } from 'reac
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { LoginRequest, LoginResponse, SessionUser } from '@oh/contracts';
 import type { Permission } from '@oh/config';
-import { api, UNAUTHENTICATED_EVENT } from '@/lib/api';
+import { api, hasSessionHint, UNAUTHENTICATED_EVENT } from '@/lib/api';
 
 interface AuthContextValue {
   user: SessionUser | null;
@@ -55,6 +55,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   } = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: () => api.get<SessionUser>('/auth/me'),
+    // Avoid an expected 401 request when the visitor has no browser session.
+    enabled: hasSessionHint(),
 
     /**
      * ⚠️ لا إعادة محاولة إطلاقًا — وهذا مقصود.

@@ -9,7 +9,7 @@ import {
   type PaginatedResult,
   type ReverseEntryRequest,
 } from '@oh/contracts';
-import { add, subtract, sum, toMoney, toMoneyString, zero } from '@oh/money';
+import { add, greaterThan, isZero, subtract, sum, toMoney, toMoneyString, zero } from '@oh/money';
 import type { Prisma } from '@prisma/client';
 import { AppError } from '../../core/errors/app-error.js';
 import { AuditService } from '../../core/audit/audit.service.js';
@@ -36,7 +36,9 @@ export class LedgerQueryService {
     private readonly audit: AuditService,
   ) {}
 
-  async list(query: LedgerListQuery): Promise<PaginatedResult<LedgerEntry> & { totals: LedgerTotals }> {
+  async list(
+    query: LedgerListQuery,
+  ): Promise<PaginatedResult<LedgerEntry> & { totals: LedgerTotals }> {
     const { tenantId } = this.context();
 
     return this.prisma.runInTenant(tenantId, async (tx) => {
@@ -96,11 +98,7 @@ export class LedgerQueryService {
    * كشف حساب يبدأ من صفر بينما على الزبون دَين قديم يضلّل القارئ تمامًا:
    * يظن أن ما يراه هو كل ما عليه.
    */
-  async statement(
-    customerId: string,
-    from?: string,
-    to?: string,
-  ): Promise<CustomerStatement> {
+  async statement(customerId: string, from?: string, to?: string): Promise<CustomerStatement> {
     const { tenantId } = this.context();
 
     return this.prisma.runInTenant(tenantId, async (tx) => {
@@ -147,13 +145,22 @@ export class LedgerQueryService {
         entries.map((e) => e.id),
       );
       const refNumbers = await this.fetchRefNumbers(tx, tenantId, entries);
+      const orderIds = [
+        ...new Set(
+          entries
+            .filter((entry) => entry.refType === 'ORDER' && entry.refId)
+            .map((entry) => entry.refId as string),
+        ),
+      ];
+      const statementOrders = orderIds.length
+        ? await tx.order.findMany({
+            where: { tenantId, customerId, id: { in: orderIds } },
+            select: { id: true, total: true, paidAmount: true, creditAppliedAmount: true },
+          })
+        : [];
 
-      const totalDebit = entries.length
-        ? sum(entries.map((e) => e.debit.toString()))
-        : zero();
-      const totalCredit = entries.length
-        ? sum(entries.map((e) => e.credit.toString()))
-        : zero();
+      const totalDebit = entries.length ? sum(entries.map((e) => e.debit.toString())) : zero();
+      const totalCredit = entries.length ? sum(entries.map((e) => e.credit.toString())) : zero();
 
       const closingBalance = entries.length
         ? toMoney(entries[entries.length - 1]?.runningBalance.toString() ?? '0')
@@ -170,6 +177,22 @@ export class LedgerQueryService {
         entries: entries.map((row) =>
           this.toDto(row, reversedIds.has(row.id), refNumbers.get(row.id) ?? null),
         ),
+        orders: statementOrders.map((order) => {
+          const paidAmount = toMoney(order.paidAmount.toString());
+          const creditApplied = toMoney(order.creditAppliedAmount.toString());
+          const remaining = subtract(order.total.toString(), paidAmount);
+          const paymentState: CustomerStatement['orders'][number]['paymentState'] = isZero(
+            remaining,
+          )
+            ? greaterThan(creditApplied, zero()) && isZero(subtract(paidAmount, creditApplied))
+              ? 'PAID_FROM_CREDIT'
+              : 'PAID'
+            : greaterThan(paidAmount, zero())
+              ? 'PARTIALLY_PAID'
+              : 'UNPAID';
+
+          return { orderId: order.id, paymentState };
+        }),
 
         totals: {
           totalDebit: toMoneyString(totalDebit, 2),
@@ -271,9 +294,7 @@ export class LedgerQueryService {
         );
       }
       if (original.entryType === 'ORDER_DEBIT') {
-        throw AppError.conflict(
-          'قيد طلب يُعكس بإلغاء الطلب من شاشة الطلبات، لا من دفتر الحركات.',
-        );
+        throw AppError.conflict('قيد طلب يُعكس بإلغاء الطلب من شاشة الطلبات، لا من دفتر الحركات.');
       }
 
       const reversal = await this.ledger.reverse(tx, {

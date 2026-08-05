@@ -34,6 +34,13 @@ export function RequireTenant() {
   if (!user) return <Navigate to="/login" replace />;
   if (user.mustChangePassword) return <Navigate to="/change-initial-password" replace />;
 
+  // جلسة الدعم هي هوية محل مؤقتة وموقّعة من الخادم. نعطيها الأولوية على
+  // صفة المدير الأصلية كي لا تعيد بيانات جلسة متأخرة توجيهه إلى لوحة المنصة.
+  if (user.supportMode) {
+    if (!user.tenant || !user.store) return <Navigate to="/403" replace />;
+    return <Outlet />;
+  }
+
   // المدير العام لا مكان له هنا — نوجّهه للوحته بدل عرض 403 مربك.
   if (user.isSuperAdmin) return <Navigate to="/platform" replace />;
 
@@ -69,11 +76,26 @@ export function RequirePermission({ permission }: { permission: Permission }) {
 /** يمنع الوصول لصفحة الدخول وأنت مسجّل أصلًا. */
 export function RedirectIfAuthenticated() {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
 
   if (isLoading) return <FullPageLoader />;
 
   if (user) {
-    return <Navigate to={user.mustChangePassword ? '/change-initial-password' : user.isSuperAdmin ? '/platform' : '/'} replace />;
+    if (user.mustChangePassword && location.pathname === '/change-initial-password') {
+      return <Outlet />;
+    }
+    return (
+      <Navigate
+        to={
+          user.mustChangePassword
+            ? '/change-initial-password'
+            : user.isSuperAdmin
+              ? '/platform'
+              : '/'
+        }
+        replace
+      />
+    );
   }
 
   return <Outlet />;

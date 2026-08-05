@@ -32,7 +32,8 @@ export default defineConfig({
   },
 
   build: {
-    sourcemap: true,
+    // Production source maps expose the original application source to public clients.
+    sourcemap: false,
     rollupOptions: {
       output: {
         // فصل المكتبات الكبيرة — لا يُعاد تنزيلها مع كل نشر.

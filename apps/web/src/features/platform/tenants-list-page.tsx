@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Building2, LogIn, PauseCircle, Pencil, PlayCircle, Plus } from 'lucide-react';
+import { Building2, LogIn, Mail, PauseCircle, Pencil, Phone, PlayCircle, Plus } from 'lucide-react';
 import type { PaginatedResult, SetTenantStatusRequest, Tenant, TenantStatus } from '@oh/contracts';
 import {
   Button,
@@ -250,8 +250,9 @@ export function TenantsListPage() {
           { label: t('platform.tenantsList') },
         ]}
         linkAs={Link}
+        className="max-sm:flex-col"
         actions={
-          <Button variant="brand" asChild>
+          <Button variant="brand" className="max-sm:w-full" asChild>
             <Link to="/platform/tenants/new">
               <Plus aria-hidden />
               {t('platform.addTenant')}
@@ -262,6 +263,7 @@ export function TenantsListPage() {
 
       <FilterBar>
         <SearchFilter
+          className="max-sm:w-full max-sm:min-w-0"
           value={search}
           onChange={(value) => {
             setSearch(value);
@@ -270,6 +272,7 @@ export function TenantsListPage() {
           placeholder="ابحث بالاسم أو المعرّف…"
         />
         <SelectFilter
+          className="max-sm:w-full"
           value={status}
           onChange={(value) => {
             setStatus(value);
@@ -318,6 +321,101 @@ export function TenantsListPage() {
           }}
           sort={sort}
           onSortChange={toggleSort}
+          mobileRender={(row) => {
+            const badge = TENANT_STATUS_BADGE[row.status as TenantStatus];
+            return (
+              <article className="rounded-card border-border bg-card shadow-card overflow-hidden border">
+                <div className="border-border-subtle flex items-start gap-3 border-b p-4">
+                  <div className="bg-brand-soft text-brand rounded-ctrl flex size-11 shrink-0 items-center justify-center">
+                    <Building2 className="size-5" aria-hidden />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <Link
+                        to={`/platform/tenants/${row.id}`}
+                        className="text-fg block truncate text-base font-semibold hover:underline"
+                      >
+                        {row.name}
+                      </Link>
+                      <StatusBadge tone={badge.tone} withDot>
+                        {badge.label}
+                      </StatusBadge>
+                    </div>
+                    <p className="text-fg-muted mt-1 truncate text-xs">
+                      {row.ownerName || t('platform.ownerName')}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 px-4 py-3">
+                  <MobileTenantContact
+                    icon={Phone}
+                    label={t('staff.phone')}
+                    value={row.contactPhone}
+                    href={row.contactPhone ? `tel:${row.contactPhone}` : undefined}
+                  />
+                  <MobileTenantContact
+                    icon={Mail}
+                    label={t('platform.ownerEmail')}
+                    value={row.ownerEmail}
+                    href={row.ownerEmail ? `mailto:${row.ownerEmail}` : undefined}
+                  />
+                </div>
+
+                <div className="bg-border-subtle grid grid-cols-2 gap-px">
+                  <MobileTenantMetric label={t('platform.plan')} value={row.planName || '—'} />
+                  <MobileTenantMetric
+                    label={t('subscription.endDate')}
+                    value={row.subscriptionEndsAt?.slice(0, 10) || '—'}
+                    ltr
+                  />
+                  <MobileTenantMetric
+                    label={t('platform.storeCount')}
+                    value={String(row.storeCount)}
+                  />
+                  <MobileTenantMetric
+                    label={t('platform.userCount')}
+                    value={String(row.userCount)}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 p-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => navigate(`/platform/tenants/${row.id}`)}
+                  >
+                    <Pencil aria-hidden />
+                    {t('common.edit')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    loading={supportMutation.isPending && supportMutation.variables === row.id}
+                    onClick={() => supportMutation.mutate(row.id)}
+                  >
+                    <LogIn aria-hidden />
+                    {t('platform.supportAccess')}
+                  </Button>
+                  <Button
+                    variant={row.status === 'SUSPENDED' ? 'brand' : 'danger'}
+                    size="sm"
+                    className="col-span-2 w-full"
+                    onClick={() => setStatusTarget(row)}
+                  >
+                    {row.status === 'SUSPENDED' ? (
+                      <PlayCircle aria-hidden />
+                    ) : (
+                      <PauseCircle aria-hidden />
+                    )}
+                    {row.status === 'SUSPENDED' ? t('platform.activate') : t('platform.suspend')}
+                  </Button>
+                </div>
+              </article>
+            );
+          }}
         />
 
         {query.data && query.data.total > 0 ? (
@@ -415,6 +513,62 @@ export function TenantsListPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function MobileTenantMetric({
+  label,
+  value,
+  ltr = false,
+}: {
+  label: string;
+  value: string;
+  ltr?: boolean;
+}) {
+  return (
+    <div className="bg-card min-w-0 p-3">
+      <p className="text-fg-muted truncate text-[11px]">{label}</p>
+      <p
+        className="text-fg mt-1 truncate text-sm font-medium tabular-nums"
+        dir={ltr ? 'ltr' : undefined}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function MobileTenantContact({
+  icon: Icon,
+  label,
+  value,
+  href,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string | null;
+  href?: string;
+}) {
+  const content = (
+    <span className="text-fg min-w-0 truncate text-sm" dir="ltr">
+      {value || '—'}
+    </span>
+  );
+
+  return (
+    <div className="grid grid-cols-[32px_minmax(0,1fr)] items-center gap-x-2">
+      <span className="bg-neutral-soft text-fg-muted rounded-ctrl row-span-2 flex size-8 items-center justify-center">
+        <Icon className="size-4" aria-hidden />
+      </span>
+      <span className="text-fg-muted text-[11px]">{label}</span>
+      {href ? (
+        <a className="min-w-0 hover:underline" href={href}>
+          {content}
+        </a>
+      ) : (
+        content
+      )}
     </div>
   );
 }

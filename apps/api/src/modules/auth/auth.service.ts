@@ -6,6 +6,7 @@ import {
   type LoginResponse,
   type SessionUser,
   type ChangePasswordRequest,
+  type ResetPasswordRequest,
 } from '@oh/contracts';
 import { ROLES, permissionsForRole, type Permission, type RoleName } from '@oh/config';
 import { EnvService } from '../../core/config/env.service.js';
@@ -14,7 +15,12 @@ import { PrismaService, type TxClient } from '../../core/prisma/prisma.service.j
 import { AuditService } from '../../core/audit/audit.service.js';
 import { TenantContext } from '../../core/tenancy/tenant-context.js';
 import { PasswordService } from './password.service.js';
-import { TokenService, type AccessTokenPayload } from './token.service.js';
+import {
+  TokenService,
+  type AccessTokenPayload,
+  type PasswordResetTokenPayload,
+} from './token.service.js';
+import { MailService } from '../../core/mail/mail.service.js';
 
 /** ما تُرجعه دالة app_auth_lookup (SECURITY DEFINER). */
 interface AuthLookupRow {
@@ -42,6 +48,7 @@ export class AuthService {
     private readonly tokens: TokenService,
     private readonly audit: AuditService,
     private readonly env: EnvService,
+    private readonly mail: MailService,
   ) {}
 
   /**
@@ -125,6 +132,12 @@ export class AuthService {
       }),
     );
     if (!authState) throw AppError.invalidCredentials();
+    if (authState.mustChangePassword) {
+      const resetToken = await this.tokens.signPasswordResetToken(found.id, found.password_hash);
+      const resetUrl = new URL('/reset-password', this.env.get('WEB_ORIGIN'));
+      resetUrl.searchParams.set('token', resetToken);
+      await this.mail.sendPasswordResetLink(dto.email, resetUrl.toString());
+    }
     const permissions = await this.resolvePermissions(found, authState.platformRole);
 
     const { accessToken, csrfToken } = await this.prisma.runUnscoped(async (tx) => {
@@ -314,6 +327,10 @@ export class AuthService {
     this.tokens.clearAuthCookies(res);
   }
 
+  clearAuthCookies(res: Response): void {
+    this.tokens.clearAuthCookies(res);
+  }
+
   /**
    * استعادة كلمة المرور.
    *
@@ -332,10 +349,16 @@ export class AuthService {
     const found = rows[0] ?? null;
 
     if (found) {
-      this.logger.log(
-        { userId: found.id },
-        'طُلبت استعادة كلمة مرور. إرسال البريد مؤجل للمرحلة 7.',
-      );
+      const resetToken = await this.tokens.signPasswordResetToken(found.id, found.password_hash);
+      const resetUrl = new URL('/reset-password', this.env.get('WEB_ORIGIN'));
+      resetUrl.searchParams.set('token', resetToken);
+
+      try {
+        await this.mail.sendPasswordResetLink(email, resetUrl.toString());
+      } catch (error) {
+        // Keep the public response identical so this endpoint cannot be used to enumerate users.
+        this.logger.error({ err: error, userId: found.id }, 'Failed to send password reset email.');
+      }
     }
 
     // نفس الرسالة، ونفس الزمن تقريبًا، في الحالتين.
@@ -343,6 +366,57 @@ export class AuthService {
       message:
         'إن كان هذا البريد مسجّلًا لدينا، فستصلك رسالة تحتوي على رابط إعادة تعيين كلمة المرور خلال دقائق.',
     };
+  }
+
+  async resetInitialPassword(dto: ResetPasswordRequest): Promise<void> {
+    let payload: PasswordResetTokenPayload;
+    try {
+      payload = await this.tokens.verifyPasswordResetToken(dto.token);
+    } catch {
+      throw AppError.validation('رابط تعيين كلمة السر غير صالح أو انتهت صلاحيته.');
+    }
+
+    const user = await this.prisma.runUnscoped((tx) =>
+      tx.user.findUnique({
+        where: { id: payload.sub },
+        select: { id: true, passwordHash: true, mustChangePassword: true, tenantId: true },
+      }),
+    );
+    if (
+      !user ||
+      !this.passwords.compareTokens(
+        payload.passwordFingerprint,
+        this.tokens.passwordFingerprint(user.passwordHash),
+      )
+    ) {
+      throw AppError.validation('رابط تعيين كلمة السر غير صالح أو استُخدم سابقاً.');
+    }
+
+    const passwordHash = await this.passwords.hash(dto.password);
+    await this.prisma.runUnscoped(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          passwordHash,
+          mustChangePassword: false,
+          passwordChangedAt: new Date(),
+          failedLoginCount: 0,
+          lockedUntil: null,
+        },
+      });
+      await tx.session.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date(), revokedReason: 'INITIAL_PASSWORD_LINK_USED' },
+      });
+      await this.audit.record(tx, {
+        action: AUDIT_ACTIONS.AUTH_PASSWORD_CHANGED,
+        summary: 'تعيين كلمة السر الأولى عبر الرابط الآمن.',
+        entityType: 'User',
+        entityId: user.id,
+        tenantId: user.tenantId,
+        actor: { id: user.id, name: null },
+      });
+    });
   }
 
   /** الجلسة الحالية — يستدعيها /auth/me. */

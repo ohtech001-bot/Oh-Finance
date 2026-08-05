@@ -91,8 +91,37 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
   if (loading) {
     return (
-      <div className={cn('overflow-hidden rounded-card border border-border bg-card', className)}>
-        <TableSkeleton columns={columns.length} />
+      <div
+        className={cn(
+          'overflow-hidden rounded-card border border-border bg-card',
+          mobileRender && 'border-0 bg-transparent md:border md:bg-card',
+          className,
+        )}
+      >
+        {mobileRender ? (
+          <>
+            <div className="space-y-3 md:hidden" aria-label="جارٍ التحميل">
+              {Array.from({ length: 3 }, (_, index) => (
+                <div
+                  key={index}
+                  className="rounded-card border-border bg-card space-y-4 border p-4 shadow-card"
+                >
+                  <div className="bg-card-muted h-5 w-2/3 animate-pulse rounded" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-card-muted h-12 animate-pulse rounded" />
+                    <div className="bg-card-muted h-12 animate-pulse rounded" />
+                  </div>
+                  <div className="bg-card-muted h-10 animate-pulse rounded" />
+                </div>
+              ))}
+            </div>
+            <div className="hidden md:block">
+              <TableSkeleton columns={columns.length} />
+            </div>
+          </>
+        ) : (
+          <TableSkeleton columns={columns.length} />
+        )}
       </div>
     );
   }

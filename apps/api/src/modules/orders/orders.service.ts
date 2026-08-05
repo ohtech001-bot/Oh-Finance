@@ -15,9 +15,12 @@ import {
   type UpdateOrderRequest,
 } from '@oh/contracts';
 import {
+  abs,
   add,
   greaterThan,
+  isNegative,
   isZero,
+  min,
   subtract,
   toMoney,
   toMoneyString,
@@ -90,7 +93,9 @@ export class OrdersService {
       const issuedAt = dto.issuedAt ? new Date(dto.issuedAt) : new Date();
       const dueAt = dto.dueAt
         ? new Date(dto.dueAt)
-        : (customer.paymentDueDate ?? this.addDays(issuedAt, customer.paymentTermDays));
+        : customer.paymentDueDate
+          ? this.monthlyDueDate(issuedAt, customer.paymentDueDate.getUTCDate())
+          : this.addDays(issuedAt, customer.paymentTermDays);
 
       const willConfirm = dto.status === 'CONFIRMED';
 
@@ -220,8 +225,9 @@ export class OrdersService {
       const dueAt = dto.dueAt
         ? new Date(dto.dueAt)
         : (order.dueAt ??
-          order.customer.paymentDueDate ??
-          this.addDays(order.issuedAt, order.customer.paymentTermDays));
+          (order.customer.paymentDueDate
+            ? this.monthlyDueDate(new Date(), order.customer.paymentDueDate.getUTCDate())
+            : this.addDays(order.issuedAt, order.customer.paymentTermDays)));
 
       await this.postConfirmation(tx, {
         tenantId,
@@ -311,6 +317,17 @@ export class OrdersService {
       createdBy: params.userId,
     });
 
+    // الرصيد الدائن الموجود قبل الطلب يُقابل الطلب تلقائيًا. قيد الطلب نفسه
+    // خفّض الرصيد في الدفتر؛ هذان الحقلان يبيّنان فقط مقدار ما غطّاه الرصيد.
+    const creditApplied = isNegative(entry.openingBalance)
+      ? min(abs(entry.openingBalance), total)
+      : zero();
+    const status = isZero(creditApplied)
+      ? 'CONFIRMED'
+      : creditApplied.equals(total)
+        ? 'PAID'
+        : 'PARTIALLY_PAID';
+
     // ── قفل الطلب ──────────────────────────────────────────────────────
     const now = new Date();
     const where: Prisma.OrderWhereUniqueInput =
@@ -321,7 +338,9 @@ export class OrdersService {
     const updated = await tx.order.updateMany({
       where,
       data: {
-        status: 'CONFIRMED',
+        status,
+        paidAmount: toMoneyString(creditApplied),
+        creditAppliedAmount: toMoneyString(creditApplied),
         confirmedAt: now,
         confirmedBy: params.userId,
         lockedAt: now,
@@ -343,7 +362,9 @@ export class OrdersService {
       entityType: 'Order',
       entityId: params.orderId,
       after: {
-        status: 'CONFIRMED',
+        status,
+        creditAppliedAmount: toMoneyString(creditApplied, 2),
+        remainingAmount: toMoneyString(subtract(total, creditApplied), 2),
         ledgerEntryId: entry.id,
         ledgerSeq: entry.seq,
         balanceAfter: toMoneyString(entry.runningBalance, 2),
@@ -485,9 +506,11 @@ export class OrdersService {
       }
 
       const paid = toMoney(order.paidAmount.toString());
-      if (!isZero(paid)) {
+      const creditApplied = toMoney(order.creditAppliedAmount.toString());
+      const cashPaid = subtract(paid, creditApplied);
+      if (!isZero(cashPaid)) {
         throw AppError.conflict(
-          `الطلب ${order.number} عليه دفعات بقيمة ${toMoneyString(paid, 2)}. ` +
+          `الطلب ${order.number} عليه دفعات نقدية بقيمة ${toMoneyString(cashPaid, 2)}. ` +
             'اعكس الدفعات أولًا، ثم ألغِ الطلب.',
         );
       }
@@ -796,18 +819,35 @@ export class OrdersService {
         classification: undefined,
       });
 
-      const [grouped, agg] = await Promise.all([
+      const [grouped, agg, debtRows] = await Promise.all([
         tx.order.groupBy({ by: ['status'], where, _count: true }),
         tx.order.aggregate({
           where: { ...where, status: { notIn: ['CANCELLED', 'DRAFT', 'QUOTE'] } },
-          _sum: { total: true, paidAmount: true },
+          _sum: { total: true },
         }),
+        tx.$queryRaw<{ outstanding_amount: string }[]>`
+          WITH latest_balances AS (
+            SELECT DISTINCT ON (le.customer_id)
+                   le.customer_id,
+                   le.running_balance
+            FROM ledger_entries le
+            JOIN customers c ON c.id = le.customer_id
+            WHERE le.tenant_id = ${tenantId}::uuid
+              AND c.archived_at IS NULL
+            ORDER BY le.customer_id, le.seq DESC
+          )
+          SELECT COALESCE(
+                   SUM(running_balance) FILTER (WHERE running_balance > 0),
+                   0
+                 )::text AS outstanding_amount
+          FROM latest_balances
+        `,
       ]);
 
       const count = (status: string) => grouped.find((g) => g.status === status)?._count ?? 0;
 
       const totalAmount = toMoney(agg._sum.total?.toString() ?? '0');
-      const paidAmount = toMoney(agg._sum.paidAmount?.toString() ?? '0');
+      const outstandingAmount = debtRows[0]?.outstanding_amount ?? '0';
 
       return {
         total: count('CONFIRMED') + count('PARTIALLY_PAID') + count('PAID'),
@@ -818,7 +858,7 @@ export class OrdersService {
         paid: count('PAID'),
         cancelled: count('CANCELLED'),
         totalAmount: toMoneyString(totalAmount, 2),
-        outstandingAmount: toMoneyString(subtract(totalAmount, paidAmount), 2),
+        outstandingAmount: toMoneyString(outstandingAmount, 2),
       } as OrderStats;
     });
   }
@@ -893,6 +933,7 @@ export class OrdersService {
       total: toMoneyString(total, 2),
 
       paidAmount: toMoneyString(paid, 2),
+      creditAppliedAmount: toMoneyString(row.creditAppliedAmount.toString(), 2),
       remainingAmount: toMoneyString(remaining, 2),
 
       notes: row.notes,
@@ -914,6 +955,13 @@ export class OrdersService {
     const result = new Date(date);
     result.setDate(result.getDate() + days);
     return result;
+  }
+
+  private monthlyDueDate(reference: Date, dueDay: number): Date {
+    const year = reference.getUTCFullYear();
+    const month = reference.getUTCMonth() + (reference.getUTCDate() > dueDay ? 1 : 0);
+    const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    return new Date(Date.UTC(year, month, Math.min(dueDay, lastDay)));
   }
 
   private context(): { tenantId: string; storeId: string; userId: string } {

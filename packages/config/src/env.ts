@@ -96,6 +96,25 @@ export const envSchema = z
       });
     }
 
+    const webOrigin = new URL(env.WEB_ORIGIN);
+    if (webOrigin.protocol !== 'https:' || webOrigin.hostname === 'localhost') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['WEB_ORIGIN'],
+        message: 'WEB_ORIGIN must be the public HTTPS web address in production.',
+      });
+    }
+
+    for (const key of ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD'] as const) {
+      if (!env[key]) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} is required in production because account emails are mandatory.`,
+        });
+      }
+    }
+
     if (env.COOKIE_SAME_SITE === 'none' && !env.COOKIE_SECURE) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

@@ -24,6 +24,12 @@ export interface AccessTokenPayload {
   sup?: boolean; // جلسة دعم مؤقتة داخل محل، صادرة للمدير العام
 }
 
+export interface PasswordResetTokenPayload {
+  sub: string;
+  purpose: 'initial-password-reset';
+  passwordFingerprint: string;
+}
+
 export const COOKIE_NAMES = {
   ACCESS: 'oh_at',
   REFRESH: 'oh_rt',
@@ -66,6 +72,34 @@ export class TokenService {
     return this.jwt.verifyAsync<AccessTokenPayload>(token, {
       secret: this.env.get('JWT_ACCESS_SECRET'),
     });
+  }
+
+  async signPasswordResetToken(userId: string, passwordHash: string): Promise<string> {
+    return this.jwt.signAsync(
+      {
+        sub: userId,
+        purpose: 'initial-password-reset',
+        passwordFingerprint: this.passwords.hashToken(passwordHash),
+      } satisfies PasswordResetTokenPayload,
+      {
+        secret: this.env.get('JWT_REFRESH_SECRET'),
+        expiresIn: '30m',
+      },
+    );
+  }
+
+  async verifyPasswordResetToken(token: string): Promise<PasswordResetTokenPayload> {
+    const payload = await this.jwt.verifyAsync<PasswordResetTokenPayload>(token, {
+      secret: this.env.get('JWT_REFRESH_SECRET'),
+    });
+    if (payload.purpose !== 'initial-password-reset') {
+      throw new Error('Invalid password reset token purpose.');
+    }
+    return payload;
+  }
+
+  passwordFingerprint(passwordHash: string): string {
+    return this.passwords.hashToken(passwordHash);
   }
 
   /**

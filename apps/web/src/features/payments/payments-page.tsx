@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Banknote, CalendarDays, ChevronLeft, Plus, Wallet } from 'lucide-react';
+import { CalendarDays, ChevronLeft, Plus, Wallet } from 'lucide-react';
 import { PAYMENT_METHOD_LABELS, type Payment, type PaymentListQuery } from '@oh/contracts';
 import type { CurrencyCode } from '@oh/money';
 import {
@@ -13,14 +13,12 @@ import {
   PageHeader,
   Pagination,
   SearchFilter,
-  StatCard,
-  StatCardsSkeleton,
   StatusBadge,
   type Column,
 } from '@oh/ui';
 import { ApiRequestError } from '@/lib/api';
 import { useAuth } from '@/app/auth-context';
-import { usePayments, usePaymentStats } from './api';
+import { usePayments } from './api';
 import { RecordPaymentDialog } from './record-payment-dialog';
 
 export function PaymentsPage() {
@@ -55,7 +53,6 @@ export function PaymentsPage() {
   };
 
   const list = usePayments(query);
-  const stats = usePaymentStats({ from: from || undefined, to: to || undefined });
 
   const isFiltered = search !== '' || from !== '' || to !== '';
   const resetFilters = () => {
@@ -76,7 +73,6 @@ export function PaymentsPage() {
       render: (row) => (
         <Link to={`/customers/${row.customerId}`} className="min-w-0 hover:underline">
           <p className="text-fg truncate text-sm">{row.customerName}</p>
-          <p className="text-fg-muted truncate text-xs">{row.customerCode}</p>
         </Link>
       ),
     },
@@ -142,8 +138,6 @@ export function PaymentsPage() {
     },
   ];
 
-  const s = stats.data;
-
   return (
     <div className="space-y-5">
       <PageHeader
@@ -160,30 +154,6 @@ export function PaymentsPage() {
           ) : undefined
         }
       />
-
-      {stats.isLoading ? (
-        <StatCardsSkeleton count={2} />
-      ) : s ? (
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <StatCard
-            label="إجمالي المدفوعات"
-            money={s.totalAmount}
-            currency={currency}
-            moneyTone="credit"
-            icon={Wallet}
-            tone="credit"
-            sublabel={`${s.totalCount} دفعة`}
-          />
-          <StatCard
-            label="المدفوعات النقدية"
-            money={s.byMethod.CASH.amount}
-            currency={currency}
-            icon={Banknote}
-            tone="credit"
-            sublabel={`${s.byMethod.CASH.count} دفعة`}
-          />
-        </div>
-      ) : null}
 
       <FilterBar>
         <SearchFilter

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -88,6 +88,14 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
     navigate(`/customers?search=${encodeURIComponent(term)}`);
   };
 
+  const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    const term = search.trim();
+    if (!term || !canSearchCustomers) return;
+    navigate(`/customers?search=${encodeURIComponent(term)}`);
+  };
+
   const handleExitSupport = async () => {
     setExitingSupport(true);
     try {
@@ -143,6 +151,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
             placeholder={t('common.searchPlaceholder')}
             startIcon={<Search className="size-4" />}
             disabled={!canSearchCustomers}
@@ -348,6 +357,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={handleSearchKeyDown}
             placeholder={t('common.searchPlaceholder')}
             startIcon={<Search className="size-4" />}
             aria-label={t('common.search')}
@@ -417,12 +427,22 @@ function notificationText(
   }
 
   const dueToday = notification.kind === 'PAYMENT_DUE_TODAY';
+  const overdue = notification.kind === 'PAYMENT_DUE_OVERDUE';
   return {
-    title: t(dueToday ? 'notificationFeed.dueTodayTitle' : 'notificationFeed.dueSoonTitle', {
-      name: notification.customerName ?? '',
-    }),
+    title: t(
+      overdue
+        ? 'notificationFeed.dueOverdueTitle'
+        : dueToday
+          ? 'notificationFeed.dueTodayTitle'
+          : 'notificationFeed.dueSoonTitle',
+      { name: notification.customerName ?? '' },
+    ),
     description: t(
-      dueToday ? 'notificationFeed.dueTodayDescription' : 'notificationFeed.dueSoonDescription',
+      overdue
+        ? 'notificationFeed.dueOverdueDescription'
+        : dueToday
+          ? 'notificationFeed.dueTodayDescription'
+          : 'notificationFeed.dueSoonDescription',
       { balance: notification.balance ?? '' },
     ),
   };

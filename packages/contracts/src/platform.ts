@@ -101,6 +101,7 @@ export const tenantSchema = z.object({
   timezone: z.string(),
   ownerEmail: emailSchema.nullable(),
   ownerName: z.string().nullable(),
+  contactPhone: z.string().nullable(),
   storeCount: z.number().int(),
   userCount: z.number().int(),
   planName: z.string().nullable(),
@@ -135,7 +136,13 @@ export const createTenantSchema = z
     storeEmail: emailSchema.optional().or(z.literal('')),
     storeAddress: z.string().trim().max(240).optional().or(z.literal('')),
     storeCity: z.string().trim().max(80).optional().or(z.literal('')),
-    websiteUrl: z.string().trim().url('رابط الموقع غير صحيح.').max(512).optional().or(z.literal('')),
+    websiteUrl: z
+      .string()
+      .trim()
+      .url('رابط الموقع غير صحيح.')
+      .max(512)
+      .optional()
+      .or(z.literal('')),
     logoDataUrl: z
       .string()
       .max(7_000_000, 'حجم الشعار كبير جدًا.')
@@ -304,19 +311,26 @@ export type UpdateSubscriptionBillingRequest = z.infer<typeof updateSubscription
 export const platformRoleSchema = z.enum(['GENERAL_MANAGER', 'MANAGER', 'EMPLOYEE']);
 export type PlatformRole = z.infer<typeof platformRoleSchema>;
 
-export const createPlatformStaffInviteSchema = z.object({
+const platformStaffInputSchema = z.object({
   name: z.string().trim().min(2).max(120),
   email: emailSchema,
   phone: z.string().regex(/^05\d{8}$/, 'رقم الهاتف يجب أن يتكون من 10 أرقام ويبدأ بـ05.'),
   dateOfBirth: isoDateSchema,
-  identityNumber: z.string().trim().min(1).max(32),
-  jobTitle: z.string().trim().min(2).max(80),
+  jobTitle: z.string().trim().max(80).default(''),
   platformRole: platformRoleSchema,
   locale: localeSchema.default('ar'),
 });
+
+export const createPlatformStaffInviteSchema = platformStaffInputSchema.and(
+  z.object({ initialPassword: passwordSchema }),
+);
 export type CreatePlatformStaffInviteRequest = z.infer<typeof createPlatformStaffInviteSchema>;
 
-export const updatePlatformStaffSchema = createPlatformStaffInviteSchema;
+export const updatePlatformStaffSchema = platformStaffInputSchema.and(
+  z.object({
+    initialPassword: z.union([z.literal(''), passwordSchema]).optional(),
+  }),
+);
 export type UpdatePlatformStaffRequest = z.infer<typeof updatePlatformStaffSchema>;
 
 export const setPlatformStaffStatusSchema = z.object({

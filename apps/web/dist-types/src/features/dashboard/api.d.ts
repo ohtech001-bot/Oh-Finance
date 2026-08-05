@@ -7,8 +7,8 @@ import type { DashboardQuery } from '@oh/contracts';
  */
 export declare function useDashboard(query: Partial<DashboardQuery>): import("@tanstack/react-query").UseQueryResult<NoInfer<{
     kpis: {
-        id: "revenue" | "payments" | "orders" | "outstanding_balance" | "overdue_balance" | "overdue_customers" | "active_customers" | "average_order_value" | "collection_rate" | "unallocated_payments";
         value: string;
+        id: "revenue" | "payments" | "orders" | "outstanding_balance" | "overdue_balance" | "overdue_customers" | "active_customers" | "average_order_value" | "collection_rate" | "unallocated_payments";
         unit: "money" | "count" | "percent";
         previous: string | null;
         deltaPct: number | null;
@@ -23,14 +23,14 @@ export declare function useDashboard(query: Partial<DashboardQuery>): import("@t
         }[];
     }[];
     topCustomers: {
-        id: string;
         code: string;
+        id: string;
         name: string;
         amount: string;
     }[];
     topDebtors: {
-        id: string;
         code: string;
+        id: string;
         name: string;
         balance: string;
         oldestOverdueAt: string | null;
@@ -39,20 +39,20 @@ export declare function useDashboard(query: Partial<DashboardQuery>): import("@t
     recentPayments: {
         number: string;
         id: string;
+        amount: string;
         customerId: string;
         customerName: string;
-        paidAt: string;
         method: "CASH" | "BANK_TRANSFER" | "CARD" | "CHECK";
-        amount: string;
+        paidAt: string;
         createdByName: string | null;
     }[];
     recentOrders: {
         number: string;
-        id: string;
         status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
-        total: string;
+        id: string;
         customerId: string;
         customerName: string;
+        total: string;
         issuedAt: string;
     }[];
     meta: {
@@ -61,9 +61,9 @@ export declare function useDashboard(query: Partial<DashboardQuery>): import("@t
         timezone: string;
         generatedAt: string;
         range: {
+            preset: "today" | "yesterday" | "last_7_days" | "last_30_days" | "this_month" | "previous_month" | "this_year" | "custom";
             from: string;
             to: string;
-            preset: "custom" | "today" | "yesterday" | "last_7_days" | "last_30_days" | "this_month" | "previous_month" | "this_year";
             granularity: "day" | "week" | "month";
             previousFrom: string;
             previousTo: string;
@@ -77,8 +77,8 @@ export declare function useDashboard(query: Partial<DashboardQuery>): import("@t
         };
     };
     alerts: {
-        id: string;
         message: string;
+        id: string;
         date: string | null;
         amount: string | null;
         kind: "unallocated_payments" | "approaching_credit_limit" | "over_credit_limit" | "long_overdue" | "stale_draft_orders" | "inactive_no_activity" | "subscription_ending";

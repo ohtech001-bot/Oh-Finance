@@ -72,10 +72,11 @@ const host = (() => {
 console.error(`▶ Prisma على قاعدة الاختبار: ${host}\n`);
 
 const schema = resolve(ROOT, 'apps/api/prisma/schema.prisma');
-const result = spawnSync('npx', ['prisma', ...args, '--schema', schema], {
+const prismaCli = resolve(ROOT, 'node_modules/prisma/build/index.js');
+const result = spawnSync(process.execPath, [prismaCli, ...args, '--schema', schema], {
   stdio: 'inherit',
   env: { ...process.env, DATABASE_URL: url, DIRECT_DATABASE_URL: directUrl },
-  shell: process.platform === 'win32',
+  shell: false,
 });
 
 process.exit(result.status ?? 1);

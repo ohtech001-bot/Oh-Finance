@@ -111,6 +111,20 @@ export const ledgerTotalsSchema = z.object({
 });
 export type LedgerTotals = z.infer<typeof ledgerTotalsSchema>;
 
+export const statementOrderPaymentStateSchema = z.enum([
+  'PAID_FROM_CREDIT',
+  'PAID',
+  'PARTIALLY_PAID',
+  'UNPAID',
+]);
+export type StatementOrderPaymentState = z.infer<typeof statementOrderPaymentStateSchema>;
+
+export const statementOrderPaymentSchema = z.object({
+  orderId: uuidSchema,
+  paymentState: statementOrderPaymentStateSchema,
+});
+export type StatementOrderPayment = z.infer<typeof statementOrderPaymentSchema>;
+
 /** كشف حساب زبون. */
 export const customerStatementSchema = z.object({
   customerId: uuidSchema,
@@ -123,6 +137,8 @@ export const customerStatementSchema = z.object({
   closingBalance: moneySchema,
 
   entries: z.array(ledgerEntrySchema),
+  /** حالة السداد الحالية للطلبات الظاهرة في حركات هذا الكشف. */
+  orders: z.array(statementOrderPaymentSchema),
   totals: ledgerTotalsSchema,
 
   from: isoDateSchema.nullable(),

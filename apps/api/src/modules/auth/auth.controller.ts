@@ -6,9 +6,11 @@ import {
   forgotPasswordRequestSchema,
   changePasswordRequestSchema,
   loginRequestSchema,
+  resetPasswordRequestSchema,
   type ForgotPasswordRequest,
   type LoginRequest,
   type ChangePasswordRequest,
+  type ResetPasswordRequest,
 } from '@oh/contracts';
 import { zodBody } from '../../core/validation/zod.pipe.js';
 import { AppError } from '../../core/errors/app-error.js';
@@ -130,5 +132,19 @@ export class AuthController {
   @ApiOperation({ summary: 'طلب استعادة كلمة المرور — رد موحّد لمنع تعداد المستخدمين.' })
   async forgotPassword(@Body(zodBody(forgotPasswordRequestSchema)) dto: ForgotPasswordRequest) {
     return this.auth.forgotPassword(dto.email);
+  }
+
+  @Public()
+  @SkipCsrf()
+  @Throttle({ default: { limit: 5, ttl: 900_000 } })
+  @Post('reset-initial-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'تعيين كلمة السر الأولى عبر رابط البريد الموقّع.' })
+  async resetInitialPassword(
+    @Body(zodBody(resetPasswordRequestSchema)) dto: ResetPasswordRequest,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
+    await this.auth.resetInitialPassword(dto);
+    this.auth.clearAuthCookies(res);
   }
 }

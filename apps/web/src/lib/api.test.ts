@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api, resetApiSessionStateForTests, UNAUTHENTICATED_EVENT } from './api';
+import { api, hasSessionHint, resetApiSessionStateForTests, UNAUTHENTICATED_EVENT } from './api';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -12,6 +12,16 @@ describe('API session refresh', () => {
   afterEach(() => {
     resetApiSessionStateForTests();
     vi.unstubAllGlobals();
+  });
+
+  it('detects whether the browser has a session hint', () => {
+    document.cookie = 'oh_csrf=; Max-Age=0; Path=/';
+    expect(hasSessionHint()).toBe(false);
+
+    document.cookie = 'oh_csrf=session-csrf; Path=/';
+    expect(hasSessionHint()).toBe(true);
+
+    document.cookie = 'oh_csrf=; Max-Age=0; Path=/';
   });
 
   it('renews an expired session and retries the original request once', async () => {

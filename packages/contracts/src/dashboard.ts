@@ -192,8 +192,8 @@ export const DASHBOARD_KPI_META: Record<DashboardKpiId, KpiMeta> = {
     unit: 'percent',
     label: 'نسبة التحصيل',
     definition:
-      'المقبوضات المُثبَّتة في الفترة ÷ إيراد الفترة، ×100. المقام صفر يُعيد null ' +
-      '(لا NaN ولا Infinity).',
+      'المبلغ المسدد من الطلبات المؤكدة في الفترة ÷ إجمالي تلك الطلبات، ×100. ' +
+      'دفعات الديون القديمة والدفعات المقدمة لا ترفع نسبة تحصيل طلبات الفترة.',
     positiveIsGood: true,
   },
   unallocated_payments: {

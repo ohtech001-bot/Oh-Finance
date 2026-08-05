@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  ApplyCustomerCreditRequest,
+  ApplyCustomerCreditResult,
   CreatePaymentRequest,
+  CustomerCredit,
   PaginatedResult,
   Payment,
   PaymentListQuery,
@@ -11,11 +14,12 @@ import { api, buildQuery } from '@/lib/api';
 
 const KEY = 'payments';
 
-export function usePayments(query: Partial<PaymentListQuery>) {
+export function usePayments(query: Partial<PaymentListQuery>, enabled = true) {
   return useQuery({
     queryKey: [KEY, 'list', query],
     queryFn: () =>
       api.get<PaginatedResult<Payment>>(`/payments${buildQuery(query as Record<string, string>)}`),
+    enabled,
   });
 }
 
@@ -57,6 +61,38 @@ export function useCreatePayment() {
       void qc.invalidateQueries({ queryKey: ['customers'] });
       void qc.invalidateQueries({ queryKey: ['orders'] });
       void qc.invalidateQueries({ queryKey: ['ledger'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+export function useCustomerCredit(customerId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: [KEY, 'customer-credit', customerId],
+    queryFn: () => api.get<CustomerCredit>(`/payments/customer-credit/${customerId}`),
+    enabled: enabled && Boolean(customerId),
+  });
+}
+
+export function useApplyCustomerCredit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      body,
+      idempotencyKey,
+    }: {
+      body: ApplyCustomerCreditRequest;
+      idempotencyKey: string;
+    }) =>
+      api.post<ApplyCustomerCreditResult>('/payments/apply-customer-credit', body, {
+        idempotencyKey,
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: [KEY] });
+      void qc.invalidateQueries({ queryKey: ['customers'] });
+      void qc.invalidateQueries({ queryKey: ['orders'] });
+      void qc.invalidateQueries({ queryKey: ['ledger'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
@@ -70,6 +106,7 @@ export function useReversePayment(id: string) {
       void qc.invalidateQueries({ queryKey: ['customers'] });
       void qc.invalidateQueries({ queryKey: ['orders'] });
       void qc.invalidateQueries({ queryKey: ['ledger'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }

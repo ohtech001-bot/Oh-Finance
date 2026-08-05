@@ -125,6 +125,8 @@ export const orderSchema = z.object({
   total: nonNegativeMoneySchema,
 
   paidAmount: nonNegativeMoneySchema,
+  /** جزء المدفوع الذي اختار المستخدم تسديده من رصيد الزبون السابق. */
+  creditAppliedAmount: nonNegativeMoneySchema,
   /** = total − paidAmount. مشتق. */
   remainingAmount: nonNegativeMoneySchema,
 

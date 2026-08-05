@@ -1,4 +1,4 @@
-import { StrictMode } from 'react';
+import { StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -15,15 +15,16 @@ import { ApiRequestError } from './lib/api';
 import { currentLocale } from './lib/i18n';
 import { LOCALES } from '@oh/config';
 import { StartupLoader } from './features/loading/startup-loader';
+import { FullPageLoader } from './components/full-page-loader';
 
 /**
  * إعداد TanStack Query.
  *
- * ── قرار مقصود: `refetchOnWindowFocus` مفعّل ─────────────────────────────
- * في نظام مالي، بيانات قديمة على الشاشة خطرة: صاحب المحل يعود إلى التبويب
- * بعد ساعة فيرى رصيد زبون كما كان — بينما سجّل موظف دفعة في هذه الأثناء.
- * لو اتخذ قرارًا بناءً على الرقم القديم (منحه بضاعة جديدة مثلًا)، فالضرر حقيقي.
- * إعادة الجلب عند العودة للتبويب تكلّف طلبًا، وتشتري صحة البيانات.
+ * ── التنقل السريع دون طلبات متكررة ───────────────────────────────────────
+ * العمليات المالية تُبطل الاستعلامات المتأثرة فور نجاحها، لذلك لا حاجة
+ * لإعادة جلب كل بيانات الصفحة عند كل تبديل لنافذة المتصفح. نحتفظ بالصفحات
+ * الحديثة في الذاكرة ونحدّث البيانات القديمة عند فتحها، مع إبقاء النسخة
+ * المخزنة ظاهرة أثناء التحديث بدل إعادة شاشة التحميل.
  *
  * ── لا إعادة محاولة على 401/403 ──────────────────────────────────────────
  * الجلسة المنتهية أو الصلاحية الناقصة لا تُصلحها إعادة المحاولة — تضيف
@@ -40,8 +41,11 @@ const queryClient = new QueryClient({
         }
         return failureCount < 2;
       },
-      staleTime: 30_000,
-      refetchOnWindowFocus: true,
+      // Mutations invalidate their affected data explicitly. A longer cache
+      // keeps navigation instant while still refreshing stale screens later.
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+      refetchOnWindowFocus: false,
     },
     mutations: {
       // ⚠️ لا إعادة محاولة تلقائية للطفرات إطلاقًا.
@@ -65,7 +69,9 @@ createRoot(root).render(
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <StartupLoader>
-              <RouterProvider router={router} />
+              <Suspense fallback={<FullPageLoader />}>
+                <RouterProvider router={router} />
+              </Suspense>
               <Toaster dir={LOCALES[currentLocale()].dir} />
             </StartupLoader>
           </AuthProvider>

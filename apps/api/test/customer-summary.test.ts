@@ -81,7 +81,7 @@ const dateFromToday = (days: number): string => {
 function customerPayload(
   name: string,
   openingBalance: string,
-  paymentDueDate?: string,
+  paymentDueDay = 15,
 ): CreateCustomerRequest {
   return {
     name,
@@ -95,7 +95,7 @@ function customerPayload(
     tags: [],
     creditLimit: '1500',
     paymentTermDays: 30,
-    paymentDueDate,
+    paymentDueDay,
     status: 'ACTIVE',
     openingBalance,
   };
@@ -185,7 +185,9 @@ describe.skipIf(!HAS_TEST_DB)('ملخّص الزبون', () => {
 
   it('يظهر استحقاق الحساب في اليوم المتفق عليه ما دام الرصيد دينًا دون ربطه بطلب', async () => {
     const customer = await asUser(t, () =>
-      customers.create(customerPayload('مستحق اليوم', '-1000', dateFromToday(0))),
+      customers.create(
+        customerPayload('مستحق اليوم', '-1000', Number(dateFromToday(0).slice(8, 10))),
+      ),
     );
 
     const s = await asUser(t, () => customers.summary(customer.id));
@@ -197,7 +199,9 @@ describe.skipIf(!HAS_TEST_DB)('ملخّص الزبون', () => {
 
   it('لا يظهر استحقاق الحساب قبل التاريخ المتفق عليه', async () => {
     const customer = await asUser(t, () =>
-      customers.create(customerPayload('موعده لاحقًا', '-1000', dateFromToday(1))),
+      customers.create(
+        customerPayload('موعده لاحقًا', '-1000', Number(dateFromToday(1).slice(8, 10))),
+      ),
     );
 
     const s = await asUser(t, () => customers.summary(customer.id));

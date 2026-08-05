@@ -1,11 +1,9 @@
 import type { CreateOrderRequest, OrderListQuery, PaginatedResult } from '@oh/contracts';
-export declare function useOrders(query: Partial<OrderListQuery>): import("@tanstack/react-query").UseQueryResult<NoInfer<PaginatedResult<{
+export declare function useOrders(query: Partial<OrderListQuery>, enabled?: boolean): import("@tanstack/react-query").UseQueryResult<NoInfer<PaginatedResult<{
     number: string;
     id: string;
-    notes: string | null;
-    status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
     createdAt: string;
-    total: string;
+    status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
     customerId: string;
     customerName: string;
     customerCode: string;
@@ -14,8 +12,11 @@ export declare function useOrders(query: Partial<OrderListQuery>): import("@tans
     subtotal: string;
     discountAmount: string;
     taxAmount: string;
+    total: string;
     paidAmount: string;
+    creditAppliedAmount: string;
     remainingAmount: string;
+    notes: string | null;
     isLocked: boolean;
     isOverdue: boolean;
     isArchived: boolean;
@@ -39,10 +40,8 @@ export declare function useOrderStats(query: Partial<OrderListQuery>): import("@
 export declare function useOrder(id: string | undefined): import("@tanstack/react-query").UseQueryResult<NoInfer<{
     number: string;
     id: string;
-    notes: string | null;
-    status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
     createdAt: string;
-    total: string;
+    status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
     customerId: string;
     customerName: string;
     customerCode: string;
@@ -51,8 +50,11 @@ export declare function useOrder(id: string | undefined): import("@tanstack/reac
     subtotal: string;
     discountAmount: string;
     taxAmount: string;
+    total: string;
     paidAmount: string;
+    creditAppliedAmount: string;
     remainingAmount: string;
+    notes: string | null;
     isLocked: boolean;
     isOverdue: boolean;
     isArchived: boolean;
@@ -63,16 +65,16 @@ export declare function useOrder(id: string | undefined): import("@tanstack/reac
     cancelReason: string | null;
     items: {
         id: string;
-        name: string;
-        sortOrder: number;
         sourceType: "MANUAL" | "PRODUCT" | "SERVICE";
         sourceId: string | null;
+        name: string;
         description: string | null;
         quantity: string;
         unitPrice: string;
         discount: string;
         taxRate: string;
         lineTotal: string;
+        sortOrder: number;
     }[];
     allocations: {
         paymentId: string;
@@ -85,10 +87,8 @@ export declare function useOrder(id: string | undefined): import("@tanstack/reac
 export declare function useCreateOrder(): import("@tanstack/react-query").UseMutationResult<{
     number: string;
     id: string;
-    notes: string | null;
-    status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
     createdAt: string;
-    total: string;
+    status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
     customerId: string;
     customerName: string;
     customerCode: string;
@@ -97,8 +97,11 @@ export declare function useCreateOrder(): import("@tanstack/react-query").UseMut
     subtotal: string;
     discountAmount: string;
     taxAmount: string;
+    total: string;
     paidAmount: string;
+    creditAppliedAmount: string;
     remainingAmount: string;
+    notes: string | null;
     isLocked: boolean;
     isOverdue: boolean;
     isArchived: boolean;
@@ -109,16 +112,16 @@ export declare function useCreateOrder(): import("@tanstack/react-query").UseMut
     cancelReason: string | null;
     items: {
         id: string;
-        name: string;
-        sortOrder: number;
         sourceType: "MANUAL" | "PRODUCT" | "SERVICE";
         sourceId: string | null;
+        name: string;
         description: string | null;
         quantity: string;
         unitPrice: string;
         discount: string;
         taxRate: string;
         lineTotal: string;
+        sortOrder: number;
     }[];
     allocations: {
         paymentId: string;
@@ -132,8 +135,8 @@ export declare function useCreateOrder(): import("@tanstack/react-query").UseMut
     customerId: string;
     discountAmount: string;
     items: {
-        name: string;
         sourceType: "MANUAL" | "PRODUCT" | "SERVICE";
+        name: string;
         quantity: string;
         unitPrice: string;
         discount: string;
@@ -141,17 +144,15 @@ export declare function useCreateOrder(): import("@tanstack/react-query").UseMut
         sourceId?: string | undefined;
         description?: string | undefined;
     }[];
-    notes?: string | undefined;
     issuedAt?: string | undefined;
     dueAt?: string | undefined;
+    notes?: string | undefined;
 }, unknown>;
 export declare function useUpdateOrder(id: string): import("@tanstack/react-query").UseMutationResult<{
     number: string;
     id: string;
-    notes: string | null;
-    status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
     createdAt: string;
-    total: string;
+    status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
     customerId: string;
     customerName: string;
     customerCode: string;
@@ -160,8 +161,11 @@ export declare function useUpdateOrder(id: string): import("@tanstack/react-quer
     subtotal: string;
     discountAmount: string;
     taxAmount: string;
+    total: string;
     paidAmount: string;
+    creditAppliedAmount: string;
     remainingAmount: string;
+    notes: string | null;
     isLocked: boolean;
     isOverdue: boolean;
     isArchived: boolean;
@@ -172,16 +176,16 @@ export declare function useUpdateOrder(id: string): import("@tanstack/react-quer
     cancelReason: string | null;
     items: {
         id: string;
-        name: string;
-        sortOrder: number;
         sourceType: "MANUAL" | "PRODUCT" | "SERVICE";
         sourceId: string | null;
+        name: string;
         description: string | null;
         quantity: string;
         unitPrice: string;
         discount: string;
         taxRate: string;
         lineTotal: string;
+        sortOrder: number;
     }[];
     allocations: {
         paymentId: string;
@@ -192,14 +196,14 @@ export declare function useUpdateOrder(id: string): import("@tanstack/react-quer
     }[];
 }, Error, {
     version: number;
-    notes?: string | undefined;
     customerId?: string | undefined;
     issuedAt?: string | undefined;
     dueAt?: string | undefined;
     discountAmount?: string | undefined;
+    notes?: string | undefined;
     items?: {
-        name: string;
         sourceType: "MANUAL" | "PRODUCT" | "SERVICE";
+        name: string;
         quantity: string;
         unitPrice: string;
         discount: string;
@@ -210,10 +214,10 @@ export declare function useUpdateOrder(id: string): import("@tanstack/react-quer
 }, unknown>;
 /** معاينة حساب الطلب — الخادم يحسب، الواجهة تعرض. */
 export declare function usePreviewOrder(): import("@tanstack/react-query").UseMutationResult<{
-    total: string;
     subtotal: string;
     discountAmount: string;
     taxAmount: string;
+    total: string;
     lineTotals: string[];
 }, Error, {
     items: CreateOrderRequest["items"];
@@ -222,10 +226,8 @@ export declare function usePreviewOrder(): import("@tanstack/react-query").UseMu
 export declare function useConfirmOrder(id: string): import("@tanstack/react-query").UseMutationResult<{
     number: string;
     id: string;
-    notes: string | null;
-    status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
     createdAt: string;
-    total: string;
+    status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
     customerId: string;
     customerName: string;
     customerCode: string;
@@ -234,8 +236,11 @@ export declare function useConfirmOrder(id: string): import("@tanstack/react-que
     subtotal: string;
     discountAmount: string;
     taxAmount: string;
+    total: string;
     paidAmount: string;
+    creditAppliedAmount: string;
     remainingAmount: string;
+    notes: string | null;
     isLocked: boolean;
     isOverdue: boolean;
     isArchived: boolean;
@@ -246,16 +251,16 @@ export declare function useConfirmOrder(id: string): import("@tanstack/react-que
     cancelReason: string | null;
     items: {
         id: string;
-        name: string;
-        sortOrder: number;
         sourceType: "MANUAL" | "PRODUCT" | "SERVICE";
         sourceId: string | null;
+        name: string;
         description: string | null;
         quantity: string;
         unitPrice: string;
         discount: string;
         taxRate: string;
         lineTotal: string;
+        sortOrder: number;
     }[];
     allocations: {
         paymentId: string;
@@ -273,10 +278,8 @@ export declare function useConfirmOrder(id: string): import("@tanstack/react-que
 export declare function useCancelOrder(id: string): import("@tanstack/react-query").UseMutationResult<{
     number: string;
     id: string;
-    notes: string | null;
-    status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
     createdAt: string;
-    total: string;
+    status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
     customerId: string;
     customerName: string;
     customerCode: string;
@@ -285,8 +288,11 @@ export declare function useCancelOrder(id: string): import("@tanstack/react-quer
     subtotal: string;
     discountAmount: string;
     taxAmount: string;
+    total: string;
     paidAmount: string;
+    creditAppliedAmount: string;
     remainingAmount: string;
+    notes: string | null;
     isLocked: boolean;
     isOverdue: boolean;
     isArchived: boolean;
@@ -297,16 +303,16 @@ export declare function useCancelOrder(id: string): import("@tanstack/react-quer
     cancelReason: string | null;
     items: {
         id: string;
-        name: string;
-        sortOrder: number;
         sourceType: "MANUAL" | "PRODUCT" | "SERVICE";
         sourceId: string | null;
+        name: string;
         description: string | null;
         quantity: string;
         unitPrice: string;
         discount: string;
         taxRate: string;
         lineTotal: string;
+        sortOrder: number;
     }[];
     allocations: {
         paymentId: string;
@@ -322,10 +328,8 @@ export declare function useCancelOrder(id: string): import("@tanstack/react-quer
 export declare function useDuplicateOrder(): import("@tanstack/react-query").UseMutationResult<{
     number: string;
     id: string;
-    notes: string | null;
-    status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
     createdAt: string;
-    total: string;
+    status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
     customerId: string;
     customerName: string;
     customerCode: string;
@@ -334,8 +338,11 @@ export declare function useDuplicateOrder(): import("@tanstack/react-query").Use
     subtotal: string;
     discountAmount: string;
     taxAmount: string;
+    total: string;
     paidAmount: string;
+    creditAppliedAmount: string;
     remainingAmount: string;
+    notes: string | null;
     isLocked: boolean;
     isOverdue: boolean;
     isArchived: boolean;
@@ -346,16 +353,16 @@ export declare function useDuplicateOrder(): import("@tanstack/react-query").Use
     cancelReason: string | null;
     items: {
         id: string;
-        name: string;
-        sortOrder: number;
         sourceType: "MANUAL" | "PRODUCT" | "SERVICE";
         sourceId: string | null;
+        name: string;
         description: string | null;
         quantity: string;
         unitPrice: string;
         discount: string;
         taxRate: string;
         lineTotal: string;
+        sortOrder: number;
     }[];
     allocations: {
         paymentId: string;
@@ -372,10 +379,8 @@ export declare function useDeleteOrder(): import("@tanstack/react-query").UseMut
 export declare function useArchiveOrder(): import("@tanstack/react-query").UseMutationResult<{
     number: string;
     id: string;
-    notes: string | null;
-    status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
     createdAt: string;
-    total: string;
+    status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
     customerId: string;
     customerName: string;
     customerCode: string;
@@ -384,8 +389,11 @@ export declare function useArchiveOrder(): import("@tanstack/react-query").UseMu
     subtotal: string;
     discountAmount: string;
     taxAmount: string;
+    total: string;
     paidAmount: string;
+    creditAppliedAmount: string;
     remainingAmount: string;
+    notes: string | null;
     isLocked: boolean;
     isOverdue: boolean;
     isArchived: boolean;
@@ -396,16 +404,16 @@ export declare function useArchiveOrder(): import("@tanstack/react-query").UseMu
     cancelReason: string | null;
     items: {
         id: string;
-        name: string;
-        sortOrder: number;
         sourceType: "MANUAL" | "PRODUCT" | "SERVICE";
         sourceId: string | null;
+        name: string;
         description: string | null;
         quantity: string;
         unitPrice: string;
         discount: string;
         taxRate: string;
         lineTotal: string;
+        sortOrder: number;
     }[];
     allocations: {
         paymentId: string;
@@ -422,10 +430,8 @@ export declare function useArchiveOrder(): import("@tanstack/react-query").UseMu
 export declare function useRevertToDraft(): import("@tanstack/react-query").UseMutationResult<{
     number: string;
     id: string;
-    notes: string | null;
-    status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
     createdAt: string;
-    total: string;
+    status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
     customerId: string;
     customerName: string;
     customerCode: string;
@@ -434,8 +440,11 @@ export declare function useRevertToDraft(): import("@tanstack/react-query").UseM
     subtotal: string;
     discountAmount: string;
     taxAmount: string;
+    total: string;
     paidAmount: string;
+    creditAppliedAmount: string;
     remainingAmount: string;
+    notes: string | null;
     isLocked: boolean;
     isOverdue: boolean;
     isArchived: boolean;
@@ -446,16 +455,16 @@ export declare function useRevertToDraft(): import("@tanstack/react-query").UseM
     cancelReason: string | null;
     items: {
         id: string;
-        name: string;
-        sortOrder: number;
         sourceType: "MANUAL" | "PRODUCT" | "SERVICE";
         sourceId: string | null;
+        name: string;
         description: string | null;
         quantity: string;
         unitPrice: string;
         discount: string;
         taxRate: string;
         lineTotal: string;
+        sortOrder: number;
     }[];
     allocations: {
         paymentId: string;

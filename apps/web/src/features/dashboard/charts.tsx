@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
   Cell,
   Legend,
@@ -39,7 +41,13 @@ const COLLECTION_LABELS = {
   en: { title: 'Collection rate', collected: 'Collected from amounts due' },
 } as const;
 
-export function CollectionRateChart({ metric }: { metric: KpiMetric }) {
+export function CollectionRateChart({
+  metric,
+  large = false,
+}: {
+  metric: KpiMetric;
+  large?: boolean;
+}) {
   const locale = currentLocale();
   const value = Number(metric.value);
   const displayed = Number.isFinite(value) ? value : 0;
@@ -55,22 +63,30 @@ export function CollectionRateChart({ metric }: { metric: KpiMetric }) {
   return (
     <section
       aria-label={COLLECTION_LABELS[locale].title}
-      className="rounded-card border-border bg-card shadow-card flex min-h-28 items-center justify-between gap-3 border px-4 py-3"
+      className={`rounded-card border-border bg-card shadow-card flex h-full items-center gap-4 border p-5 ${
+        large
+          ? 'min-h-64 flex-col justify-center text-center sm:min-h-72'
+          : 'min-h-28 justify-between'
+      }`}
     >
-      <div className="min-w-0 text-start">
-        <h2 className="text-fg-muted text-sm font-medium">{COLLECTION_LABELS[locale].title}</h2>
+      <div className={large ? 'min-w-0 text-center' : 'min-w-0 text-start'}>
+        <h2
+          className={large ? 'text-fg text-lg font-semibold' : 'text-fg-muted text-sm font-medium'}
+        >
+          {COLLECTION_LABELS[locale].title}
+        </h2>
         <p className="text-fg-subtle mt-2 text-xs leading-5">
           {COLLECTION_LABELS[locale].collected}
         </p>
       </div>
-      <div className="relative size-24 shrink-0" dir="ltr">
+      <div className={`relative shrink-0 ${large ? 'size-40' : 'size-24'}`} dir="ltr">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               dataKey="value"
-              innerRadius={31}
-              outerRadius={43}
+              innerRadius={large ? 52 : 31}
+              outerRadius={large ? 72 : 43}
               startAngle={90}
               endAngle={-270}
               stroke="none"
@@ -82,7 +98,9 @@ export function CollectionRateChart({ metric }: { metric: KpiMetric }) {
           </PieChart>
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <span className="text-fg text-lg font-bold tabular-nums">{formattedValue}%</span>
+          <span className={`text-fg font-bold tabular-nums ${large ? 'text-3xl' : 'text-lg'}`}>
+            {formattedValue}%
+          </span>
         </div>
       </div>
     </section>
@@ -144,6 +162,59 @@ export function TrendChart({
   }
 
   const anyMoney = series.some((s) => s.unit === 'money');
+  const tooltipFormatter = (value: number, name: string) => {
+    const id = name as DashboardTrendId;
+    const meta = TREND_META[id];
+    const formatted =
+      meta?.unit === 'money' ? formatMoney(String(value), { currency }) : String(value);
+    return [formatted, meta?.label ?? name];
+  };
+
+  if (data.length === 1) {
+    return (
+      <ResponsiveContainer width="100%" height={height}>
+        <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 4 }} barGap={8}>
+          <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
+          <XAxis
+            dataKey="label"
+            tick={{ fill: AXIS, fontSize: 11 }}
+            axisLine={{ stroke: GRID }}
+            tickLine={false}
+          />
+          <YAxis
+            orientation="right"
+            tick={{ fill: AXIS, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={shortNumber}
+            width={44}
+          />
+          <Tooltip
+            formatter={tooltipFormatter}
+            labelFormatter={(label) => `التاريخ: ${label}`}
+            contentStyle={tooltipStyle}
+          />
+          {ids.length > 1 ? (
+            <Legend
+              formatter={(value) => TREND_META[value as DashboardTrendId]?.label ?? value}
+              iconType="circle"
+              wrapperStyle={{ fontSize: 12 }}
+            />
+          ) : null}
+          {ids.map((id) => (
+            <Bar
+              key={id}
+              dataKey={id}
+              fill={SERIES_COLOR[id]}
+              radius={[5, 5, 0, 0]}
+              maxBarSize={64}
+              isAnimationActive
+            />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+    );
+  }
 
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -165,13 +236,7 @@ export function TrendChart({
           width={44}
         />
         <Tooltip
-          formatter={(value: number, name: string) => {
-            const id = name as DashboardTrendId;
-            const meta = TREND_META[id];
-            const formatted =
-              meta?.unit === 'money' ? formatMoney(String(value), { currency }) : String(value);
-            return [formatted, meta?.label ?? name];
-          }}
+          formatter={tooltipFormatter}
           labelFormatter={(l) => `التاريخ: ${l}`}
           contentStyle={tooltipStyle}
         />

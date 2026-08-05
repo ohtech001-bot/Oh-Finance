@@ -34,6 +34,8 @@ import { LedgerService } from '../ledger/ledger.service.js';
 /** صف الزبون كما نقرأه من Prisma. */
 type CustomerRow = Prisma.CustomerGetPayload<Record<string, never>>;
 
+const CUSTOMER_ARCHIVE_RETENTION_DAYS = 30;
+
 @Injectable()
 export class CustomersService {
   constructor(
@@ -72,9 +74,7 @@ export class CustomersService {
           tags: dto.tags,
           creditLimit: dto.creditLimit,
           paymentTermDays: dto.paymentTermDays,
-          paymentDueDate: dto.paymentDueDate
-            ? new Date(`${dto.paymentDueDate}T00:00:00.000Z`)
-            : null,
+          paymentDueDate: paymentDueDateFromRequest(dto.paymentDueDay, dto.paymentDueDate),
           status: dto.status,
           createdBy: userId,
         },
@@ -108,7 +108,7 @@ export class CustomersService {
           code,
           name: dto.name,
           creditLimit: dto.creditLimit,
-          paymentDueDate: dto.paymentDueDate ?? null,
+          paymentDueDay: dto.paymentDueDay,
           openingBalance: dto.openingBalance,
         },
       });
@@ -125,8 +125,15 @@ export class CustomersService {
     const { tenantId } = this.context();
 
     return this.prisma.runInTenant(tenantId, async (tx) => {
+      await this.purgeExpiredArchivedCustomers(tx, tenantId);
+
+      const restorableAfter = this.archiveCutoff();
       const where: Prisma.CustomerWhereInput = {
-        ...(query.includeArchived ? {} : { archivedAt: null }),
+        ...(query.archivedOnly
+          ? { archivedAt: { not: null, gt: restorableAfter } }
+          : query.includeArchived
+            ? {}
+            : { archivedAt: null }),
         ...(query.status ? { status: query.status } : {}),
         ...(query.city ? { city: { equals: query.city, mode: 'insensitive' } } : {}),
         ...(query.tag ? { tags: { has: query.tag } } : {}),
@@ -239,7 +246,12 @@ export class CustomersService {
     const { tenantId } = this.context();
 
     return this.prisma.runInTenant(tenantId, async (tx) => {
-      const row = await tx.customer.findFirst({ where: { id } });
+      const row = await tx.customer.findFirst({
+        where: {
+          id,
+          OR: [{ archivedAt: null }, { archivedAt: { gt: this.archiveCutoff() } }],
+        },
+      });
       if (!row) return null;
 
       const balance = await this.ledger.getBalance(tx, tenantId, id);
@@ -252,7 +264,12 @@ export class CustomersService {
     const { tenantId } = this.context();
 
     return this.prisma.runInTenant(tenantId, async (tx) => {
-      const row = await tx.customer.findFirst({ where: { id } });
+      const row = await tx.customer.findFirst({
+        where: {
+          id,
+          OR: [{ archivedAt: null }, { archivedAt: { gt: this.archiveCutoff() } }],
+        },
+      });
       if (!row) throw AppError.notFound('الزبون');
 
       const balance = await this.ledger.getBalance(tx, tenantId, id);
@@ -262,9 +279,12 @@ export class CustomersService {
         select: { timezone: true },
       });
       const todayText = isoDateInTimeZone(now, tenant?.timezone ?? 'Asia/Jerusalem');
-      const paymentDueDate = row.paymentDueDate?.toISOString().slice(0, 10) ?? null;
-      const paymentDueReached =
-        paymentDueDate !== null && paymentDueDate <= todayText && balance.greaterThan(0);
+      const todayDay = Number(todayText.slice(8, 10));
+      const paymentDueDay = Math.min(
+        paymentDueDayFromDate(row.paymentDueDate),
+        lastDayOfMonth(todayText),
+      );
+      const paymentDueReached = todayDay >= paymentDueDay && balance.greaterThan(0);
 
       const [orderAgg, paymentAgg, lastOrder, lastPayment, overdue, avgPay] = await Promise.all([
         tx.order.aggregate({
@@ -387,11 +407,12 @@ export class CustomersService {
           ...(dto.tags !== undefined ? { tags: dto.tags } : {}),
           ...(dto.creditLimit !== undefined ? { creditLimit: dto.creditLimit } : {}),
           ...(dto.paymentTermDays !== undefined ? { paymentTermDays: dto.paymentTermDays } : {}),
-          ...(dto.paymentDueDate !== undefined
+          ...(dto.paymentDueDay !== undefined || dto.paymentDueDate !== undefined
             ? {
-                paymentDueDate: dto.paymentDueDate
-                  ? new Date(`${dto.paymentDueDate}T00:00:00.000Z`)
-                  : null,
+                paymentDueDate: paymentDueDateFromRequest(
+                  dto.paymentDueDay ?? paymentDueDayFromDate(before.paymentDueDate),
+                  dto.paymentDueDate,
+                ),
               }
             : {}),
           ...(dto.status !== undefined ? { status: dto.status } : {}),
@@ -406,13 +427,13 @@ export class CustomersService {
         before: {
           name: before.name,
           creditLimit: before.creditLimit.toString(),
-          paymentDueDate: before.paymentDueDate?.toISOString().slice(0, 10) ?? null,
+          paymentDueDay: paymentDueDayFromDate(before.paymentDueDate),
           status: before.status,
         },
         after: {
           name: after.name,
           creditLimit: after.creditLimit.toString(),
-          paymentDueDate: after.paymentDueDate?.toISOString().slice(0, 10) ?? null,
+          paymentDueDay: paymentDueDayFromDate(after.paymentDueDate),
           status: after.status,
         },
       });
@@ -449,15 +470,18 @@ export class CustomersService {
         );
       }
 
-      const openOrders = await tx.order.count({
+      const futureOrders = await tx.order.count({
         where: {
           tenantId,
           customerId: id,
-          status: { in: ['DRAFT', 'QUOTE', 'CONFIRMED', 'PARTIALLY_PAID'] },
+          status: { in: ['DRAFT', 'QUOTE'] },
+          archivedAt: null,
         },
       });
-      if (openOrders > 0) {
-        throw AppError.conflict(`للزبون ${openOrders} طلب مفتوح. أغلقها أو ألغِها أولًا.`);
+      if (futureOrders > 0) {
+        throw AppError.conflict(
+          `لا يمكن أرشفة الزبون لأن لديه ${futureOrders} طلب مستقبلي أو مسودة. أكمل الطلبات أو احذفها أولًا.`,
+        );
       }
 
       await tx.customer.update({
@@ -474,15 +498,47 @@ export class CustomersService {
     });
   }
 
+  async restore(id: string): Promise<Customer> {
+    const { tenantId } = this.context();
+
+    return this.prisma.runInTenant(tenantId, async (tx) => {
+      const customer = await tx.customer.findFirst({ where: { id } });
+      if (!customer) throw AppError.notFound('الزبون');
+      if (!customer.archivedAt) throw AppError.conflict('الزبون غير موجود في الأرشيف.');
+      if (customer.archivedAt <= this.archiveCutoff()) {
+        throw AppError.conflict('انتهت مهلة الاستعادة لهذا الزبون.');
+      }
+
+      const restored = await tx.customer.update({
+        where: { id },
+        data: { archivedAt: null, status: 'ACTIVE' },
+      });
+
+      await this.audit.record(tx, {
+        action: AUDIT_ACTIONS.CUSTOMER_RESTORED,
+        summary: `استعادة الزبون "${customer.name}" من الأرشيف`,
+        entityType: 'Customer',
+        entityId: id,
+      });
+
+      const balance = await this.ledger.getBalance(tx, tenantId, id);
+      return this.toDto(restored, balance);
+    });
+  }
+
   /** إحصاءات رأس الشاشة. */
   async stats(): Promise<CustomerStats> {
     const { tenantId } = this.context();
 
     return this.prisma.runInTenant(tenantId, async (tx) => {
-      const [total, active] = await Promise.all([
+      const [total, active, tenant] = await Promise.all([
         tx.customer.count({ where: { archivedAt: null } }),
         tx.customer.count({ where: { archivedAt: null, status: 'ACTIVE' } }),
+        tx.tenant.findUnique({ where: { id: tenantId }, select: { timezone: true } }),
       ]);
+      const todayText = isoDateInTimeZone(new Date(), tenant?.timezone ?? 'Asia/Jerusalem');
+      const todayDay = Number(todayText.slice(8, 10));
+      const currentMonthLastDay = lastDayOfMonth(todayText);
 
       /**
        * إجمالي الديون — من الدفتر مباشرة، بـSQL.
@@ -491,7 +547,12 @@ export class CustomersService {
        * دَينًا لنا، وطرحه من الإجمالي كان سيُخفي حجم الديون الحقيقي.
        */
       const rows = await tx.$queryRaw<
-        { with_debt: bigint; total_debt: string; over_limit: bigint }[]
+        {
+          with_debt: bigint;
+          total_debt: string;
+          over_limit: bigint;
+          overdue_payment_customers: bigint;
+        }[]
       >`
         WITH balances AS (
           SELECT DISTINCT ON (le.customer_id)
@@ -507,7 +568,11 @@ export class CustomersService {
         SELECT
           COUNT(*) FILTER (WHERE running_balance > 0)                       AS with_debt,
           COALESCE(SUM(running_balance) FILTER (WHERE running_balance > 0), 0)::text AS total_debt,
-          COUNT(*) FILTER (WHERE credit_limit > 0 AND running_balance > credit_limit) AS over_limit
+          COUNT(*) FILTER (WHERE credit_limit > 0 AND running_balance > credit_limit) AS over_limit,
+          COUNT(*) FILTER (
+            WHERE running_balance > 0
+              AND LEAST(EXTRACT(DAY FROM payment_due_date)::int, ${currentMonthLastDay}) <= ${todayDay}
+          ) AS overdue_payment_customers
         FROM balances
       `;
 
@@ -519,6 +584,7 @@ export class CustomersService {
         withDebt: Number(row?.with_debt ?? 0),
         totalDebt: toMoneyString(row?.total_debt ?? '0', 2),
         overCreditLimit: Number(row?.over_limit ?? 0),
+        overduePaymentCustomers: Number(row?.overdue_payment_customers ?? 0),
       } as CustomerStats;
     });
   }
@@ -554,6 +620,67 @@ export class CustomersService {
     return balance.greaterThan(0) ? 'DEBIT' : 'CREDIT';
   }
 
+  private archiveCutoff(): Date {
+    return new Date(Date.now() - CUSTOMER_ARCHIVE_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  }
+
+  private async purgeExpiredArchivedCustomers(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+  ): Promise<void> {
+    const expired = await tx.customer.findMany({
+      where: {
+        tenantId,
+        archivedAt: { not: null, lte: this.archiveCutoff() },
+        OR: [
+          { phone: { not: null } },
+          { email: { not: null } },
+          { name: { not: { startsWith: 'زبون محذوف' } } },
+        ],
+      },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        _count: { select: { orders: true, payments: true, ledgerEntries: true } },
+      },
+    });
+
+    for (const customer of expired) {
+      const hasFinancialHistory =
+        customer._count.orders + customer._count.payments + customer._count.ledgerEntries > 0;
+
+      await this.audit.record(tx, {
+        action: AUDIT_ACTIONS.CUSTOMER_PURGED,
+        summary: `حذف بيانات الزبون "${customer.name}" بعد انتهاء مهلة الأرشيف`,
+        entityType: 'Customer',
+        entityId: customer.id,
+      });
+
+      if (!hasFinancialHistory) {
+        await tx.customer.delete({ where: { id: customer.id } });
+        continue;
+      }
+
+      await tx.customer.update({
+        where: { id: customer.id },
+        data: {
+          name: `زبون محذوف ${customer.code}`,
+          company: null,
+          phone: null,
+          phoneAlt: null,
+          email: null,
+          address: null,
+          city: null,
+          taxNumber: null,
+          notes: null,
+          tags: [],
+          status: 'INACTIVE',
+        },
+      });
+    }
+  }
+
   private toDto(row: CustomerRow, balance: Decimal): Customer {
     const creditLimit = toMoney(row.creditLimit.toString());
 
@@ -575,6 +702,7 @@ export class CustomersService {
       tags: row.tags,
       creditLimit: toMoneyString(creditLimit, 2),
       paymentTermDays: row.paymentTermDays,
+      paymentDueDay: paymentDueDayFromDate(row.paymentDueDate),
       paymentDueDate: row.paymentDueDate?.toISOString().slice(0, 10) ?? null,
       status: row.status,
 
@@ -587,4 +715,19 @@ export class CustomersService {
       archivedAt: row.archivedAt?.toISOString() ?? null,
     } as Customer;
   }
+}
+
+function paymentDueDayFromDate(value: Date | null): number {
+  return value?.getUTCDate() ?? 15;
+}
+
+function paymentDueDateFromRequest(day: number, legacyDate?: string): Date {
+  const resolvedDay = legacyDate ? Number(legacyDate.slice(8, 10)) : day;
+  return new Date(Date.UTC(2000, 0, Math.min(31, Math.max(1, resolvedDay))));
+}
+
+function lastDayOfMonth(isoDate: string): number {
+  const year = Number(isoDate.slice(0, 4));
+  const month = Number(isoDate.slice(5, 7));
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }

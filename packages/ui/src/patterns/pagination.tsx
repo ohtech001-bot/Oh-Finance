@@ -47,7 +47,7 @@ export function Pagination({
       )}
     >
       {/* العدّاد + حجم الصفحة */}
-      <div className="flex items-center gap-4 text-[13px] text-fg-muted">
+      <div className="flex flex-wrap items-center gap-3 text-[13px] text-fg-muted sm:gap-4">
         {onPageSizeChange ? (
           <div className="flex items-center gap-2">
             <label htmlFor="page-size" className="whitespace-nowrap">
@@ -79,7 +79,7 @@ export function Pagination({
       </div>
 
       {/* أزرار الصفحات */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex w-full items-center justify-between gap-1.5 sm:w-auto sm:justify-start">
         <Button
           variant="outline"
           size="sm"
@@ -91,7 +91,11 @@ export function Pagination({
 
         {buildPageList(page, totalPages).map((item, i) =>
           item === 'ellipsis' ? (
-            <span key={`gap-${i}`} className="px-2 text-fg-subtle" aria-hidden>
+            <span
+              key={`gap-${i}`}
+              className="hidden px-2 text-fg-subtle sm:inline"
+              aria-hidden
+            >
               …
             </span>
           ) : (
@@ -99,7 +103,7 @@ export function Pagination({
               key={item}
               variant={item === page ? 'accent' : 'outline'}
               size="sm"
-              className="min-w-9 tabular-nums"
+              className={cn('min-w-9 tabular-nums', item !== page && 'max-sm:hidden')}
               onClick={() => onPageChange(item)}
               aria-current={item === page ? 'page' : undefined}
               aria-label={`صفحة ${item}`}

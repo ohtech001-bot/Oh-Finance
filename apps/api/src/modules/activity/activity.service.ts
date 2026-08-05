@@ -153,6 +153,11 @@ export class ActivityService {
       const today = new Date(`${todayText}T00:00:00.000Z`);
       const fiveDaysFromNow = new Date(today);
       fiveDaysFromNow.setUTCDate(fiveDaysFromNow.getUTCDate() + 5);
+      const todayDay = today.getUTCDate();
+      const dueSoonDay = fiveDaysFromNow.getUTCDate();
+      const currentMonthLastDay = new Date(
+        Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0),
+      ).getUTCDate();
 
       const allowedActions: string[] = [];
       if (permissions.has('orders.read')) allowedActions.push('order.created');
@@ -260,23 +265,35 @@ export class ActivityService {
           WHERE c.tenant_id = ${tenantId}::uuid
             AND c.archived_at IS NULL
             AND b.running_balance > 0
-            AND c.payment_due_date IN (${today}::date, ${fiveDaysFromNow}::date)
-          ORDER BY c.payment_due_date ASC, c.name ASC
+            AND c.payment_due_date IS NOT NULL
+          ORDER BY c.name ASC
         `;
 
         const generatedAt = new Date().toISOString();
         for (const customer of dueCustomers) {
-          const dueToday = customer.payment_due_date.getTime() === today.getTime();
+          const dueDay = Math.min(customer.payment_due_date.getUTCDate(), currentMonthLastDay);
+          const dueToday = dueDay === todayDay;
+          const dueSoon = dueDay === dueSoonDay;
+          const overdue = dueDay < todayDay;
+          if (!dueToday && !dueSoon && !overdue) continue;
           items.push({
-            id: `${dueToday ? 'due-today' : 'due-soon'}-${customer.id}-${todayText}`,
-            kind: dueToday ? 'PAYMENT_DUE_TODAY' : 'PAYMENT_DUE_SOON',
-            severity: dueToday ? 'danger' : 'warning',
-            title: dueToday
-              ? `موعد سداد ${customer.name} اليوم`
-              : `اقترب موعد سداد ${customer.name}`,
-            description: dueToday
-              ? `موعد سداد الدين اليوم. الرصيد المستحق: ${customer.balance}`
-              : `متبقي 5 أيام على موعد سداد الدين. الرصيد المستحق: ${customer.balance}`,
+            id: `${overdue ? 'due-overdue' : dueToday ? 'due-today' : 'due-soon'}-${customer.id}-${todayText}`,
+            kind: overdue
+              ? 'PAYMENT_DUE_OVERDUE'
+              : dueToday
+                ? 'PAYMENT_DUE_TODAY'
+                : 'PAYMENT_DUE_SOON',
+            severity: dueToday || overdue ? 'danger' : 'warning',
+            title: overdue
+              ? `تجاوز ${customer.name} موعد السداد`
+              : dueToday
+                ? `موعد سداد ${customer.name} اليوم`
+                : `اقترب موعد سداد ${customer.name}`,
+            description: overdue
+              ? `تجاوز موعد السداد وما زال الحساب مديونًا. الرصيد المستحق: ${customer.balance}`
+              : dueToday
+                ? `موعد سداد الدين اليوم وما زال الحساب مديونًا. الرصيد المستحق: ${customer.balance}`
+                : `متبقي 5 أيام على موعد سداد الدين. الرصيد المستحق: ${customer.balance}`,
             customerName: customer.name,
             balance: customer.balance,
             occurredAt: generatedAt,

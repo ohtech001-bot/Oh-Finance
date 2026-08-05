@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import {
   AUDIT_ACTIONS,
+  type ApplyCustomerCreditRequest,
+  type ApplyCustomerCreditResult,
   type AllocationPreview,
   type AllocationPreviewRequest,
   type AllocationStrategy,
@@ -17,6 +19,7 @@ import {
   add,
   equals,
   greaterThan,
+  isNegative,
   isZero,
   min,
   subtract,
@@ -92,12 +95,16 @@ export class PaymentsService {
       const amount = toMoney(dto.amount);
 
       // ── 2. التوزيع ─────────────────────────────────────────────────────
+      // A general receipt must always settle existing debt oldest-first. NONE
+      // is kept in the public contract for backward compatibility, but it may
+      // not leave money unlinked while the customer has open orders.
+      const allocationStrategy = dto.strategy === 'MANUAL' ? 'MANUAL' : 'AUTO_OLDEST_FIRST';
       const planned = await this.planAllocations(
         tx,
         tenantId,
         dto.customerId,
         amount,
-        dto.strategy,
+        allocationStrategy,
         dto.allocations,
       );
 
@@ -210,6 +217,144 @@ export class PaymentsService {
     const created = await this.findOne(paymentId);
     if (!created) throw AppError.internal('تعذّر قراءة الدفعة بعد إنشائها.');
     return created;
+  }
+
+  /** الرصيد السابق القابل للاستخدام، بعد طرح ما استُخدم أو رُبط بطلبات. */
+  async customerCredit(customerId: string): Promise<{ availableAmount: MoneyString }> {
+    const { tenantId } = this.context();
+
+    return this.prisma.runInTenant(tenantId, async (tx) => ({
+      availableAmount: toMoneyString(
+        await this.availableCustomerCredit(tx, tenantId, customerId),
+        2,
+      ),
+    }));
+  }
+
+  /**
+   * يربط جزءًا من رصيد الزبون بطلب محدد دون إنشاء دفعة نقدية أو قيد جديد.
+   * قيد الطلب وقيد الرصيد السابق موجودان أصلًا؛ هذه العملية تحدد فقط أن
+   * صاحب المحل اختار مقابلة أحدهما بالآخر.
+   */
+  async applyCustomerCredit(
+    dto: ApplyCustomerCreditRequest,
+    idempotencyKey: string,
+  ): Promise<ApplyCustomerCreditResult> {
+    const { tenantId, userId } = this.context();
+
+    return this.prisma.runInTenant(tenantId, async (tx) => {
+      const order = await tx.order.findFirst({
+        where: {
+          id: dto.orderId,
+          tenantId,
+          status: { in: ['CONFIRMED', 'PARTIALLY_PAID'] },
+        },
+        select: {
+          id: true,
+          number: true,
+          customerId: true,
+          total: true,
+          paidAmount: true,
+          creditAppliedAmount: true,
+          customer: { select: { name: true } },
+        },
+      });
+      if (!order) throw AppError.notFound('الطلب غير المسدَّد');
+
+      // نفس قفل دفتر الزبون: يمنع عمليتي استخدام رصيد متزامنتين من صرفه مرتين.
+      await tx.$executeRaw`
+        SELECT pg_advisory_xact_lock(hashtextextended(${`ledger:${order.customerId}`}, 0))
+      `;
+
+      const amount = toMoney(dto.amount);
+      const total = toMoney(order.total.toString());
+      const alreadyPaid = toMoney(order.paidAmount.toString());
+      const remaining = subtract(total, alreadyPaid);
+      const available = await this.availableCustomerCredit(tx, tenantId, order.customerId);
+
+      if (greaterThan(amount, available)) {
+        throw AppError.validation(
+          `المبلغ يتجاوز رصيد الزبون المتاح (${toMoneyString(available, 2)}).`,
+        );
+      }
+      if (greaterThan(amount, remaining)) {
+        throw AppError.validation(
+          `المبلغ يتجاوز المتبقي على الطلب (${toMoneyString(remaining, 2)}).`,
+        );
+      }
+
+      const newPaid = add(alreadyPaid, amount);
+      const newCreditApplied = add(order.creditAppliedAmount.toString(), amount);
+      const fullyPaid = equals(newPaid, total);
+      const status = fullyPaid ? 'PAID' : 'PARTIALLY_PAID';
+
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          paidAmount: toMoneyString(newPaid),
+          creditAppliedAmount: toMoneyString(newCreditApplied),
+          status,
+          version: { increment: 1 },
+        },
+      });
+
+      await this.audit.record(tx, {
+        action: AUDIT_ACTIONS.ORDER_CUSTOMER_CREDIT_APPLIED,
+        summary: `استخدام ${toMoneyString(amount, 2)} من رصيد "${order.customer.name}" لسداد الطلب ${order.number}.`,
+        entityType: 'Order',
+        entityId: order.id,
+        after: {
+          amount: toMoneyString(amount, 2),
+          paidAmount: toMoneyString(newPaid, 2),
+          idempotencyKey,
+        },
+        actor: { id: userId, name: null },
+      });
+
+      return {
+        orderId: order.id,
+        appliedAmount: toMoneyString(amount, 2),
+        paidAmount: toMoneyString(newPaid, 2),
+        remainingAmount: toMoneyString(subtract(total, newPaid), 2),
+        status,
+      };
+    });
+  }
+
+  private async availableCustomerCredit(
+    tx: TxClient,
+    tenantId: string,
+    customerId: string,
+  ): Promise<Decimal> {
+    const [payments, allocations, openingCredit, applied] = await Promise.all([
+      tx.payment.aggregate({
+        where: { tenantId, customerId, status: 'POSTED' },
+        _sum: { amount: true },
+      }),
+      tx.paymentAllocation.aggregate({
+        where: { tenantId, payment: { customerId, status: 'POSTED' } },
+        _sum: { amount: true },
+      }),
+      tx.ledgerEntry.aggregate({
+        where: { tenantId, customerId, entryType: 'OPENING_BALANCE', credit: { gt: 0 } },
+        _sum: { credit: true },
+      }),
+      tx.order.aggregate({
+        where: { tenantId, customerId, status: { not: 'CANCELLED' } },
+        _sum: { creditAppliedAmount: true },
+      }),
+    ]);
+
+    const received = add(
+      payments._sum.amount?.toString() ?? '0',
+      openingCredit._sum.credit?.toString() ?? '0',
+    );
+    const used = add(
+      allocations._sum.amount?.toString() ?? '0',
+      applied._sum.creditAppliedAmount?.toString() ?? '0',
+    );
+    const available = subtract(received, used);
+    return isNegative(available) ? zero() : available;
   }
 
   /**

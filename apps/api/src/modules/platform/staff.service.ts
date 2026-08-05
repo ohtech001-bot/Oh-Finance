@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import {
   AUDIT_ACTIONS,
   type CreatePlatformStaffInviteRequest,
@@ -49,7 +50,49 @@ export class StaffService {
     }));
   }
 
+  async create(dto: CreatePlatformStaffInviteRequest, actorId: string): Promise<PlatformStaff> {
+    const passwordHash = await this.passwords.hash(dto.initialPassword);
+
+    try {
+      const created = await this.prisma.runAsPlatform(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            email: dto.email,
+            name: dto.name,
+            phone: dto.phone,
+            dateOfBirth: new Date(`${dto.dateOfBirth}T00:00:00.000Z`),
+            identityNumber: null,
+            jobTitle: dto.jobTitle || null,
+            locale: dto.locale,
+            platformRole: dto.platformRole,
+            isSuperAdmin: true,
+            status: 'ACTIVE',
+            passwordHash,
+            emailVerifiedAt: null,
+            mustChangePassword: true,
+          },
+        });
+        await this.audit.record(tx, {
+          action: AUDIT_ACTIONS.PLATFORM_STAFF_CREATED,
+          summary: `إنشاء حساب منصة بكلمة سر أولية: ${user.email}`,
+          entityType: 'User',
+          entityId: user.id,
+          tenantId: null,
+          actor: { id: actorId, name: null },
+        });
+        return user;
+      });
+      return (await this.list()).find((item) => item.id === created.id)!;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw AppError.conflict('البريد الإلكتروني مستخدم لحساب آخر.');
+      }
+      throw error;
+    }
+  }
+
   async invite(dto: CreatePlatformStaffInviteRequest, actorId: string) {
+    const { initialPassword: _initialPassword, ...inviteData } = dto;
     const existing = await this.prisma.runAsPlatform((tx) =>
       tx.user.findUnique({ where: { email: dto.email } }),
     );
@@ -61,14 +104,16 @@ export class StaffService {
       const row = await tx.platformStaffInvite.upsert({
         where: { email: dto.email },
         create: {
-          ...dto,
+          ...inviteData,
+          identityNumber: '',
           dateOfBirth: new Date(`${dto.dateOfBirth}T00:00:00.000Z`),
           verificationCodeHash: this.hashCode(code),
           expiresAt,
           createdBy: actorId,
         },
         update: {
-          ...dto,
+          ...inviteData,
+          identityNumber: '',
           dateOfBirth: new Date(`${dto.dateOfBirth}T00:00:00.000Z`),
           verificationCodeHash: this.hashCode(code),
           expiresAt,
@@ -121,8 +166,8 @@ export class StaffService {
           name: invite.name,
           phone: invite.phone,
           dateOfBirth: invite.dateOfBirth,
-          identityNumber: invite.identityNumber,
-          jobTitle: invite.jobTitle,
+          identityNumber: null,
+          jobTitle: invite.jobTitle || null,
           locale: invite.locale,
           platformRole: invite.platformRole,
           isSuperAdmin: true,
@@ -195,6 +240,9 @@ export class StaffService {
     dto: UpdatePlatformStaffRequest,
     actorId: string,
   ): Promise<PlatformStaff> {
+    const passwordHash = dto.initialPassword
+      ? await this.passwords.hash(dto.initialPassword)
+      : undefined;
     await this.prisma.runAsPlatform(async (tx) => {
       const target = await tx.user.findUnique({
         where: { id },
@@ -207,22 +255,40 @@ export class StaffService {
         });
         if (generalManagers <= 1) throw AppError.forbidden('لا يمكن تغيير وظيفة آخر مدير عام.');
       }
-      if (dto.email !== target.email) {
-        throw AppError.validation('تغيير البريد يتطلب إرسال رمز تحقق جديد.');
-      }
+      const duplicate = await tx.user.findFirst({
+        where: { email: dto.email, id: { not: id } },
+        select: { id: true },
+      });
+      if (duplicate) throw AppError.conflict('البريد الإلكتروني مستخدم لحساب آخر.');
 
       await tx.user.update({
         where: { id },
         data: {
           name: dto.name,
+          email: dto.email,
           phone: dto.phone,
           dateOfBirth: new Date(`${dto.dateOfBirth}T00:00:00.000Z`),
-          identityNumber: dto.identityNumber,
-          jobTitle: dto.jobTitle,
+          identityNumber: null,
+          jobTitle: dto.jobTitle || null,
           platformRole: dto.platformRole,
           locale: dto.locale,
+          ...(passwordHash
+            ? {
+                passwordHash,
+                mustChangePassword: true,
+                passwordChangedAt: new Date(),
+                failedLoginCount: 0,
+                lockedUntil: null,
+              }
+            : {}),
         },
       });
+      if (passwordHash) {
+        await tx.session.updateMany({
+          where: { userId: id, revokedAt: null },
+          data: { revokedAt: new Date(), revokedReason: 'INITIAL_PASSWORD_RESET_BY_ADMIN' },
+        });
+      }
       await this.audit.record(tx, {
         action: AUDIT_ACTIONS.PLATFORM_STAFF_UPDATED,
         summary: `تعديل حساب منصة: ${target.email}`,
@@ -239,6 +305,7 @@ export class StaffService {
   }
 
   async inviteUpdate(id: string, dto: UpdatePlatformStaffRequest, actorId: string) {
+    const { initialPassword: _initialPassword, ...inviteData } = dto;
     const target = await this.prisma.runAsPlatform((tx) =>
       tx.user.findUnique({
         where: { id },
@@ -257,14 +324,16 @@ export class StaffService {
       const row = await tx.platformStaffInvite.upsert({
         where: { email: dto.email },
         create: {
-          ...dto,
+          ...inviteData,
+          identityNumber: '',
           dateOfBirth: new Date(`${dto.dateOfBirth}T00:00:00.000Z`),
           verificationCodeHash: this.hashCode(code),
           expiresAt,
           createdBy: actorId,
         },
         update: {
-          ...dto,
+          ...inviteData,
+          identityNumber: '',
           dateOfBirth: new Date(`${dto.dateOfBirth}T00:00:00.000Z`),
           verificationCodeHash: this.hashCode(code),
           expiresAt,
@@ -339,8 +408,8 @@ export class StaffService {
           name: invite.name,
           phone: invite.phone,
           dateOfBirth: invite.dateOfBirth,
-          identityNumber: invite.identityNumber,
-          jobTitle: invite.jobTitle,
+          identityNumber: null,
+          jobTitle: invite.jobTitle || null,
           platformRole: invite.platformRole,
           locale: invite.locale,
           emailVerifiedAt: new Date(),

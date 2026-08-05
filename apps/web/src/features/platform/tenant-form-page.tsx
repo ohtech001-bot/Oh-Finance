@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { CheckCircle2, ImagePlus, Save, Store, User } from 'lucide-react';
 import {
   createTenantSchema,
+  updateTenantSchema,
   type CreateTenantRequest,
   type Plan,
   type TenantDetail,
@@ -85,7 +86,9 @@ export function TenantFormPage() {
     watch,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<CreateTenantRequest>({
-    resolver: zodResolver(createTenantSchema),
+    resolver: zodResolver(
+      isEdit ? updateTenantSchema : createTenantSchema,
+    ) as Resolver<CreateTenantRequest>,
     defaultValues: {
       name: '',
       locale: 'ar',
@@ -203,6 +206,7 @@ export function TenantFormPage() {
         await createMutation.mutateAsync(pendingValues);
       }
     } catch (error) {
+      setConfirmOpen(false);
       if (error instanceof ApiRequestError) {
         // أخطاء الحقول من الخادم تُربط بالحقول مباشرة — لا تُعرض كتنبيه عام.
         if (error.fields) {
@@ -220,10 +224,13 @@ export function TenantFormPage() {
     }
   };
 
-  const onSubmit = handleSubmit((values) => {
-    setPendingValues(values);
-    setConfirmOpen(true);
-  });
+  const onSubmit = handleSubmit(
+    (values) => {
+      setPendingValues(values);
+      setConfirmOpen(true);
+    },
+    () => toast.error(t('platform.fixFormErrors')),
+  );
 
   if (isEdit && tenantQuery.isLoading) {
     return (
@@ -272,7 +279,7 @@ export function TenantFormPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={onSubmit} className="space-y-5 p-6" noValidate>
+          <form onSubmit={onSubmit} className="space-y-4 px-3 py-4 sm:space-y-5 sm:p-6" noValidate>
             {/* ── بيانات المحل ────────────────────────────────────────────── */}
             <Card>
               <CardHeader title="بيانات المحل" />
@@ -339,27 +346,29 @@ export function TenantFormPage() {
 
                 <Field label="شعار المحل" error={errors.logoDataUrl?.message}>
                   {() => (
-                    <div className="flex items-center gap-4">
-                      {(watch('logoDataUrl') || tenantQuery.data?.stores[0]?.logoUrl) ? (
+                    <div className="flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
+                      {watch('logoDataUrl') || tenantQuery.data?.stores[0]?.logoUrl ? (
                         <img
                           src={watch('logoDataUrl') || tenantQuery.data?.stores[0]?.logoUrl || ''}
                           alt="شعار المحل"
-                          className="size-16 rounded-ctrl border border-border object-contain"
+                          className="rounded-ctrl border-border size-16 border object-contain"
                         />
                       ) : (
-                        <div className="flex size-16 items-center justify-center rounded-ctrl border border-dashed border-border text-fg-muted">
+                        <div className="rounded-ctrl border-border text-fg-muted flex size-16 items-center justify-center border border-dashed">
                           <ImagePlus className="size-6" aria-hidden />
                         </div>
                       )}
                       <input
                         type="file"
                         accept="image/png,image/jpeg,image/webp"
-                        className="block min-w-0 text-sm text-fg-muted file:me-3 file:rounded-ctrl file:border-0 file:bg-brand-soft file:px-3 file:py-2 file:text-brand"
+                        className="text-fg-muted file:rounded-ctrl file:bg-brand-soft file:text-brand block w-full min-w-0 text-sm file:me-3 file:border-0 file:px-3 file:py-2"
                         onChange={(event) => {
                           const file = event.target.files?.[0];
                           if (!file) return;
                           if (file.size > 5 * 1024 * 1024) {
-                            setError('logoDataUrl', { message: 'حجم الشعار يجب ألا يتجاوز 5 ميجابايت.' });
+                            setError('logoDataUrl', {
+                              message: 'حجم الشعار يجب ألا يتجاوز 5 ميجابايت.',
+                            });
                             return;
                           }
                           const reader = new FileReader();
@@ -474,7 +483,7 @@ export function TenantFormPage() {
 
                     <Field
                       label={t('platform.ownerPassword')}
-                      hint="12 حرفًا على الأقل. أبلغه بها عبر قناة آمنة واطلب تغييرها."
+                      hint="7 أحرف على الأقل. أبلغه بها عبر قناة آمنة واطلب تغييرها."
                       error={errors.ownerPassword?.message}
                       required
                     >
@@ -609,8 +618,8 @@ export function TenantFormPage() {
               </>
             ) : null}
 
-            <div className="flex flex-wrap items-center gap-3">
-              <Button type="submit" variant="brand" loading={pending}>
+            <div className="grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap sm:gap-3">
+              <Button type="submit" variant="brand" className="w-full sm:w-auto" loading={pending}>
                 <Save aria-hidden />
                 {isEdit ? t('common.saveChanges') : t('platform.addTenant')}
               </Button>
@@ -618,6 +627,7 @@ export function TenantFormPage() {
               <Button
                 type="button"
                 variant="outline"
+                className="w-full sm:w-auto"
                 disabled={pending}
                 onClick={() => navigate('/platform/tenants')}
               >
@@ -625,7 +635,9 @@ export function TenantFormPage() {
               </Button>
 
               {isDirty ? (
-                <span className="text-warning text-xs">لديك تغييرات غير محفوظة.</span>
+                <span className="text-warning col-span-2 text-xs sm:col-span-1">
+                  لديك تغييرات غير محفوظة.
+                </span>
               ) : null}
             </div>
           </form>

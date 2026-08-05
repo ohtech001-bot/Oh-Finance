@@ -41,4 +41,14 @@ export class MailService {
       html: `<div dir="rtl" style="font-family:Arial,sans-serif"><h2>تم إنشاء حسابك في OH Finance</h2><p>مرحباً ${name}، كلمة المرور المؤقتة هي:</p><p style="font-size:22px;font-weight:700" dir="ltr">${password}</p><p>هذه كلمة مرور أحادية الاستعمال، وسيطلب منك النظام تغييرها فور الدخول.</p></div>`,
     });
   }
+
+  async sendPasswordResetLink(to: string, resetUrl: string): Promise<void> {
+    await this.transport().sendMail({
+      from: { name: this.env.get('SMTP_FROM_NAME'), address: this.env.get('SMTP_FROM_EMAIL') },
+      to,
+      subject: 'OH Finance - Set your password',
+      text: `Use this secure link to set your OH Finance password: ${resetUrl}. The link expires in 30 minutes.`,
+      html: `<div dir="rtl" style="font-family:Arial,sans-serif"><h2>تعيين كلمة السر</h2><p>استخدم الرابط الآمن التالي لتعيين كلمة سر جديدة لحسابك في OH Finance:</p><p><a href="${resetUrl}" style="display:inline-block;padding:12px 20px;background:#23883f;color:#fff;text-decoration:none;border-radius:6px">تعيين كلمة السر</a></p><p>تنتهي صلاحية الرابط خلال 30 دقيقة، ولا يمكن استخدامه بعد تغيير كلمة السر.</p></div>`,
+    });
+  }
 }

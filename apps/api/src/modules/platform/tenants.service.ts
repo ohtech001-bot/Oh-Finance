@@ -257,7 +257,13 @@ export class TenantsService {
             _count: { select: { stores: true, users: true } },
             users: {
               where: { role: { name: ROLES.OWNER } },
-              select: { name: true, email: true },
+              select: { name: true, email: true, phone: true },
+              take: 1,
+            },
+            stores: {
+              where: { isActive: true },
+              orderBy: { createdAt: 'asc' },
+              select: { phone: true },
               take: 1,
             },
             subscriptions: {
@@ -283,6 +289,7 @@ export class TenantsService {
           timezone: row.timezone,
           ownerEmail: owner?.email ?? null,
           ownerName: owner?.name ?? null,
+          contactPhone: row.stores[0]?.phone ?? owner?.phone ?? null,
           storeCount: row._count.stores,
           userCount: row._count.users,
           planName: subscription?.plan.nameAr ?? null,
@@ -310,7 +317,7 @@ export class TenantsService {
           _count: { select: { stores: true, users: true } },
           users: {
             where: { role: { name: ROLES.OWNER } },
-            select: { name: true, email: true },
+            select: { name: true, email: true, phone: true },
             take: 1,
           },
           subscriptions: {
@@ -340,6 +347,7 @@ export class TenantsService {
         timezone: row.timezone,
         ownerEmail: owner?.email ?? null,
         ownerName: owner?.name ?? null,
+        contactPhone: row.stores[0]?.phone ?? owner?.phone ?? null,
         storeCount: row._count.stores,
         userCount: row._count.users,
         planName: subscription?.plan.nameAr ?? null,
@@ -427,8 +435,19 @@ export class TenantsService {
     const match = /^data:image\/(png|jpeg|webp);base64,(.+)$/.exec(dataUrl);
     if (!match?.[1] || !match[2]) throw AppError.validation('صيغة الشعار غير مدعومة.');
     const extension = match[1] === 'jpeg' ? 'jpg' : match[1];
+    if (match[2].length > 7 * 1024 * 1024)
+      throw AppError.validation('حجم الشعار يجب ألا يتجاوز 5 ميجابايت.');
     const bytes = Buffer.from(match[2], 'base64');
-    if (bytes.length > 5 * 1024 * 1024) throw AppError.validation('حجم الشعار يجب ألا يتجاوز 5 ميجابايت.');
+    if (bytes.length > 5 * 1024 * 1024)
+      throw AppError.validation('حجم الشعار يجب ألا يتجاوز 5 ميجابايت.');
+    const validSignature =
+      (extension === 'png' &&
+        bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) ||
+      (extension === 'jpg' && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) ||
+      (extension === 'webp' &&
+        bytes.subarray(0, 4).toString('ascii') === 'RIFF' &&
+        bytes.subarray(8, 12).toString('ascii') === 'WEBP');
+    if (!validSignature) throw AppError.validation('محتوى ملف الشعار لا يطابق صيغة الصورة المحددة.');
     const directory = join(process.cwd(), 'uploads', 'store-logos');
     await mkdir(directory, { recursive: true });
     const filename = `${randomUUID()}.${extension}`;

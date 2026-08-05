@@ -98,10 +98,14 @@ describe('parseEnv — يرفض الإقلاع بإعداد سيّئ', () => {
     const env = parseEnv(
       baseEnv({
         NODE_ENV: 'production',
+        WEB_ORIGIN: 'https://finance.example.com',
         COOKIE_SECURE: 'true',
         COOKIE_SAME_SITE: 'strict',
         REDIS_URL: 'rediss://user:pass@host:6379',
         LOG_LEVEL: 'info',
+        SMTP_HOST: 'smtp.example.com',
+        SMTP_USER: 'mailer',
+        SMTP_PASSWORD: 'mail-secret',
       }),
     );
     expect(env.NODE_ENV).toBe('production');

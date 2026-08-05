@@ -15,11 +15,12 @@ import { api, buildQuery } from '@/lib/api';
 
 const KEY = 'orders';
 
-export function useOrders(query: Partial<OrderListQuery>) {
+export function useOrders(query: Partial<OrderListQuery>, enabled = true) {
   return useQuery({
     queryKey: [KEY, 'list', query],
     queryFn: () =>
       api.get<PaginatedResult<Order>>(`/orders${buildQuery(query as Record<string, string>)}`),
+    enabled,
   });
 }
 
@@ -47,6 +48,7 @@ export function useCreateOrder() {
       void qc.invalidateQueries({ queryKey: [KEY] });
       void qc.invalidateQueries({ queryKey: ['customers'] });
       void qc.invalidateQueries({ queryKey: ['ledger'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
@@ -75,6 +77,7 @@ export function useConfirmOrder(id: string) {
       void qc.invalidateQueries({ queryKey: [KEY] });
       void qc.invalidateQueries({ queryKey: ['customers'] });
       void qc.invalidateQueries({ queryKey: ['ledger'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }

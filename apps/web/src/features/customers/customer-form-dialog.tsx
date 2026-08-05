@@ -41,25 +41,22 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
     ar: {
       debtLimit: 'حد الدين',
       debtLimitHint: 'الحد الافتراضي 1500 شيكل ويمكن تعديله.',
-      paymentDueDate: 'تاريخ السداد',
-      paymentDueDateHint: 'التاريخ المتفق عليه لسداد الدين.',
-      paymentDueDateRequired: 'تاريخ السداد مطلوب.',
+      paymentDueDate: 'يوم السداد الشهري',
+      paymentDueDateHint: 'مثال: 15 يعني أن موعد السداد هو يوم 15 من كل شهر.',
       openingHint: 'الرقم الموجب رصيد للزبون. الرقم السالب (-x أو x-) دين على الزبون.',
     },
     he: {
       debtLimit: 'מסגרת',
       debtLimitHint: 'ברירת המחדל היא 1,500 ₪ וניתן לשנות אותה.',
-      paymentDueDate: 'תאריך תשלום',
-      paymentDueDateHint: 'התאריך שסוכם לתשלום החוב.',
-      paymentDueDateRequired: 'יש לבחור תאריך תשלום.',
+      paymentDueDate: 'יום התשלום החודשי',
+      paymentDueDateHint: 'לדוגמה: 15 פירושו שמועד התשלום הוא בכל 15 בחודש.',
       openingHint: 'מספר חיובי הוא יתרה לזכות הלקוח. מספר שלילי (-x או x-) הוא חוב.',
     },
     en: {
       debtLimit: 'Debt limit',
       debtLimitHint: 'The default is ILS 1,500 and can be changed.',
-      paymentDueDate: 'Payment due date',
-      paymentDueDateHint: 'The agreed date for settling the debt.',
-      paymentDueDateRequired: 'Payment due date is required.',
+      paymentDueDate: 'Monthly payment day',
+      paymentDueDateHint: 'For example, 15 means payment is due on the 15th of every month.',
       openingHint: 'A positive number is customer credit. A negative number (-x or x-) is debt.',
     },
   }[locale];
@@ -86,7 +83,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
       tags: [],
       creditLimit: '1500',
       paymentTermDays: 30,
-      paymentDueDate: '',
+      paymentDueDay: 15,
       status: 'ACTIVE',
       openingBalance: '0',
     },
@@ -107,7 +104,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
         tags: customer.tags,
         creditLimit: customer.creditLimit,
         paymentTermDays: customer.paymentTermDays,
-        paymentDueDate: customer.paymentDueDate ?? '',
+        paymentDueDay: customer.paymentDueDay,
         status: customer.status,
         openingBalance: '0',
       });
@@ -120,10 +117,6 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
   useUnsavedChangesWarning(open && isDirty && !isSubmitting);
 
   const onSubmit = handleSubmit(async (values) => {
-    if (!values.paymentDueDate) {
-      setError('paymentDueDate', { message: labels.paymentDueDateRequired });
-      return;
-    }
     try {
       if (isEdit && customer) {
         const { openingBalance: _drop, ...rest } = values;
@@ -223,10 +216,21 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
             <Field
               label={labels.paymentDueDate}
               hint={labels.paymentDueDateHint}
-              error={errors.paymentDueDate?.message}
+              error={errors.paymentDueDay?.message}
               required
             >
-              {(p) => <Input {...p} {...register('paymentDueDate')} type="date" dir="ltr" />}
+              {(p) => (
+                <Input
+                  {...p}
+                  {...register('paymentDueDay', { valueAsNumber: true })}
+                  type="number"
+                  min={1}
+                  max={31}
+                  inputMode="numeric"
+                  dir="ltr"
+                  placeholder="15"
+                />
+              )}
             </Field>
 
             {/* الرصيد الافتتاحي — عند الإضافة فقط */}

@@ -11,6 +11,7 @@ import {
   passwordSchema,
   positiveMoneySchema,
   setTenantStatusSchema,
+  updateTenantSchema,
 } from './index.js';
 
 describe('createCustomerSchema — بيانات التواصل الإلزامية', () => {
@@ -91,9 +92,9 @@ describe('loginRequestSchema', () => {
 });
 
 describe('passwordSchema', () => {
-  it('يفرض 12 حرفًا على الأقل', () => {
-    expect(passwordSchema.safeParse('short').success).toBe(false);
-    expect(passwordSchema.safeParse('Passw0rd!').success).toBe(false); // 9 أحرف
+  it('يفرض 7 أحرف على الأقل', () => {
+    expect(passwordSchema.safeParse('123456').success).toBe(false);
+    expect(passwordSchema.safeParse('1234567').success).toBe(true);
     expect(passwordSchema.safeParse('a-long-enough-passphrase').success).toBe(true);
   });
 });
@@ -130,6 +131,25 @@ describe('createTenantSchema — إنشاء محل من لوحة المدير ا
   });
 });
 
+describe('updateTenantSchema — تعديل المحل مستقل عن حقول الإنشاء', () => {
+  it('يقبل بيانات المحل الظاهرة دون الباقة أو بيانات صاحب المحل', () => {
+    expect(
+      updateTenantSchema.safeParse({
+        name: 'محل النجاح',
+        locale: 'ar',
+        currency: 'ILS',
+        timezone: 'Asia/Jerusalem',
+        storePhone: '0501234567',
+        storeEmail: 'info@example.com',
+        storeAddress: 'العنوان',
+        storeCity: 'المدينة',
+        websiteUrl: '',
+        logoDataUrl: '',
+      }).success,
+    ).toBe(true);
+  });
+});
+
 describe('createPlatformStaffInviteSchema', () => {
   const valid = {
     name: 'موظف جديد',
@@ -140,6 +160,7 @@ describe('createPlatformStaffInviteSchema', () => {
     jobTitle: 'خدمة العملاء',
     platformRole: 'EMPLOYEE',
     locale: 'ar',
+    initialPassword: 'StrongPassword123!',
   } as const;
 
   it('يقبل كل الحقول الإلزامية', () => {
@@ -153,6 +174,26 @@ describe('createPlatformStaffInviteSchema', () => {
     expect(
       createPlatformStaffInviteSchema.safeParse({ ...valid, phone: '050123456' }).success,
     ).toBe(false);
+  });
+
+  it('يرفض إنشاء الحساب بلا كلمة سر أولية', () => {
+    const { initialPassword: _initialPassword, ...withoutPassword } = valid;
+    expect(createPlatformStaffInviteSchema.safeParse(withoutPassword).success).toBe(false);
+  });
+
+  it('لا يطلب وظيفة نصية لأن نوع الوظيفة يكفي', () => {
+    const { jobTitle: _jobTitle, ...withoutJobTitle } = valid;
+    expect(createPlatformStaffInviteSchema.safeParse(withoutJobTitle).success).toBe(true);
+  });
+
+  it('يقبل المدير العام بلا رقم هوية أو وظيفة', () => {
+    const { identityNumber: _identityNumber, jobTitle: _jobTitle, ...manager } = valid;
+    expect(
+      createPlatformStaffInviteSchema.safeParse({
+        ...manager,
+        platformRole: 'GENERAL_MANAGER',
+      }).success,
+    ).toBe(true);
   });
 });
 

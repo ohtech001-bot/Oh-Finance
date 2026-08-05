@@ -18,7 +18,6 @@ async function bootstrap(): Promise<void> {
   const env = app.get(EnvService);
 
   app.setGlobalPrefix('api');
-  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/api/uploads/' });
 
   /**
    * ترويسات الأمان.
@@ -49,6 +48,9 @@ async function bootstrap(): Promise<void> {
       hsts: env.isProduction ? { maxAge: 31_536_000, includeSubDomains: true, preload: true } : false,
     }),
   );
+
+  // Register uploaded assets after Helmet so they receive the same security headers.
+  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/api/uploads/' });
 
   app.use(cookieParser(env.get('COOKIE_SECRET')));
 

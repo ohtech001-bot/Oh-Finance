@@ -60,6 +60,11 @@ function readCsrfToken(): string | null {
   return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 
+/** A readable CSRF cookie is the browser-side hint that an HttpOnly session exists. */
+export function hasSessionHint(): boolean {
+  return readCsrfToken() !== null;
+}
+
 const MUTATING_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
 
 function markSessionAuthenticated(): void {
