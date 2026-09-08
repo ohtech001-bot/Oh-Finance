@@ -1,71 +1,89 @@
-# Deployment (Vercel) — oh-finance monorepo
+# Deployment (Vercel)
 
-npm-workspaces monorepo. `apps/api` and `apps/web` import the internal packages
-`@oh/money`, `@oh/config`, `@oh/contracts` (built to `dist/`) and `@oh/ui`
-(consumed as source by Vite). The Vercel failure was **build order**: Vercel
-built an app in isolation (`nest build` / `vite build`) without first building
-those packages, so `@oh/*` (whose `package.json main → dist/index.js`) could not
-be resolved. This is now fixed **in configuration only — no application code was
-changed.**
+The production web application and NestJS API are deployed from one Vercel
+Services project. This keeps browser requests, authentication cookies, and CSRF
+checks on the same origin while allowing Vercel to build each framework with its
+native adapter.
 
-## What was changed
-- **Root `package.json` scripts** (build order made explicit and self-contained):
-  - `build:packages` → builds `@oh/money`, `@oh/config`, `@oh/contracts` (dist).
-  - `build:api` → `build:packages` then `nest build` (→ `apps/api/dist`).
-  - `build:web` → `build:packages`, then `tsc -b tsconfig.web.json` (type-builds
-    libs + `@oh/ui` so the web's `tsc -b --noEmit` is a no-op — avoids TS6310),
-    then `vite build` (→ `apps/web/dist`).
-  - `build` → `build:api && build:web` (both self-contained; works from a clean
-    clone without needing `typecheck` first).
-- **`tsconfig.web.json`** — web-only solution project (libs + `apps/web`, **not**
-  `apps/api`), so a web deploy never depends on Prisma/the server.
-- **`apps/api/vercel.json`**, **`apps/web/vercel.json`** — per-app build config.
-- **`postinstall` → `tooling/prisma-postinstall.mjs`** — generates Prisma Client
-  using only the **locally-installed pinned** Prisma (6.19.3), never `npx`-
-  downloads a newer version, and **skips entirely when `SKIP_PRISMA_GENERATE=1`**
-  (set by the web deploy). The old fallback that ran `npx prisma` (which pulled
-  `prisma@latest`) was removed. The API deploy's install runs it normally →
-  pinned 6.19.3.
+## Project settings
 
-Internal package `main`/`types`/`exports`/`files` and tsconfig project
-references were already correct and were left unchanged.
+- Repository: this monorepo
+- Root Directory: repository root
+- Framework Preset: Services
+- Node.js: 20.x or 22.x
+- Service definitions and public routing: use the root `vercel.json`
 
-## Web — `apps/web` (fully deployable on Vercel)
-Create a Vercel project pointed at this repo with:
-- **Root Directory:** `apps/web`
-- Build/Install/Output come from `apps/web/vercel.json`:
-  - `buildCommand`: `cd ../.. && npm run build:web`
-  - `outputDirectory`: `dist`
-  - SPA fallback rewrite to `/index.html`
-- Install runs at the workspace root automatically (npm workspaces). The web
-  `installCommand` sets **`SKIP_PRISMA_GENERATE=1`**, so the root `postinstall`
-  **does not run Prisma at all** on the web deploy (no accidental download of a
-  newer Prisma).
-- Set any `VITE_*` runtime env vars (e.g. API base URL) in the Vercel project.
+The `web` service builds `apps/web` with Vite. The `api` service builds
+`apps/api` with Vercel's NestJS adapter and recognizes `src/main.ts` as its
+entrypoint. Top-level service rewrites route `/api/*` to NestJS and all remaining
+paths to the web service. The original request path is preserved, including the
+existing `/api` global prefix.
 
-Result: a static SPA — builds and serves correctly.
+`apps/api/vercel.json` and `apps/web/vercel.json` are retained as inactive legacy
+per-app configurations. Do not create a second Vercel project from either app
+while the combined Services project is in use.
 
-## API — `apps/api` (build fixed; runtime needs a Node host)
-`apps/api/vercel.json` makes the **build succeed** on Vercel
-(`cd ../.. && npm run build:api`). However, **NestJS is a long-running HTTP
-server, and Vercel is serverless/static** — it cannot run `node dist/main.js`.
-So the build passes, but Vercel cannot *serve* the API as-is.
+## Required environment variables
 
-To actually run the API, pick one (both are out of scope of "no app-code
-changes", so they are recommendations, not applied):
-1. **Deploy the API on a Node host** — Railway (already used for the DB),
-   Render, or Fly.io. Start command: `npm run build:api && npm run start -w @oh/api`.
-   This is the recommended fit for NestJS.
-2. **Add a Vercel serverless entry** — a thin handler that boots the Nest app
-   (e.g. `apps/api/api/index.ts` with `serverless-express`). This is new
-   deployment glue (app-adjacent code); say the word and it can be added.
+Set these in Vercel for Production and Preview as appropriate:
 
-## Node version
-Root `engines.node` is `>=20.11.0` and `.npmrc` has `engine-strict=true`. Ensure
-the Vercel project uses **Node 20.x or 22.x** (both satisfy the range; this is
-Vercel's default).
+- `NODE_ENV=production`
+- `DATABASE_URL`: Supabase PostgreSQL connection URL
+- `DIRECT_DATABASE_URL`: Supabase direct/session connection used by Prisma
+  migration tooling; migrations are not run by the application function
+- `WEB_ORIGIN`: the exact public HTTPS origin of this Vercel project
+- `JWT_ACCESS_SECRET`: unique random value of at least 32 characters
+- `JWT_REFRESH_SECRET`: different unique random value of at least 32 characters
+- `COOKIE_SECRET`: unique random value of at least 32 characters
+- `COOKIE_SECURE=true`
+- `COOKIE_SAME_SITE=lax`
+- `SUPABASE_URL`: Supabase project URL used by server-side Storage requests
+- `SUPABASE_SERVICE_ROLE_KEY`: server-only Storage credential; never expose it as `VITE_*`
+- `SUPABASE_STORAGE_BUCKET=store-logos`
+- `REDIS_URL`: TLS Redis connection shared by every Vercel runtime
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`
+- `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`
 
-## Independence
-Each app is its own Vercel project (different **Root Directory**), so they build
-and deploy independently. No manual build commands are needed — the `vercel.json`
-files encode everything; Vercel just needs the Root Directory set per project.
+Leave `COOKIE_DOMAIN` unset for host-only, same-origin cookies unless a custom
+domain design explicitly requires it. Never expose database, JWT, cookie, Redis,
+or SMTP secrets as `VITE_*` variables.
+
+## Database
+
+Prisma remains the only application database client. The schema and migrations
+remain under `apps/api/prisma`. `DATABASE_URL` must point to Supabase only.
+
+The current Supabase Session Pooler URL works with this application, including
+its interactive transactions, `SET LOCAL ROLE`, RLS context, and advisory-lock
+logic. Serverless concurrency can create more database connections, so changing
+to Supabase Transaction Pooler must be tested separately before replacing the
+connection string.
+
+## Serverless constraints
+
+- Vercel's NestJS adapter deploys the application as one Function and reuses the
+  warm runtime. `PrismaService` owns one client per Nest application instance;
+  cold runtimes still create a fresh container and connection.
+- Throttling uses Redis through `@nest-lab/throttler-storage-redis`. API startup
+  fails in production when Redis is not configured or cannot be reached, and a
+  runtime Redis failure denies the request with HTTP 503 instead of silently
+  bypassing rate limits.
+- Store logos are stored in the public Supabase Storage bucket `store-logos`.
+  The API creates or verifies the bucket before the first upload, accepts only
+  PNG/JPEG/WebP up to 5 MiB, and stores only the resulting public URL in Prisma.
+- No WebSocket gateway, in-process cron, background worker, or backend
+  `setInterval` is currently present.
+
+## Verification
+
+Before promoting a deployment, verify:
+
+1. `GET /api/health/live` returns HTTP 200.
+2. `GET /api/health` returns HTTP 200 and reports the database as available.
+3. Login, refresh, logout, and a CSRF-protected write work on the Vercel origin.
+4. A normal authenticated Prisma request respects tenant RLS.
+5. Upload, replace, and remove a store logo; confirm the public URL is served
+   from Supabase Storage and remains available after a fresh deployment.
+6. Send requests through at least two warm runtimes and confirm they increment
+   the same Redis-backed rate-limit counter.
+7. Vercel function logs contain no secrets.

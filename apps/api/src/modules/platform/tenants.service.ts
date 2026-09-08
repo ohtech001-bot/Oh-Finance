@@ -1,6 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
   AUDIT_ACTIONS,
@@ -26,6 +24,7 @@ import { AppError } from '../../core/errors/app-error.js';
 import { AuditService } from '../../core/audit/audit.service.js';
 import { PrismaService, type TxClient } from '../../core/prisma/prisma.service.js';
 import { PasswordService } from '../auth/password.service.js';
+import { StoreLogoStorageService } from '../../core/storage/store-logo-storage.service.js';
 
 @Injectable()
 export class TenantsService {
@@ -35,6 +34,7 @@ export class TenantsService {
     private readonly prisma: PrismaService,
     private readonly passwords: PasswordService,
     private readonly audit: AuditService,
+    private readonly logos: StoreLogoStorageService,
   ) {}
 
   /**
@@ -72,149 +72,156 @@ export class TenantsService {
     if (!paymentIsValid) throw AppError.validation('المبلغ المدفوع لا يطابق حالة السداد.');
 
     const slug = `store-${randomUUID().slice(0, 12)}`;
-    const logoUrl = dto.logoDataUrl ? await this.saveLogo(dto.logoDataUrl) : null;
+    const logoAsset = dto.logoDataUrl ? await this.logos.uploadDataUrl(dto.logoDataUrl) : null;
+    const logoUrl = logoAsset?.publicUrl ?? null;
 
     const passwordHash = await this.passwords.hash(dto.ownerPassword);
 
-    const tenantId = await this.prisma.runAsPlatform(async (tx) => {
-      // ── تفرّد المعرّف والبريد ──────────────────────────────────────────
-      const existingEmail = await tx.user.findUnique({ where: { email: dto.ownerEmail } });
-      if (existingEmail) {
-        throw AppError.conflict('البريد الإلكتروني مستخدم لحساب آخر.');
-      }
+    let tenantId: string;
+    try {
+      tenantId = await this.prisma.runAsPlatform(async (tx) => {
+        // ── تفرّد المعرّف والبريد ──────────────────────────────────────────
+        const existingEmail = await tx.user.findUnique({ where: { email: dto.ownerEmail } });
+        if (existingEmail) {
+          throw AppError.conflict('البريد الإلكتروني مستخدم لحساب آخر.');
+        }
 
-      // ── 1) المستأجر ────────────────────────────────────────────────────
-      const tenant = await tx.tenant.create({
-        data: {
-          name: dto.name,
-          slug,
-          locale: dto.locale,
-          currency: dto.currency,
-          timezone: dto.timezone,
-          status: 'ACTIVE',
-        },
-      });
-
-      // ── 2) المحل ───────────────────────────────────────────────────────
-      const storeCode = await this.nextStoreCode(tx);
-      const store = await tx.store.create({
-        data: {
-          tenantId: tenant.id,
-          code: storeCode,
-          name: dto.name,
-          phone: dto.storePhone || null,
-          email: dto.storeEmail || null,
-          address: dto.storeAddress || null,
-          city: dto.storeCity || null,
-          currency: dto.currency,
-          logoUrl,
-          settings: dto.websiteUrl ? { websiteUrl: dto.websiteUrl } : {},
-        },
-      });
-
-      // ── 3) الفرع الرئيسي ───────────────────────────────────────────────
-      await tx.branch.create({
-        data: {
-          tenantId: tenant.id,
-          storeId: store.id,
-          code: 'MAIN',
-          name: 'الفرع الرئيسي',
-          phone: dto.storePhone || null,
-          address: dto.storeAddress || null,
-          city: dto.storeCity || null,
-          isMain: true,
-        },
-      });
-
-      // ── 4) الأدوار النظامية + صلاحياتها ────────────────────────────────
-      const roleIds = new Map<RoleName, string>();
-      for (const roleName of TENANT_ROLES) {
-        const role = await tx.role.create({
+        // ── 1) المستأجر ────────────────────────────────────────────────────
+        const tenant = await tx.tenant.create({
           data: {
-            tenantId: tenant.id,
-            name: roleName,
-            description: ROLE_DESCRIPTIONS[roleName],
-            isSystem: true,
+            name: dto.name,
+            slug,
+            locale: dto.locale,
+            currency: dto.currency,
+            timezone: dto.timezone,
+            status: 'ACTIVE',
           },
         });
-        roleIds.set(roleName, role.id);
 
-        const permissions = permissionsForRole(roleName);
-        if (permissions.length > 0) {
-          await tx.rolePermission.createMany({
-            data: permissions.map((permissionKey) => ({
-              roleId: role.id,
-              permissionKey,
+        // ── 2) المحل ───────────────────────────────────────────────────────
+        const storeCode = await this.nextStoreCode(tx);
+        const store = await tx.store.create({
+          data: {
+            tenantId: tenant.id,
+            code: storeCode,
+            name: dto.name,
+            phone: dto.storePhone || null,
+            email: dto.storeEmail || null,
+            address: dto.storeAddress || null,
+            city: dto.storeCity || null,
+            currency: dto.currency,
+            logoUrl,
+            settings: dto.websiteUrl ? { websiteUrl: dto.websiteUrl } : {},
+          },
+        });
+
+        // ── 3) الفرع الرئيسي ───────────────────────────────────────────────
+        await tx.branch.create({
+          data: {
+            tenantId: tenant.id,
+            storeId: store.id,
+            code: 'MAIN',
+            name: 'الفرع الرئيسي',
+            phone: dto.storePhone || null,
+            address: dto.storeAddress || null,
+            city: dto.storeCity || null,
+            isMain: true,
+          },
+        });
+
+        // ── 4) الأدوار النظامية + صلاحياتها ────────────────────────────────
+        const roleIds = new Map<RoleName, string>();
+        for (const roleName of TENANT_ROLES) {
+          const role = await tx.role.create({
+            data: {
               tenantId: tenant.id,
-            })),
+              name: roleName,
+              description: ROLE_DESCRIPTIONS[roleName],
+              isSystem: true,
+            },
           });
+          roleIds.set(roleName, role.id);
+
+          const permissions = permissionsForRole(roleName);
+          if (permissions.length > 0) {
+            await tx.rolePermission.createMany({
+              data: permissions.map((permissionKey) => ({
+                roleId: role.id,
+                permissionKey,
+                tenantId: tenant.id,
+              })),
+            });
+          }
         }
-      }
 
-      const ownerRoleId = roleIds.get(ROLES.OWNER);
-      if (!ownerRoleId) {
-        throw AppError.internal('تعذّر إنشاء دور صاحب المحل.');
-      }
+        const ownerRoleId = roleIds.get(ROLES.OWNER);
+        if (!ownerRoleId) {
+          throw AppError.internal('تعذّر إنشاء دور صاحب المحل.');
+        }
 
-      // ── 5) صاحب المحل ──────────────────────────────────────────────────
-      const owner = await tx.user.create({
-        data: {
-          tenantId: tenant.id,
-          storeId: store.id,
-          roleId: ownerRoleId,
-          email: dto.ownerEmail,
-          name: dto.ownerName,
-          phone: dto.ownerPhone || null,
-          passwordHash,
-          locale: dto.locale,
-          isSuperAdmin: false,
-          status: 'ACTIVE',
-          passwordChangedAt: new Date(),
-        },
+        // ── 5) صاحب المحل ──────────────────────────────────────────────────
+        const owner = await tx.user.create({
+          data: {
+            tenantId: tenant.id,
+            storeId: store.id,
+            roleId: ownerRoleId,
+            email: dto.ownerEmail,
+            name: dto.ownerName,
+            phone: dto.ownerPhone || null,
+            passwordHash,
+            locale: dto.locale,
+            isSuperAdmin: false,
+            status: 'ACTIVE',
+            passwordChangedAt: new Date(),
+          },
+        });
+
+        // ── 6) الاشتراك ────────────────────────────────────────────────────
+        const periodStart = new Date(`${dto.subscriptionStartDate}T00:00:00.000Z`);
+        const periodEnd = new Date(`${dto.subscriptionEndDate}T23:59:59.999Z`);
+
+        await tx.subscription.create({
+          data: {
+            tenantId: tenant.id,
+            planId: plan.id,
+            status: 'ACTIVE',
+            startedAt: periodStart,
+            currentPeriodStart: periodStart,
+            currentPeriodEnd: periodEnd,
+            agreedMonthlyAmount,
+            paidAmount: dto.paidAmount,
+            paymentStatus: dto.paymentStatus,
+          },
+        });
+
+        // ── 7) التدقيق (داخل نفس المعاملة) ─────────────────────────────────
+        await this.audit.record(tx, {
+          action: AUDIT_ACTIONS.TENANT_CREATED,
+          summary: `إنشاء محل "${dto.name}" (${storeCode}) بباقة ${plan.nameAr} — صاحب المحل: ${dto.ownerEmail}`,
+          entityType: 'Tenant',
+          entityId: tenant.id,
+          tenantId: null, // حدث منصة
+          after: {
+            tenantId: tenant.id,
+            slug,
+            storeCode,
+            ownerEmail: dto.ownerEmail,
+            ownerId: owner.id,
+            planCode: plan.code,
+            subscriptionStartDate: dto.subscriptionStartDate,
+            subscriptionEndDate: dto.subscriptionEndDate,
+            agreedMonthlyAmount,
+            paymentStatus: dto.paymentStatus,
+          },
+          actor: { id: null, name: actorName },
+        });
+
+        return tenant.id;
       });
-
-      // ── 6) الاشتراك ────────────────────────────────────────────────────
-      const periodStart = new Date(`${dto.subscriptionStartDate}T00:00:00.000Z`);
-      const periodEnd = new Date(`${dto.subscriptionEndDate}T23:59:59.999Z`);
-
-      await tx.subscription.create({
-        data: {
-          tenantId: tenant.id,
-          planId: plan.id,
-          status: 'ACTIVE',
-          startedAt: periodStart,
-          currentPeriodStart: periodStart,
-          currentPeriodEnd: periodEnd,
-          agreedMonthlyAmount,
-          paidAmount: dto.paidAmount,
-          paymentStatus: dto.paymentStatus,
-        },
-      });
-
-      // ── 7) التدقيق (داخل نفس المعاملة) ─────────────────────────────────
-      await this.audit.record(tx, {
-        action: AUDIT_ACTIONS.TENANT_CREATED,
-        summary: `إنشاء محل "${dto.name}" (${storeCode}) بباقة ${plan.nameAr} — صاحب المحل: ${dto.ownerEmail}`,
-        entityType: 'Tenant',
-        entityId: tenant.id,
-        tenantId: null, // حدث منصة
-        after: {
-          tenantId: tenant.id,
-          slug,
-          storeCode,
-          ownerEmail: dto.ownerEmail,
-          ownerId: owner.id,
-          planCode: plan.code,
-          subscriptionStartDate: dto.subscriptionStartDate,
-          subscriptionEndDate: dto.subscriptionEndDate,
-          agreedMonthlyAmount,
-          paymentStatus: dto.paymentStatus,
-        },
-        actor: { id: null, name: actorName },
-      });
-
-      return tenant.id;
-    });
+    } catch (error) {
+      if (logoAsset) await this.logos.deleteUrlBestEffort(logoAsset.publicUrl);
+      throw error;
+    }
 
     this.logger.log({ tenantId, slug }, 'أُنشئ محل جديد.');
 
@@ -373,86 +380,82 @@ export class TenantsService {
   }
 
   async update(id: string, dto: UpdateTenantRequest, actorName: string): Promise<TenantDetail> {
-    await this.prisma.runAsPlatform(async (tx) => {
-      const before = await tx.tenant.findUnique({ where: { id } });
-      if (!before) throw AppError.notFound('المحل');
+    const existingLogo = dto.logoDataUrl
+      ? await this.prisma.runAsPlatform((tx) =>
+          tx.store.findFirst({
+            where: { tenantId: id },
+            orderBy: { createdAt: 'asc' },
+            select: { logoUrl: true },
+          }),
+        )
+      : null;
+    const logoAsset = dto.logoDataUrl ? await this.logos.uploadDataUrl(dto.logoDataUrl) : null;
 
-      const {
-        storePhone,
-        storeEmail,
-        storeAddress,
-        storeCity,
-        websiteUrl,
-        logoDataUrl,
-        ...tenantData
-      } = dto;
-      const after = await tx.tenant.update({ where: { id }, data: tenantData });
-      const primaryStore = await tx.store.findFirst({
-        where: { tenantId: id },
-        orderBy: { createdAt: 'asc' },
-        select: { id: true, settings: true },
-      });
-      if (primaryStore) {
-        await tx.store.update({
-          where: { id: primaryStore.id },
-          data: {
-            name: dto.name,
-            phone: storePhone === undefined ? undefined : storePhone || null,
-            email: storeEmail === undefined ? undefined : storeEmail || null,
-            address: storeAddress === undefined ? undefined : storeAddress || null,
-            city: storeCity === undefined ? undefined : storeCity || null,
-            logoUrl: logoDataUrl ? await this.saveLogo(logoDataUrl) : undefined,
-            settings:
-              websiteUrl === undefined
-                ? undefined
-                : {
-                    ...this.settingsObject(primaryStore.settings),
-                    websiteUrl: websiteUrl || null,
-                  },
-            currency: dto.currency,
-          },
+    try {
+      await this.prisma.runAsPlatform(async (tx) => {
+        const before = await tx.tenant.findUnique({ where: { id } });
+        if (!before) throw AppError.notFound('المحل');
+
+        const {
+          storePhone,
+          storeEmail,
+          storeAddress,
+          storeCity,
+          websiteUrl,
+          logoDataUrl,
+          ...tenantData
+        } = dto;
+        const after = await tx.tenant.update({ where: { id }, data: tenantData });
+        const primaryStore = await tx.store.findFirst({
+          where: { tenantId: id },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, settings: true },
         });
-      }
+        if (primaryStore) {
+          await tx.store.update({
+            where: { id: primaryStore.id },
+            data: {
+              name: dto.name,
+              phone: storePhone === undefined ? undefined : storePhone || null,
+              email: storeEmail === undefined ? undefined : storeEmail || null,
+              address: storeAddress === undefined ? undefined : storeAddress || null,
+              city: storeCity === undefined ? undefined : storeCity || null,
+              logoUrl: logoDataUrl ? logoAsset?.publicUrl : undefined,
+              settings:
+                websiteUrl === undefined
+                  ? undefined
+                  : {
+                      ...this.settingsObject(primaryStore.settings),
+                      websiteUrl: websiteUrl || null,
+                    },
+              currency: dto.currency,
+            },
+          });
+        }
 
-      await this.audit.record(tx, {
-        action: AUDIT_ACTIONS.TENANT_UPDATED,
-        summary: `تعديل بيانات المحل "${after.name}".`,
-        entityType: 'Tenant',
-        entityId: id,
-        tenantId: null,
-        before: { name: before.name, locale: before.locale, currency: before.currency },
-        after: { name: after.name, locale: after.locale, currency: after.currency },
-        actor: { id: null, name: actorName },
+        await this.audit.record(tx, {
+          action: AUDIT_ACTIONS.TENANT_UPDATED,
+          summary: `تعديل بيانات المحل "${after.name}".`,
+          entityType: 'Tenant',
+          entityId: id,
+          tenantId: null,
+          before: { name: before.name, locale: before.locale, currency: before.currency },
+          after: { name: after.name, locale: after.locale, currency: after.currency },
+          actor: { id: null, name: actorName },
+        });
       });
-    });
+    } catch (error) {
+      if (logoAsset) await this.logos.deleteUrlBestEffort(logoAsset.publicUrl);
+      throw error;
+    }
+
+    if (logoAsset && existingLogo?.logoUrl) {
+      await this.logos.deleteUrlBestEffort(existingLogo.logoUrl);
+    }
 
     const detail = await this.findOne(id);
     if (!detail) throw AppError.notFound('المحل');
     return detail;
-  }
-
-  private async saveLogo(dataUrl: string): Promise<string> {
-    const match = /^data:image\/(png|jpeg|webp);base64,(.+)$/.exec(dataUrl);
-    if (!match?.[1] || !match[2]) throw AppError.validation('صيغة الشعار غير مدعومة.');
-    const extension = match[1] === 'jpeg' ? 'jpg' : match[1];
-    if (match[2].length > 7 * 1024 * 1024)
-      throw AppError.validation('حجم الشعار يجب ألا يتجاوز 5 ميجابايت.');
-    const bytes = Buffer.from(match[2], 'base64');
-    if (bytes.length > 5 * 1024 * 1024)
-      throw AppError.validation('حجم الشعار يجب ألا يتجاوز 5 ميجابايت.');
-    const validSignature =
-      (extension === 'png' &&
-        bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) ||
-      (extension === 'jpg' && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) ||
-      (extension === 'webp' &&
-        bytes.subarray(0, 4).toString('ascii') === 'RIFF' &&
-        bytes.subarray(8, 12).toString('ascii') === 'WEBP');
-    if (!validSignature) throw AppError.validation('محتوى ملف الشعار لا يطابق صيغة الصورة المحددة.');
-    const directory = join(process.cwd(), 'uploads', 'store-logos');
-    await mkdir(directory, { recursive: true });
-    const filename = `${randomUUID()}.${extension}`;
-    await writeFile(join(directory, filename), bytes);
-    return `/api/uploads/store-logos/${filename}`;
   }
 
   private settingsObject(value: Prisma.JsonValue): Record<string, Prisma.JsonValue> {

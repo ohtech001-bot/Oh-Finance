@@ -28,8 +28,16 @@ function fakePrisma(): PrismaService {
 const PERMS = ['settings.read', 'settings.manage'] as const;
 function asUser<T>(t: TestTenant, fn: () => Promise<T>): Promise<T> {
   return TenantContext.run(
-    { requestId: 'test-settings', tenantId: t.tenantId, userId: t.userId, storeId: t.storeId,
-      isSuperAdmin: false, permissions: PERMS as never, ip: null, userAgent: null },
+    {
+      requestId: 'test-settings',
+      tenantId: t.tenantId,
+      userId: t.userId,
+      storeId: t.storeId,
+      isSuperAdmin: false,
+      permissions: PERMS as never,
+      ip: null,
+      userAgent: null,
+    },
     fn,
   );
 }
@@ -41,9 +49,13 @@ describe.skipIf(!HAS_TEST_DB)('الإعدادات — Increment 4.2', () => {
     await resetAll();
     t = await createTestTenant('set-a');
     b = await createTestTenant('set-b');
-    settings = new SettingsService(fakePrisma());
+    settings = new SettingsService(fakePrisma(), {
+      deleteUrlBestEffort: async () => undefined,
+    } as never);
   });
-  afterAll(async () => { await closeTestDb(); });
+  afterAll(async () => {
+    await closeTestDb();
+  });
   beforeEach(async () => {
     // نعيد ضبط JSONB الإعدادات بين الاختبارات دون حذف المحل.
     await testDb().$executeRawUnsafe(`UPDATE stores SET settings = '{}'::jsonb`);
@@ -60,8 +72,12 @@ describe.skipIf(!HAS_TEST_DB)('الإعدادات — Increment 4.2', () => {
 
   it('تعديل «عام»: الاسم إلى عمود، واللغة/المنطقة إلى JSONB', async () => {
     const g: GeneralSettings = {
-      name: 'محل النجاح', email: 'x@y.com', address: 'شارع النجاح', logoUrl: '',
-      language: 'he', timezone: 'Asia/Hebron',
+      name: 'محل النجاح',
+      email: 'x@y.com',
+      address: 'شارع النجاح',
+      logoUrl: '',
+      language: 'he',
+      timezone: 'Asia/Hebron',
     };
     await asUser(t, () => settings.updateSection('general', g));
     const s = await asUser(t, () => settings.getSettings());
@@ -70,14 +86,18 @@ describe.skipIf(!HAS_TEST_DB)('الإعدادات — Increment 4.2', () => {
     expect(s.general.timezone).toBe('Asia/Hebron');
     // اسم المحل يُخزَّن في العمود (يظهر في استعلام مباشر).
     const [row] = await testDb().$queryRawUnsafe<{ name: string }[]>(
-      `SELECT name FROM stores WHERE id = $1::uuid`, t.storeId,
+      `SELECT name FROM stores WHERE id = $1::uuid`,
+      t.storeId,
     );
     expect(row?.name).toBe('محل النجاح');
   });
 
   it('تعديل «المالية»: العملة إلى العمود، والضريبة إلى JSONB', async () => {
     const f: FinancialSettings = {
-      currency: 'USD', country: 'فلسطين', numberFormat: '1,234.56', dateFormat: 'DD/MM/YYYY',
+      currency: 'USD',
+      country: 'فلسطين',
+      numberFormat: '1,234.56',
+      dateFormat: 'DD/MM/YYYY',
       tax: { enabled: true, rate: 16, text: 'ضريبة القيمة المضافة' },
     };
     await asUser(t, () => settings.updateSection('financial', f));
@@ -90,8 +110,13 @@ describe.skipIf(!HAS_TEST_DB)('الإعدادات — Increment 4.2', () => {
 
   it('تعديل «الطباعة»: round-trip كامل عبر JSONB', async () => {
     const p: PrintingSettings = {
-      printer: 'Xprinter XP-58', paperSize: '58mm', orientation: 'portrait',
-      printLogo: false, printInvoiceNumber: true, printDateTime: false, printBarcode: true,
+      printer: 'Xprinter XP-58',
+      paperSize: '58mm',
+      orientation: 'portrait',
+      printLogo: false,
+      printInvoiceNumber: true,
+      printDateTime: false,
+      printBarcode: true,
     };
     await asUser(t, () => settings.updateSection('printing', p));
     const s = await asUser(t, () => settings.getSettings());
@@ -101,10 +126,15 @@ describe.skipIf(!HAS_TEST_DB)('الإعدادات — Increment 4.2', () => {
   });
 
   it('عزل المستأجرين: تعديل أ لا يؤثّر على إعدادات ب', async () => {
-    await asUser(t, () => settings.updateSection('financial', {
-      currency: 'USD', country: 'x', numberFormat: '1,234.56', dateFormat: 'YYYY-MM-DD',
-      tax: { enabled: false, rate: 0, text: '' },
-    } as FinancialSettings));
+    await asUser(t, () =>
+      settings.updateSection('financial', {
+        currency: 'USD',
+        country: 'x',
+        numberFormat: '1,234.56',
+        dateFormat: 'YYYY-MM-DD',
+        tax: { enabled: false, rate: 0, text: '' },
+      } as FinancialSettings),
+    );
     const sb = await asUser(b, () => settings.getSettings());
     expect(sb.financial.currency).not.toBe('USD'); // ب يبقى على افتراضه
   });

@@ -17,12 +17,14 @@ import {
 } from './index.js';
 
 const VALID_SECRET = 'a'.repeat(48);
-const VALID_DB = 'postgresql://user:pass@host.neon.tech/db?sslmode=require';
+const VALID_DB = 'postgresql://host.example/db?sslmode=require';
 
 function baseEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
   return {
     NODE_ENV: 'development',
     DATABASE_URL: VALID_DB,
+    SUPABASE_URL: 'https://project.supabase.co',
+    SUPABASE_SERVICE_ROLE_KEY: `service-${VALID_SECRET}`,
     JWT_ACCESS_SECRET: `access-${VALID_SECRET}`,
     JWT_REFRESH_SECRET: `refresh-${VALID_SECRET}`,
     COOKIE_SECRET: `cookie-${VALID_SECRET}`,
@@ -70,15 +72,15 @@ describe('parseEnv — يرفض الإقلاع بإعداد سيّئ', () => {
   });
 
   it('يرفض COOKIE_SECURE=false في الإنتاج', () => {
-    expect(() =>
-      parseEnv(baseEnv({ NODE_ENV: 'production', REDIS_URL: 'rediss://h:1' })),
-    ).toThrow(/COOKIE_SECURE/);
+    expect(() => parseEnv(baseEnv({ NODE_ENV: 'production', REDIS_URL: 'rediss://h:1' }))).toThrow(
+      /COOKIE_SECURE/,
+    );
   });
 
   it('يرفض غياب REDIS_URL في الإنتاج', () => {
-    expect(() =>
-      parseEnv(baseEnv({ NODE_ENV: 'production', COOKIE_SECURE: 'true' })),
-    ).toThrow(/REDIS_URL/);
+    expect(() => parseEnv(baseEnv({ NODE_ENV: 'production', COOKIE_SECURE: 'true' }))).toThrow(
+      /REDIS_URL/,
+    );
   });
 
   it('يرفض LOG_LEVEL=debug في الإنتاج (تسريب بيانات)', () => {
@@ -101,7 +103,7 @@ describe('parseEnv — يرفض الإقلاع بإعداد سيّئ', () => {
         WEB_ORIGIN: 'https://finance.example.com',
         COOKIE_SECURE: 'true',
         COOKIE_SAME_SITE: 'strict',
-        REDIS_URL: 'rediss://user:pass@host:6379',
+        REDIS_URL: 'rediss://host:6379',
         LOG_LEVEL: 'info',
         SMTP_HOST: 'smtp.example.com',
         SMTP_USER: 'mailer',

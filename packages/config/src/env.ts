@@ -15,7 +15,9 @@ const SECRET_MIN = 32;
 
 const secret = (name: string) =>
   z
-    .string({ required_error: `${name} مطلوب — ولّده بـ: node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` })
+    .string({
+      required_error: `${name} مطلوب — ولّده بـ: node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`,
+    })
     .min(SECRET_MIN, `${name} يجب أن يكون ${SECRET_MIN} حرفًا على الأقل.`);
 
 const postgresUrl = z
@@ -25,9 +27,7 @@ const postgresUrl = z
     message: 'المزوّد PostgreSQL حصرًا (postgresql://). النظام يعتمد على RLS و NUMERIC.',
   });
 
-const boolish = z
-  .enum(['true', 'false', '1', '0'])
-  .transform((v) => v === 'true' || v === '1');
+const boolish = z.enum(['true', 'false', '1', '0']).transform((v) => v === 'true' || v === '1');
 
 export const envSchema = z
   .object({
@@ -42,6 +42,14 @@ export const envSchema = z
     // قاعدة البيانات
     DATABASE_URL: postgresUrl,
     DIRECT_DATABASE_URL: postgresUrl.optional(),
+
+    // Supabase Storage (server-side only; never expose the service role key to Vite)
+    SUPABASE_URL: z.string().url().optional(),
+    SUPABASE_SERVICE_ROLE_KEY: z.string().min(32).optional(),
+    SUPABASE_STORAGE_BUCKET: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/)
+      .default('store-logos'),
 
     // Redis — اختياري في التطوير؛ إن غاب تُستخدم حدود معدل بالذاكرة.
     REDIS_URL: z.string().url().optional(),
@@ -115,6 +123,16 @@ export const envSchema = z
       }
     }
 
+    for (const key of ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'] as const) {
+      if (!env[key]) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} is required in production for durable store-logo storage.`,
+        });
+      }
+    }
+
     if (env.COOKIE_SAME_SITE === 'none' && !env.COOKIE_SECURE) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -127,8 +145,7 @@ export const envSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['JWT_REFRESH_SECRET'],
-        message:
-          'سر الوصول وسر التجديد يجب أن يختلفا — وإلا صلح رمز الوصول كرمز تجديد.',
+        message: 'سر الوصول وسر التجديد يجب أن يختلفا — وإلا صلح رمز الوصول كرمز تجديد.',
       });
     }
 
@@ -192,6 +209,7 @@ export const REDACTED_KEYS = [
   'api_key',
   'DATABASE_URL',
   'DIRECT_DATABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
   'REDIS_URL',
   'SMTP_PASSWORD',
 ] as const;

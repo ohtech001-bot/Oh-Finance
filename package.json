@@ -51,11 +51,16 @@
     "@oh/typescript-config": "*",
     "@playwright/test": "^1.49.1",
     "@types/node": "^22.10.5",
+    "@types/pg": "^8.23.1",
     "concurrently": "^9.1.2",
     "eslint": "^9.17.0",
     "prettier": "^3.4.2",
     "prisma": "^6.2.1",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "@supabase/server": "^1.5.3",
+    "pg": "^8.23.0"
   }
 }

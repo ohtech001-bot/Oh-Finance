@@ -365,10 +365,18 @@ export function TenantFormPage() {
                         onChange={(event) => {
                           const file = event.target.files?.[0];
                           if (!file) return;
+                          if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+                            setError('logoDataUrl', {
+                              message: 'صيغة الشعار يجب أن تكون PNG أو JPEG أو WebP.',
+                            });
+                            event.target.value = '';
+                            return;
+                          }
                           if (file.size > 5 * 1024 * 1024) {
                             setError('logoDataUrl', {
                               message: 'حجم الشعار يجب ألا يتجاوز 5 ميجابايت.',
                             });
+                            event.target.value = '';
                             return;
                           }
                           const reader = new FileReader();

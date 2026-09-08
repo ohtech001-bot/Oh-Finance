@@ -1,11 +1,10 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { parseEnv } from '@oh/config';
 
 import { AppConfigModule } from './core/config/config.module.js';
-import { EnvService } from './core/config/env.service.js';
 import { PrismaModule } from './core/prisma/prisma.module.js';
 import { AuditModule } from './core/audit/audit.module.js';
 import { AllExceptionsFilter } from './core/errors/all-exceptions.filter.js';
@@ -38,6 +37,8 @@ import { ActivityModule } from './modules/activity/activity.module.js';
 import { ReportsModule } from './modules/reports/reports.module.js';
 import { SettingsModule } from './modules/settings/settings.module.js';
 import { MailModule } from './core/mail/mail.module.js';
+import { StorageModule } from './core/storage/storage.module.js';
+import { RateLimitModule } from './core/rate-limit/rate-limit.module.js';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { MailModule } from './core/mail/mail.module.js';
     PrismaModule,
     AuditModule,
     MailModule,
+    StorageModule,
 
     LoggerModule.forRoot(buildLoggerConfig(parseEnv(process.env))),
 
@@ -57,16 +59,7 @@ import { MailModule } from './core/mail/mail.module.js';
      * لأن العدّاد بالذاكرة لا يعمل عبر عدة نسخ من الخادم — يصير كل نسخة تعدّ
      * وحدها، فيتضاعف الحد الفعلي بعدد النسخ.
      */
-    ThrottlerModule.forRootAsync({
-      inject: [EnvService],
-      useFactory: (env: EnvService) => [
-        {
-          name: 'default',
-          ttl: env.get('RATE_LIMIT_TTL_SECONDS') * 1000,
-          limit: env.get('RATE_LIMIT_MAX'),
-        },
-      ],
-    }),
+    RateLimitModule,
 
     AuthModule,
     PlatformModule,

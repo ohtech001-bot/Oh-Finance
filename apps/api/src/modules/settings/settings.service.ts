@@ -12,6 +12,7 @@ import { DEFAULT_STORE_SETTINGS } from '@oh/contracts';
 import { AppError } from '../../core/errors/app-error.js';
 import { PrismaService } from '../../core/prisma/prisma.service.js';
 import { TenantContext } from '../../core/tenancy/tenant-context.js';
+import { StoreLogoStorageService } from '../../core/storage/store-logo-storage.service.js';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -32,7 +33,10 @@ import { TenantContext } from '../../core/tenancy/tenant-context.js';
  */
 @Injectable()
 export class SettingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly logos: StoreLogoStorageService,
+  ) {}
 
   async getSettings(): Promise<StoreSettings> {
     const tenantId = TenantContext.requireTenantId();
@@ -44,7 +48,12 @@ export class SettingsService {
       const store = await tx.store.findFirst({
         where: { id: storeId },
         select: {
-          name: true, email: true, address: true, logoUrl: true, currency: true, settings: true,
+          name: true,
+          email: true,
+          address: true,
+          logoUrl: true,
+          currency: true,
+          settings: true,
           tenant: { select: { timezone: true, locale: true } },
         },
       });
@@ -59,11 +68,17 @@ export class SettingsService {
     if (!ctx?.storeId) throw AppError.forbidden('لا يوجد محل مرتبط بحسابك.');
     const storeId = ctx.storeId;
 
-    return this.prisma.runInTenant(tenantId, async (tx) => {
+    let replacedLogoUrl: string | null = null;
+    const result = await this.prisma.runInTenant(tenantId, async (tx) => {
       const store = await tx.store.findFirst({
         where: { id: storeId },
         select: {
-          name: true, email: true, address: true, logoUrl: true, currency: true, settings: true,
+          name: true,
+          email: true,
+          address: true,
+          logoUrl: true,
+          currency: true,
+          settings: true,
           tenant: { select: { timezone: true, locale: true } },
         },
       });
@@ -75,6 +90,7 @@ export class SettingsService {
       switch (section) {
         case 'general': {
           const g = data as GeneralSettings;
+          if (store.logoUrl && g.logoUrl !== store.logoUrl) replacedLogoUrl = store.logoUrl;
           storeUpdate.name = g.name;
           storeUpdate.email = g.email || null;
           storeUpdate.address = g.address || null;
@@ -85,7 +101,12 @@ export class SettingsService {
         case 'financial': {
           const f = data as FinancialSettings;
           storeUpdate.currency = f.currency;
-          json.financial = { country: f.country, numberFormat: f.numberFormat, dateFormat: f.dateFormat, tax: f.tax };
+          json.financial = {
+            country: f.country,
+            numberFormat: f.numberFormat,
+            dateFormat: f.dateFormat,
+            tax: f.tax,
+          };
           break;
         }
         case 'invoices':
@@ -108,12 +129,20 @@ export class SettingsService {
       const fresh = await tx.store.findFirst({
         where: { id: storeId },
         select: {
-          name: true, email: true, address: true, logoUrl: true, currency: true, settings: true,
+          name: true,
+          email: true,
+          address: true,
+          logoUrl: true,
+          currency: true,
+          settings: true,
           tenant: { select: { timezone: true, locale: true } },
         },
       });
       return this.merge(fresh!);
     });
+
+    if (replacedLogoUrl) await this.logos.deleteUrlBestEffort(replacedLogoUrl);
+    return result;
   }
 
   /** يدمج الأعمدة + JSONB + الافتراضيات في شكل الإعدادات الكامل. */
@@ -137,13 +166,17 @@ export class SettingsService {
         email: store.email ?? '',
         address: store.address ?? '',
         logoUrl: store.logoUrl ?? '',
-        language: (g.language as GeneralSettings['language']) ?? (store.tenant?.locale as GeneralSettings['language']) ?? 'ar',
+        language:
+          (g.language as GeneralSettings['language']) ??
+          (store.tenant?.locale as GeneralSettings['language']) ??
+          'ar',
         timezone: (g.timezone as string) ?? store.tenant?.timezone ?? 'Asia/Jerusalem',
       },
       financial: {
         currency: store.currency,
         country: (fin.country as string) ?? d.financial.country,
-        numberFormat: (fin.numberFormat as FinancialSettings['numberFormat']) ?? d.financial.numberFormat,
+        numberFormat:
+          (fin.numberFormat as FinancialSettings['numberFormat']) ?? d.financial.numberFormat,
         dateFormat: (fin.dateFormat as FinancialSettings['dateFormat']) ?? d.financial.dateFormat,
         tax: { ...d.financial.tax, ...((fin.tax as object) ?? {}) },
       },
