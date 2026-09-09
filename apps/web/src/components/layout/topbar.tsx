@@ -17,10 +17,9 @@ import {
   Store,
   Sun,
   Undo2,
-  User,
 } from 'lucide-react';
 import type { NotificationItem } from '@oh/contracts';
-import { LOCALES, LOCALE_CODES, ROLE_LABELS, type LocaleCode, type RoleName } from '@oh/config';
+import { LOCALES, ROLE_LABELS, type RoleName } from '@oh/config';
 import { formatMoney, type CurrencyCode } from '@oh/money';
 import {
   Button,
@@ -35,7 +34,7 @@ import {
   toast,
 } from '@oh/ui';
 import { useAuth } from '@/app/auth-context';
-import { changeLocale, currentLocale } from '@/lib/i18n';
+import { APP_LOCALE_CODES, changeLocale, currentLocale } from '@/lib/i18n';
 import { useTheme } from '@/app/theme-context';
 import { useNotifications } from '@/features/notifications/api';
 import { displayOrderNumber } from '@/features/orders/order-number';
@@ -75,7 +74,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
       await logout();
       navigate('/login', { replace: true });
     } catch {
-      toast.error('تعذّر تسجيل الخروج. حاول مجددًا.');
+      toast.error(t('auth.logoutFailed'));
     } finally {
       setLoggingOut(false);
     }
@@ -118,7 +117,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
         size="icon"
         onClick={onOpenMobileNav}
         className="shrink-0 lg:hidden"
-        aria-label="فتح القائمة"
+        aria-label={t('nav.openMenu')}
       >
         <Menu />
       </Button>
@@ -246,7 +245,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
           variant="ghost"
           size="icon"
           onClick={toggleTheme}
-          aria-label={theme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي'}
+          aria-label={t(theme === 'dark' ? 'common.lightTheme' : 'common.darkTheme')}
           className="hidden lg:inline-flex"
         >
           {theme === 'dark' ? <Sun /> : <Moon />}
@@ -267,10 +266,10 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {LOCALE_CODES.map((code) => (
+            {APP_LOCALE_CODES.map((code) => (
               <DropdownMenuItem
                 key={code}
-                onClick={() => changeLocale(code as LocaleCode)}
+                onClick={() => changeLocale(code)}
                 className={cn(code === locale && 'bg-accent-soft text-accent font-semibold')}
               >
                 {LOCALES[code].nameNative}
@@ -322,13 +321,6 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
               </DropdownMenuLabel>
 
               <DropdownMenuSeparator />
-
-              {user.role !== 'SUPER_ADMIN' ? (
-                <DropdownMenuItem onClick={() => navigate('/profile')}>
-                  <User />
-                  {t('common.profile')}
-                </DropdownMenuItem>
-              ) : null}
 
               {!user.isSuperAdmin ? (
                 <DropdownMenuItem onClick={() => navigate('/settings')}>
@@ -448,7 +440,7 @@ function notificationText(
   };
 }
 
-function formatNotificationTime(value: string, locale: LocaleCode): string {
+function formatNotificationTime(value: string, locale: 'ar' | 'he'): string {
   const date = new Date(value);
   return new Intl.DateTimeFormat(locale, {
     month: '2-digit',

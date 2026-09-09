@@ -1,11 +1,13 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
-import { DEFAULT_LOCALE, LOCALES, isLocaleCode, type LocaleCode } from '@oh/config';
+import { DEFAULT_LOCALE, LOCALES, type LocaleCode } from '@oh/config';
 
 import ar from '../locales/ar.json' with { type: 'json' };
 import he from '../locales/he.json' with { type: 'json' };
-import en from '../locales/en.json' with { type: 'json' };
+
+export const APP_LOCALE_CODES = ['ar', 'he'] as const;
+export type AppLocaleCode = (typeof APP_LOCALE_CODES)[number];
 
 /**
  * التوطين والاتجاه.
@@ -25,12 +27,9 @@ void i18n
     resources: {
       ar: { translation: ar },
       he: { translation: he },
-      en: { translation: en },
     },
     fallbackLng: DEFAULT_LOCALE,
-    supportedLngs: Object.keys(LOCALES),
-    // العربية أولًا: هي اللغة الافتراضية للنظام، لا الإنجليزية.
-    lng: DEFAULT_LOCALE,
+    supportedLngs: APP_LOCALE_CODES,
 
     detection: {
       order: ['localStorage', 'navigator'],
@@ -55,14 +54,14 @@ export function applyLocale(locale: LocaleCode): void {
   document.documentElement.classList.toggle('font-he', locale === 'he');
 }
 
-export function changeLocale(locale: LocaleCode): void {
+export function changeLocale(locale: AppLocaleCode): void {
   void i18n.changeLanguage(locale);
   applyLocale(locale);
 }
 
-export function currentLocale(): LocaleCode {
+export function currentLocale(): AppLocaleCode {
   const lng = i18n.resolvedLanguage ?? i18n.language;
-  return isLocaleCode(lng) ? lng : DEFAULT_LOCALE;
+  return lng === 'he' ? 'he' : 'ar';
 }
 
 // تطبيق أولي قبل أول رسم — يمنع وميض الاتجاه الخاطئ.

@@ -9,6 +9,7 @@ import { Button, Field, Input, cn, toast } from '@oh/ui';
 import { ApiRequestError } from '@/lib/api';
 import { useAuth } from '@/app/auth-context';
 import { AuthLayout } from './auth-layout';
+import { loginErrorMessage } from './login-error-message';
 
 /**
  * شاشة تسجيل الدخول.
@@ -47,9 +48,13 @@ export function LoginPage() {
     try {
       const response = await login(values);
       const from = (location.state as { from?: string } | null)?.from;
-      const fallback = response.user.mustChangePassword ? '/change-initial-password' : response.user.isSuperAdmin ? '/platform' : '/';
+      const fallback = response.user.mustChangePassword
+        ? '/change-initial-password'
+        : response.user.isSuperAdmin
+          ? '/platform'
+          : '/';
       navigate(from ?? fallback, { replace: true });
-      toast.success(`أهلًا ${response.user.name}`);
+      toast.success(t('auth.welcomeUser', { name: response.user.name }));
     } catch (error) {
       if (error instanceof ApiRequestError) {
         if (error.code === 'TWO_FACTOR_REQUIRED') {
@@ -57,7 +62,7 @@ export function LoginPage() {
           setFormError(null);
           return;
         }
-        setFormError({ message: t('auth.invalidCredentials') });
+        setFormError({ message: loginErrorMessage(error, t) });
         return;
       }
       setFormError({ message: t('errors.network') });
@@ -65,11 +70,7 @@ export function LoginPage() {
   });
 
   return (
-    <AuthLayout
-      title={t('auth.loginTitle')}
-      subtitle={t('auth.loginSubtitle')}
-      icon={Store}
-    >
+    <AuthLayout title={t('auth.loginTitle')} subtitle={t('auth.loginSubtitle')} icon={Store}>
       <form onSubmit={onSubmit} className="space-y-5" noValidate>
         {/*
           خطأ عام فوق النموذج — لا يُبرز حقلًا بعينه (منع تعداد المستخدمين).
@@ -78,7 +79,7 @@ export function LoginPage() {
         {formError ? (
           <div
             role="alert"
-            className="flex items-start gap-3 rounded-ctrl border border-red-400/45 bg-red-950/80 px-4 py-3 shadow-sm"
+            className="rounded-ctrl flex items-start gap-3 border border-red-400/45 bg-red-950/80 px-4 py-3 shadow-sm"
           >
             <CircleAlert className="mt-0.5 size-5 shrink-0 text-red-300" aria-hidden />
             <div className="min-w-0 flex-1">
@@ -118,8 +119,8 @@ export function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="text-fg-subtle transition-colors hover:text-fg"
-                  aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                  className="text-fg-subtle hover:text-fg transition-colors"
+                  aria-label={t(showPassword ? 'auth.hidePassword' : 'auth.showPassword')}
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -157,13 +158,13 @@ export function LoginPage() {
         ) : null}
 
         <div className="flex items-center justify-between">
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
+          <label className="text-fg-muted flex cursor-pointer items-center gap-2 text-sm">
             <input
               type="checkbox"
               {...register('rememberMe')}
               className={cn(
-                'size-4 rounded border-border text-accent',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                'border-border text-accent size-4 rounded',
+                'focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2',
               )}
             />
             {t('auth.rememberMe')}
@@ -171,7 +172,7 @@ export function LoginPage() {
 
           <Link
             to="/forgot-password"
-            className="text-sm font-medium text-accent transition-colors hover:underline"
+            className="text-accent text-sm font-medium transition-colors hover:underline"
           >
             {t('auth.forgotPassword')}
           </Link>

@@ -69,7 +69,7 @@ export const envSchema = z
     // حدود المعدل
     RATE_LIMIT_TTL_SECONDS: z.coerce.number().int().positive().default(60),
     RATE_LIMIT_MAX: z.coerce.number().int().positive().default(120),
-    AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5),
+    AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
     AUTH_LOCKOUT_THRESHOLD: z.coerce.number().int().positive().default(10),
     AUTH_LOCKOUT_MINUTES: z.coerce.number().int().positive().default(15),
 

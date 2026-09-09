@@ -64,9 +64,6 @@ describe('اتجاه اللغة (RTL / LTR)', () => {
   });
 
   it('التبديل بين اللغات يُحدّث الاتجاه في كل مرة', () => {
-    changeLocale('en');
-    expect(document.documentElement.dir).toBe('ltr');
-
     changeLocale('he');
     expect(document.documentElement.dir).toBe('rtl');
 
@@ -76,7 +73,7 @@ describe('اتجاه اللغة (RTL / LTR)', () => {
 });
 
 describe('الترجمات', () => {
-  it('اللغات الثلاث تملك نفس مفاتيح الترجمة', () => {
+  it('العربية والعبرية تملكان نفس مفاتيح الترجمة', () => {
     // مفتاح ناقص في العبرية يعني نصًا عربيًا يظهر وسط واجهة عبرية.
     const collectKeys = (obj: Record<string, unknown>, prefix = ''): string[] =>
       Object.entries(obj).flatMap(([key, value]) => {
@@ -92,12 +89,7 @@ describe('الترجمات', () => {
     const heKeys = collectKeys(
       i18n.getResourceBundle('he', 'translation') as Record<string, unknown>,
     ).sort();
-    const enKeys = collectKeys(
-      i18n.getResourceBundle('en', 'translation') as Record<string, unknown>,
-    ).sort();
-
     expect(heKeys).toEqual(arKeys);
-    expect(enKeys).toEqual(arKeys);
   });
 
   it('كل لغة لها اسم أصلي واتجاه', () => {

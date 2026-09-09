@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -55,6 +56,7 @@ import { useSettings, useUpdateSettingsSection } from './api';
  *  «سجل النشاط» يعيد استخدام موجز النشاط، و«إدارة الاشتراك» يعرض الاشتراك القائم.
  */
 export function SettingsPage() {
+  const { t } = useTranslation();
   const { can } = useAuth();
   const [activeTab, setActiveTab] = useState('general');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(true);
@@ -63,12 +65,16 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="الإعدادات" icon={SettingsIcon} description="سبعة أقسام لضبط المحل." />
+      <PageHeader
+        title={t('nav.settings')}
+        icon={SettingsIcon}
+        description={t('settings.description')}
+      />
 
       {isError ? (
         <Card>
           <ErrorState
-            message={error instanceof ApiRequestError ? error.message : 'تعذّر تحميل الإعدادات.'}
+            message={error instanceof ApiRequestError ? error.message : t('settings.loadError')}
             onRetry={() => void refetch()}
           />
         </Card>
@@ -84,44 +90,44 @@ export function SettingsPage() {
             <TabsList className="grid h-auto w-full grid-cols-2 gap-2 bg-transparent p-0">
               <SettingsTab
                 value="general"
-                label="عام"
-                description="معلومات المحل، اللغة والمنطقة الزمنية"
+                label={t('settings.general')}
+                description={t('settings.generalDescription')}
                 icon={Store}
               />
               <SettingsTab
                 value="financial"
-                label="المالية"
-                description="العملة، الضرائب وطرق الدفع"
+                label={t('settings.financial')}
+                description={t('settings.financialDescription')}
                 icon={CircleDollarSign}
               />
               <SettingsTab
                 value="invoices"
-                label="الفواتير"
-                description="التسعير والرقم التسلسلي"
+                label={t('settings.invoices')}
+                description={t('settings.invoicesDescription')}
                 icon={FileText}
               />
               <SettingsTab
                 value="printing"
-                label="الطباعة"
-                description="الطابعة وتنسيق المستندات"
+                label={t('settings.printing')}
+                description={t('settings.printingDescription')}
                 icon={Printer}
               />
               <SettingsTab
                 value="messaging"
-                label="الرسائل"
-                description="واتساب والتنبيهات والقوالب"
+                label={t('settings.messaging')}
+                description={t('settings.messagingDescription')}
                 icon={MessageSquare}
               />
               <SettingsTab
                 value="activity"
-                label="سجل النشاط"
-                description="جميع العمليات والتغييرات"
+                label={t('settings.activity')}
+                description={t('settings.activityDescription')}
                 icon={Clock3}
               />
               <SettingsTab
                 value="subscription"
-                label="إدارة الاشتراك"
-                description="تفاصيل الباقة والاستخدام"
+                label={t('settings.subscription')}
+                description={t('settings.subscriptionDescription')}
                 icon={Crown}
               />
             </TabsList>
@@ -134,12 +140,12 @@ export function SettingsPage() {
               onClick={() => setMobileMenuOpen(true)}
             >
               <ChevronLeft className="rtl:rotate-180" aria-hidden />
-              جميع الإعدادات
+              {t('settings.allSettings')}
             </Button>
 
             {isLoading || !data ? (
               <Card className="mt-4">
-                <CardBody>جارٍ التحميل…</CardBody>
+                <CardBody>{t('common.loading')}</CardBody>
               </Card>
             ) : (
               <>
@@ -213,10 +219,11 @@ function SectionCard({ title, children }: { title: string; children: React.React
 }
 
 function SaveBar({ disabled, loading }: { disabled: boolean; loading: boolean }) {
+  const { t } = useTranslation();
   return (
     <div className="flex justify-start pt-2">
       <Button type="submit" variant="brand" disabled={disabled} loading={loading}>
-        حفظ التغييرات
+        {t('common.saveChanges')}
       </Button>
     </div>
   );
@@ -230,14 +237,16 @@ function useSectionForm<T extends Record<string, unknown>>(
   schema: Parameters<typeof zodResolver>[0],
   values: T,
 ) {
+  const { t } = useTranslation();
   const mutation = useUpdateSettingsSection();
   const form = useForm<T>({ resolver: zodResolver(schema), values: values as never });
   const onSubmit = form.handleSubmit((data) =>
     mutation.mutate(
       { section, data },
       {
-        onSuccess: () => toast.success('حُفظت التغييرات'),
-        onError: (e) => toast.error(e instanceof ApiRequestError ? e.message : 'تعذّر الحفظ'),
+        onSuccess: () => toast.success(t('settings.saved')),
+        onError: (e) =>
+          toast.error(e instanceof ApiRequestError ? e.message : t('settings.saveError')),
       },
     ),
   );
@@ -247,6 +256,7 @@ function useSectionForm<T extends Record<string, unknown>>(
 // ── عام ──────────────────────────────────────────────────────────────────────
 
 function GeneralForm({ data, canManage }: { data: StoreSettings; canManage: boolean }) {
+  const { t } = useTranslation();
   const { form, onSubmit, saving } = useSectionForm<GeneralSettings>(
     'general',
     generalSettingsSchema,
@@ -258,26 +268,25 @@ function GeneralForm({ data, canManage }: { data: StoreSettings; canManage: bool
   } = form;
   return (
     <form onSubmit={onSubmit}>
-      <SectionCard title="الإعدادات العامة — معلومات المحل">
-        <Field label="اسم المحل" error={errors.name?.message} required>
+      <SectionCard title={t('settings.generalTitle')}>
+        <Field label={t('settings.storeName')} error={errors.name?.message} required>
           {(p) => <Input {...p} {...register('name')} disabled={!canManage} />}
         </Field>
-        <Field label="البريد الإلكتروني" error={errors.email?.message}>
+        <Field label={t('settings.email')} error={errors.email?.message}>
           {(p) => <Input {...p} {...register('email')} dir="ltr" disabled={!canManage} />}
         </Field>
-        <Field label="العنوان" error={errors.address?.message}>
+        <Field label={t('settings.address')} error={errors.address?.message}>
           {(p) => <Input {...p} {...register('address')} disabled={!canManage} />}
         </Field>
-        <Field label="اللغة">
+        <Field label={t('common.language')}>
           {(p) => (
             <select {...p} {...register('language')} className={selectCls} disabled={!canManage}>
               <option value="ar">العربية</option>
-              <option value="he">العبرية</option>
-              <option value="en">الإنجليزية</option>
+              <option value="he">עברית</option>
             </select>
           )}
         </Field>
-        <Field label="المنطقة الزمنية" error={errors.timezone?.message}>
+        <Field label={t('settings.timezone')} error={errors.timezone?.message}>
           {(p) => (
             <Input
               {...p}
@@ -297,6 +306,7 @@ function GeneralForm({ data, canManage }: { data: StoreSettings; canManage: bool
 // ── المالية ──────────────────────────────────────────────────────────────────
 
 function FinancialForm({ data, canManage }: { data: StoreSettings; canManage: boolean }) {
+  const { t } = useTranslation();
   const { form, onSubmit, saving } = useSectionForm<FinancialSettings>(
     'financial',
     financialSettingsSchema,
@@ -311,8 +321,8 @@ function FinancialForm({ data, canManage }: { data: StoreSettings; canManage: bo
   const taxEnabled = watch('tax.enabled');
   return (
     <form onSubmit={onSubmit}>
-      <SectionCard title="الإعدادات المالية — العملة والمنطقة">
-        <Field label="العملة" error={errors.currency?.message}>
+      <SectionCard title={t('settings.financialTitle')}>
+        <Field label={t('settings.currency')} error={errors.currency?.message}>
           {(p) => (
             <Input
               {...p}
@@ -323,10 +333,10 @@ function FinancialForm({ data, canManage }: { data: StoreSettings; canManage: bo
             />
           )}
         </Field>
-        <Field label="الدولة">
+        <Field label={t('settings.country')}>
           {(p) => <Input {...p} {...register('country')} disabled={!canManage} />}
         </Field>
-        <Field label="فاصل الأرقام">
+        <Field label={t('settings.numberFormat')}>
           {(p) => (
             <select
               {...p}
@@ -340,7 +350,7 @@ function FinancialForm({ data, canManage }: { data: StoreSettings; canManage: bo
             </select>
           )}
         </Field>
-        <Field label="تنسيق التاريخ">
+        <Field label={t('settings.dateFormat')}>
           {(p) => (
             <select {...p} {...register('dateFormat')} className={selectCls} disabled={!canManage}>
               <option value="YYYY-MM-DD">YYYY-MM-DD</option>
@@ -350,12 +360,12 @@ function FinancialForm({ data, canManage }: { data: StoreSettings; canManage: bo
           )}
         </Field>
         <ToggleRow
-          label="تفعيل الضريبة"
+          label={t('settings.taxEnabled')}
           checked={!!taxEnabled}
           disabled={!canManage}
           onChange={(v) => setValue('tax.enabled', v, { shouldDirty: true })}
         />
-        <Field label="نسبة الضريبة (%)" error={errors.tax?.rate?.message}>
+        <Field label={t('settings.taxRate')} error={errors.tax?.rate?.message}>
           {(p) => (
             <Input
               {...p}
@@ -367,7 +377,7 @@ function FinancialForm({ data, canManage }: { data: StoreSettings; canManage: bo
             />
           )}
         </Field>
-        <Field label="نص الفاتورة الضريبية">
+        <Field label={t('settings.taxText')}>
           {(p) => (
             <textarea
               {...p}
@@ -387,6 +397,7 @@ function FinancialForm({ data, canManage }: { data: StoreSettings; canManage: bo
 // ── الفواتير ─────────────────────────────────────────────────────────────────
 
 function InvoicesForm({ data, canManage }: { data: StoreSettings; canManage: boolean }) {
+  const { t } = useTranslation();
   const { form, onSubmit, saving } = useSectionForm<InvoiceSettings>(
     'invoices',
     invoiceSettingsSchema,
@@ -400,8 +411,8 @@ function InvoicesForm({ data, canManage }: { data: StoreSettings; canManage: boo
   } = form;
   return (
     <form onSubmit={onSubmit}>
-      <SectionCard title="إعدادات الفواتير — معلومات الفاتورة">
-        <Field label="رقم بداية الفاتورة" error={errors.startNumber?.message}>
+      <SectionCard title={t('settings.invoiceTitle')}>
+        <Field label={t('settings.invoiceStart')} error={errors.startNumber?.message}>
           {(p) => (
             <Input
               {...p}
@@ -412,13 +423,13 @@ function InvoicesForm({ data, canManage }: { data: StoreSettings; canManage: boo
             />
           )}
         </Field>
-        <Field label="البادئة">
+        <Field label={t('settings.prefix')}>
           {(p) => <Input {...p} {...register('prefix')} dir="ltr" disabled={!canManage} />}
         </Field>
-        <Field label="اللاحقة">
+        <Field label={t('settings.suffix')}>
           {(p) => <Input {...p} {...register('suffix')} dir="ltr" disabled={!canManage} />}
         </Field>
-        <Field label="صيغة رقم الفاتورة">
+        <Field label={t('settings.invoiceNumberFormat')}>
           {(p) => (
             <Input
               {...p}
@@ -430,18 +441,18 @@ function InvoicesForm({ data, canManage }: { data: StoreSettings; canManage: boo
           )}
         </Field>
         <ToggleRow
-          label="عرض الأسعار شامل الضريبة"
+          label={t('settings.priceIncludesTax')}
           checked={!!watch('priceIncludesTax')}
           disabled={!canManage}
           onChange={(v) => setValue('priceIncludesTax', v, { shouldDirty: true })}
         />
         <ToggleRow
-          label="إظهار عمود الضريبة في الفاتورة"
+          label={t('settings.showTaxColumn')}
           checked={!!watch('showTaxColumn')}
           disabled={!canManage}
           onChange={(v) => setValue('showTaxColumn', v, { shouldDirty: true })}
         />
-        <Field label="ملاحظات الفاتورة">
+        <Field label={t('settings.invoiceNotes')}>
           {(p) => (
             <textarea
               {...p}
@@ -461,6 +472,7 @@ function InvoicesForm({ data, canManage }: { data: StoreSettings; canManage: boo
 // ── الطباعة ──────────────────────────────────────────────────────────────────
 
 function PrintingForm({ data, canManage }: { data: StoreSettings; canManage: boolean }) {
+  const { t } = useTranslation();
   const { form, onSubmit, saving } = useSectionForm<PrintingSettings>(
     'printing',
     printingSettingsSchema,
@@ -477,11 +489,11 @@ function PrintingForm({ data, canManage }: { data: StoreSettings; canManage: boo
   );
   return (
     <form onSubmit={onSubmit}>
-      <SectionCard title="إعدادات الطباعة — الطابعة الافتراضية">
-        <Field label="الطابعة">
+      <SectionCard title={t('settings.printTitle')}>
+        <Field label={t('settings.printer')}>
           {(p) => <Input {...p} {...register('printer')} disabled={!canManage} />}
         </Field>
-        <Field label="القياس">
+        <Field label={t('settings.paperSize')}>
           {(p) => (
             <select {...p} {...register('paperSize')} className={selectCls} disabled={!canManage}>
               <option value="80mm">80mm</option>
@@ -491,19 +503,19 @@ function PrintingForm({ data, canManage }: { data: StoreSettings; canManage: boo
             </select>
           )}
         </Field>
-        <Field label="الاتجاه">
+        <Field label={t('settings.orientation')}>
           {(p) => (
             <select {...p} {...register('orientation')} className={selectCls} disabled={!canManage}>
-              <option value="portrait">عمودي</option>
-              <option value="landscape">أفقي</option>
+              <option value="portrait">{t('settings.portrait')}</option>
+              <option value="landscape">{t('settings.landscape')}</option>
             </select>
           )}
         </Field>
-        <p className="text-fg pt-2 text-[13px] font-semibold">خيارات الطباعة</p>
-        {check('printLogo', 'طباعة الشعار في الفاتورة')}
-        {check('printInvoiceNumber', 'طباعة رقم الفاتورة')}
-        {check('printDateTime', 'طباعة التاريخ والوقت')}
-        {check('printBarcode', 'طباعة باركود المنتجات')}
+        <p className="text-fg pt-2 text-[13px] font-semibold">{t('settings.printOptions')}</p>
+        {check('printLogo', t('settings.printLogo'))}
+        {check('printInvoiceNumber', t('settings.printInvoiceNumber'))}
+        {check('printDateTime', t('settings.printDateTime'))}
+        {check('printBarcode', t('settings.printBarcode'))}
         {canManage ? <SaveBar disabled={saving} loading={saving} /> : null}
       </SectionCard>
     </form>
@@ -513,6 +525,7 @@ function PrintingForm({ data, canManage }: { data: StoreSettings; canManage: boo
 // ── الرسائل ──────────────────────────────────────────────────────────────────
 
 function MessagingForm({ data, canManage }: { data: StoreSettings; canManage: boolean }) {
+  const { t } = useTranslation();
   const { form, onSubmit, saving } = useSectionForm<MessagingSettings>(
     'messaging',
     messagingSettingsSchema,
@@ -521,14 +534,14 @@ function MessagingForm({ data, canManage }: { data: StoreSettings; canManage: bo
   const { register, watch, setValue } = form;
   return (
     <form onSubmit={onSubmit}>
-      <SectionCard title="إعدادات الرسائل — واتساب">
+      <SectionCard title={t('settings.messagingTitle')}>
         <ToggleRow
-          label="تفعيل واتساب"
+          label={t('settings.whatsappEnabled')}
           checked={!!watch('whatsappEnabled')}
           disabled={!canManage}
           onChange={(v) => setValue('whatsappEnabled', v, { shouldDirty: true })}
         />
-        <Field label="رقم واتساب الأعمال">
+        <Field label={t('settings.whatsappNumber')}>
           {(p) => (
             <Input
               {...p}
@@ -539,7 +552,7 @@ function MessagingForm({ data, canManage }: { data: StoreSettings; canManage: bo
             />
           )}
         </Field>
-        <Field label="رسالة الطلب الجديد (المتغيّرات: {order_id} {customer_name} {amount})">
+        <Field label={t('settings.newOrderTemplate')}>
           {(p) => (
             <textarea
               {...p}
@@ -551,12 +564,12 @@ function MessagingForm({ data, canManage }: { data: StoreSettings; canManage: bo
           )}
         </Field>
         <ToggleRow
-          label="تفعيل رسائل التنبيهات"
+          label={t('settings.alertsEnabled')}
           checked={!!watch('alertsEnabled')}
           disabled={!canManage}
           onChange={(v) => setValue('alertsEnabled', v, { shouldDirty: true })}
         />
-        <Field label="الطلبات الجديدة">
+        <Field label={t('settings.newOrders')}>
           {(p) => (
             <select
               {...p}
@@ -564,20 +577,20 @@ function MessagingForm({ data, canManage }: { data: StoreSettings; canManage: bo
               className={selectCls}
               disabled={!canManage}
             >
-              <option value="instant">فوري</option>
-              <option value="hourly">كل ساعة</option>
-              <option value="daily">يومي</option>
-              <option value="off">معطّل</option>
+              <option value="instant">{t('settings.instant')}</option>
+              <option value="hourly">{t('settings.hourly')}</option>
+              <option value="daily">{t('settings.daily')}</option>
+              <option value="off">{t('settings.off')}</option>
             </select>
           )}
         </Field>
-        <Field label="التسلسل">
+        <Field label={t('settings.sequence')}>
           {(p) => (
             <select {...p} {...register('sequence')} className={selectCls} disabled={!canManage}>
-              <option value="instant">فوري</option>
-              <option value="hourly">كل ساعة</option>
-              <option value="daily">يومي</option>
-              <option value="off">معطّل</option>
+              <option value="instant">{t('settings.instant')}</option>
+              <option value="hourly">{t('settings.hourly')}</option>
+              <option value="daily">{t('settings.daily')}</option>
+              <option value="off">{t('settings.off')}</option>
             </select>
           )}
         </Field>
@@ -590,20 +603,21 @@ function MessagingForm({ data, canManage }: { data: StoreSettings; canManage: bo
 // ── سجل النشاط (إعادة استخدام موجز النشاط) ─────────────────────────────────────
 
 function ActivityTab() {
+  const { t } = useTranslation();
   const { can } = useAuth();
   const canSee = can(PERMISSIONS.ACTIVITY_READ);
   const feed = useStoreActivityFeed({ pageSize: 15 }, canSee);
   return (
-    <SectionCard title="سجل النشاط">
+    <SectionCard title={t('settings.activity')}>
       {canSee ? (
         <ActivityFeed
           items={feed.data?.items ?? []}
           loading={feed.isLoading}
-          emptyText="لا يوجد نشاط في المحل بعد."
+          emptyText={t('settings.noActivity')}
         />
       ) : (
         <p className="text-fg-subtle py-8 text-center text-[13px]">
-          لا تملك صلاحية عرض سجل النشاط.
+          {t('settings.noActivityPermission')}
         </p>
       )}
     </SectionCard>
@@ -613,14 +627,13 @@ function ActivityTab() {
 // ── إدارة الاشتراك (عرض الاشتراك القائم) ───────────────────────────────────────
 
 function SubscriptionTab() {
+  const { t } = useTranslation();
   // تجنّبًا لتكرار منطق وحدة الاشتراك، نوجّه إلى شاشتها المخصّصة.
   return (
-    <SectionCard title="إدارة الاشتراك">
-      <p className="text-fg-muted text-[13px]">
-        تُدار تفاصيل الباقة والفواتير والاستخدام من شاشة الاشتراك المخصّصة.
-      </p>
+    <SectionCard title={t('settings.subscription')}>
+      <p className="text-fg-muted text-[13px]">{t('settings.subscriptionHint')}</p>
       <a href="/subscription" className="text-accent text-[13px] font-medium hover:underline">
-        فتح إدارة الاشتراك ←
+        {t('settings.openSubscription')}
       </a>
     </SectionCard>
   );

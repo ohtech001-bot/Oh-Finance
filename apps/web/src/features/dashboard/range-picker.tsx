@@ -2,6 +2,7 @@ import type { DashboardRangePreset } from '@oh/contracts';
 import { DateRangeFilter } from '@oh/ui';
 import { CalendarRange } from 'lucide-react';
 import { currentLocale } from '@/lib/i18n';
+import { useTranslation } from 'react-i18next';
 
 /**
  * منتقي الفترة — أزرار فترات جاهزة + مدى مخصّص.
@@ -12,17 +13,17 @@ import { currentLocale } from '@/lib/i18n';
 
 const PRESETS: {
   value: Exclude<DashboardRangePreset, 'custom'>;
-  label: Record<'ar' | 'he' | 'en', string>;
+  label: Record<'ar' | 'he', string>;
 }[] = [
-  { value: 'today', label: { ar: 'اليوم', he: 'היום', en: 'Today' } },
-  { value: 'yesterday', label: { ar: 'أمس', he: 'אתמול', en: 'Yesterday' } },
-  { value: 'last_7_days', label: { ar: 'آخر 7 أيام', he: '7 הימים האחרונים', en: 'Last 7 days' } },
-  { value: 'this_month', label: { ar: 'هذا الشهر', he: 'החודש', en: 'This month' } },
-  { value: 'previous_month', label: { ar: 'الشهر الماضي', he: 'החודש שעבר', en: 'Last month' } },
-  { value: 'this_year', label: { ar: 'السنة', he: 'השנה', en: 'This year' } },
+  { value: 'today', label: { ar: 'اليوم', he: 'היום' } },
+  { value: 'yesterday', label: { ar: 'أمس', he: 'אתמול' } },
+  { value: 'last_7_days', label: { ar: 'آخر 7 أيام', he: '7 הימים האחרונים' } },
+  { value: 'this_month', label: { ar: 'هذا الشهر', he: 'החודש' } },
+  { value: 'previous_month', label: { ar: 'الشهر الماضي', he: 'החודש שעבר' } },
+  { value: 'this_year', label: { ar: 'السنة', he: 'השנה' } },
 ];
 
-const CUSTOM_LABEL = { ar: 'مخصّص', he: 'מותאם', en: 'Custom' } as const;
+const CUSTOM_LABEL = { ar: 'مخصّص', he: 'מותאם' } as const;
 
 export interface RangeValue {
   preset: DashboardRangePreset;
@@ -37,11 +38,12 @@ export function RangePicker({
   value: RangeValue;
   onChange: (v: RangeValue) => void;
 }) {
-  const locale = currentLocale();
+  const { t } = useTranslation();
+  const locale = currentLocale() === 'he' ? 'he' : 'ar';
   const selectedPreset = value.preset === 'custom' ? 'today' : value.preset;
   return (
     <div className="flex flex-col items-end gap-3">
-      <div className="flex items-center gap-2" role="group" aria-label="الفترة الزمنية">
+      <div className="flex items-center gap-2" role="group" aria-label={t('dashboard.timeRange')}>
         <select
           value={selectedPreset}
           onChange={(event) => onChange({ preset: event.target.value as DashboardRangePreset })}

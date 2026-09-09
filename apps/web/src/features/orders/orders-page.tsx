@@ -102,14 +102,14 @@ export function OrdersPage() {
       setEditingOrder(await loadOrder(row.id));
     } catch (error) {
       if (error instanceof ApiRequestError) toast.apiError(error.message, error.requestId);
-      else toast.error('تعذّر تحميل الطلب للتعديل.');
+      else toast.error(t('orders.editLoadError'));
     }
   };
 
   const runPrint = async (row: Order) => {
     const printWindow = window.open('', '_blank', 'width=420,height=720');
     if (!printWindow) {
-      toast.error('اسمح بفتح نافذة الطباعة من المتصفح.');
+      toast.error(t('orders.allowPrintPopup'));
       return;
     }
     try {
@@ -124,7 +124,7 @@ export function OrdersPage() {
     } catch (error) {
       printWindow.close();
       if (error instanceof ApiRequestError) toast.apiError(error.message, error.requestId);
-      else toast.error('تعذّرت طباعة الطلب.');
+      else toast.error(t('orders.printError'));
     }
   };
 
@@ -138,18 +138,18 @@ export function OrdersPage() {
   const columns: Column<Order>[] = [
     {
       key: 'number',
-      header: 'رقم الطلب',
+      header: t('orders.number'),
       render: (row) => (
         <span className="text-accent font-semibold">{displayOrderNumber(row.number)}</span>
       ),
     },
     {
-      header: 'الزبون',
+      header: t('orders.customer'),
       render: (row) => <span className="text-fg font-medium">{row.customerName}</span>,
     },
     {
       key: 'issuedAt',
-      header: 'التاريخ',
+      header: t('common.date'),
       hideBelow: 'md',
       render: (row) => (
         <span className="text-fg text-[13px] tabular-nums" dir="ltr">
@@ -159,7 +159,7 @@ export function OrdersPage() {
     },
     {
       key: 'total',
-      header: 'تكلفة الطلب',
+      header: t('orders.cost'),
       align: 'end',
       render: (row) => {
         const isDraft = row.status === 'DRAFT' || row.status === 'QUOTE';
@@ -180,14 +180,14 @@ export function OrdersPage() {
                     : 'text-danger text-xs font-medium'
               }
             >
-              {isDraft ? 'مسودة' : isPaid ? 'مدفوع' : 'غير مدفوع'}
+              {isDraft ? t('orders.draft') : isPaid ? t('orders.paid') : t('orders.unpaid')}
             </p>
           </div>
         );
       },
     },
     {
-      header: 'المدفوع',
+      header: t('orders.amountPaid'),
       align: 'end',
       hideBelow: 'lg',
       render: (row) => (
@@ -195,7 +195,7 @@ export function OrdersPage() {
       ),
     },
     {
-      header: 'الدين',
+      header: t('orders.debt'),
       align: 'end',
       render: (row) => (
         <MoneyText
@@ -207,7 +207,7 @@ export function OrdersPage() {
       ),
     },
     {
-      header: 'الحالة',
+      header: t('common.status'),
       align: 'center',
       render: (row) => (
         <StatusBadge
@@ -220,10 +220,10 @@ export function OrdersPage() {
           }
         >
           {row.status === 'DRAFT' || row.status === 'QUOTE'
-            ? 'مسودة'
+            ? t('orders.draft')
             : row.remainingAmount === '0.00'
-              ? 'مدفوع'
-              : 'غير مدفوع'}
+              ? t('orders.paid')
+              : t('orders.unpaid')}
         </StatusBadge>
       ),
     },
@@ -242,15 +242,15 @@ export function OrdersPage() {
               variant="outline"
               size="sm"
               disabled={!editable || !can('orders.update')}
-              title={editable ? 'تعديل الطلب' : 'لا يمكن تعديل طلب مؤكد'}
+              title={editable ? t('orders.edit') : t('orders.confirmedCannotEdit')}
               onClick={() => void openEdit(row)}
             >
               <Pencil aria-hidden />
-              تعديل
+              {t('common.edit')}
             </Button>
             <Button variant="outline" size="sm" onClick={() => void runPrint(row)}>
               <Printer aria-hidden />
-              طباعة
+              {t('common.print')}
             </Button>
           </div>
         );
@@ -272,7 +272,7 @@ export function OrdersPage() {
           can('orders.create') ? (
             <Button variant="brand" onClick={() => setCreateOpen(true)}>
               <Plus aria-hidden />
-              إضافة طلب جديد
+              {t('orders.add')}
             </Button>
           ) : undefined
         }
@@ -282,11 +282,21 @@ export function OrdersPage() {
         <StatCardsSkeleton count={4} />
       ) : summary ? (
         <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-          <StatCard label="إجمالي الطلبات" value={summary.total} icon={ShoppingBag} tone="accent" />
-          <StatCard label="مدفوع" value={summary.paid} icon={CheckCircle2} tone="credit" />
-          <StatCard label="غير مدفوع" value={unpaidCount} icon={Wallet} tone="debit" />
           <StatCard
-            label="إجمالي الدين"
+            label={t('orders.total')}
+            value={summary.total}
+            icon={ShoppingBag}
+            tone="accent"
+          />
+          <StatCard
+            label={t('orders.paid')}
+            value={summary.paid}
+            icon={CheckCircle2}
+            tone="credit"
+          />
+          <StatCard label={t('orders.unpaid')} value={unpaidCount} icon={Wallet} tone="debit" />
+          <StatCard
+            label={t('orders.totalDebt')}
             money={summary.outstandingAmount}
             currency={currency}
             moneyTone="debit"
@@ -303,7 +313,7 @@ export function OrdersPage() {
             setSearch(value);
             setPage(1);
           }}
-          placeholder="ابحث برقم الطلب أو اسم الزبون…"
+          placeholder={t('orders.searchPlaceholder')}
         />
         <SelectFilter
           value={paymentState}
@@ -312,11 +322,11 @@ export function OrdersPage() {
             if (value) setClassification('confirmed');
             setPage(1);
           }}
-          allLabel="كل الحالات"
-          label="الحالة"
+          allLabel={t('orders.allStatuses')}
+          label={t('common.status')}
           options={[
-            { value: 'paid', label: 'مدفوع' },
-            { value: 'unpaid', label: 'غير مدفوع' },
+            { value: 'paid', label: t('orders.paid') },
+            { value: 'unpaid', label: t('orders.unpaid') },
           ]}
         />
         <SelectFilter
@@ -326,11 +336,11 @@ export function OrdersPage() {
             if (value === 'draft') setPaymentState('');
             setPage(1);
           }}
-          allLabel="كل التصنيفات"
-          label="التصنيف"
+          allLabel={t('orders.allClassifications')}
+          label={t('orders.classification')}
           options={[
-            { value: 'draft', label: 'مسودة' },
-            { value: 'confirmed', label: 'مؤكدة' },
+            { value: 'draft', label: t('orders.draft') },
+            { value: 'confirmed', label: t('orders.confirmed') },
           ]}
         />
         <DateRangeFilter
@@ -349,7 +359,7 @@ export function OrdersPage() {
 
       <div>
         <DataTable
-          caption="قائمة الطلبات"
+          caption={t('orders.list')}
           columns={columns}
           rows={list.data?.items ?? []}
           rowKey={(row) => row.id}
@@ -360,7 +370,7 @@ export function OrdersPage() {
                   message:
                     list.error instanceof ApiRequestError
                       ? list.error.message
-                      : 'تعذّر تحميل الطلبات.',
+                      : t('orders.loadError'),
                   requestId:
                     list.error instanceof ApiRequestError ? list.error.requestId : undefined,
                 }
@@ -377,10 +387,10 @@ export function OrdersPage() {
             setPage(1);
           }}
           empty={{
-            title: 'لا توجد طلبات بعد',
-            description: 'أنشئ أول طلب لأحد زبائنك.',
+            title: t('orders.empty'),
+            description: t('orders.emptyDescription'),
             action: can('orders.create')
-              ? { label: 'إضافة طلب جديد', onClick: () => setCreateOpen(true) }
+              ? { label: t('orders.add'), onClick: () => setCreateOpen(true) }
               : undefined,
           }}
           sort={sort}
@@ -401,7 +411,11 @@ export function OrdersPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-fg font-bold">{displayOrderNumber(row.number)}</p>
                       <StatusBadge tone={isDraft ? 'neutral' : isPaid ? 'credit' : 'debit'}>
-                        {isDraft ? 'مسودة' : isPaid ? 'مدفوع' : 'غير مدفوع'}
+                        {isDraft
+                          ? t('orders.draft')
+                          : isPaid
+                            ? t('orders.paid')
+                            : t('orders.unpaid')}
                       </StatusBadge>
                     </div>
                     <p className="text-fg mt-1 truncate text-sm font-medium">{row.customerName}</p>
@@ -426,7 +440,7 @@ export function OrdersPage() {
                             : 'text-danger mt-1 text-xs font-medium'
                       }
                     >
-                      {isDraft ? 'مسودة' : isPaid ? 'مدفوع' : 'غير مدفوع'}
+                      {isDraft ? t('orders.draft') : isPaid ? t('orders.paid') : t('orders.unpaid')}
                     </p>
                   </div>
                 </div>
@@ -442,11 +456,11 @@ export function OrdersPage() {
                     onClick={() => void openEdit(row)}
                   >
                     <Pencil aria-hidden />
-                    تعديل
+                    {t('common.edit')}
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => void runPrint(row)}>
                     <Printer aria-hidden />
-                    طباعة
+                    {t('common.print')}
                   </Button>
                 </div>
               </article>
@@ -466,7 +480,7 @@ export function OrdersPage() {
                 setPageSize(size);
                 setPage(1);
               }}
-              itemLabel="طلب"
+              itemLabel={t('orders.item')}
             />
           </div>
         ) : null}
@@ -488,7 +502,7 @@ export function OrdersPage() {
             setDetailOrder();
           } catch (error) {
             if (error instanceof ApiRequestError) toast.apiError(error.message, error.requestId);
-            else toast.error('تعذّر تحميل الطلب للتعديل.');
+            else toast.error(t('orders.editLoadError'));
           }
         }}
       />

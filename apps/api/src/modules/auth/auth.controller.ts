@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import {
@@ -26,14 +26,12 @@ export class AuthController {
   /**
    * تسجيل الدخول.
    *
-   * حد معدل صارم: 5 محاولات / 15 دقيقة لكل IP. هذه الطبقة الأولى ضد التخمين
-   * الموزّع (عدة حسابات من IP واحد). الطبقة الثانية هي قفل الحساب نفسه
-   * (10 محاولات → قفل 15د) وتوقف التخمين المركّز على حساب واحد من عدة IPs.
-   * كل طبقة وحدها قابلة للالتفاف؛ معًا لا.
+   * النجاح غير محدود. `AuthService` يسجل في Redis محاولات بيانات الدخول
+   * الخاطئة فقط، بينما يبقى قفل الحساب طبقة مستقلة ضد التخمين الموزع.
    */
   @Public()
   @SkipCsrf()
-  @Throttle({ default: { limit: 5, ttl: 900_000 } })
+  @SkipThrottle()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'تسجيل الدخول — يضع رموز الجلسة في كوكيز HttpOnly.' })
@@ -56,7 +54,7 @@ export class AuthController {
    */
   @Public()
   @SkipCsrf()
-  @Throttle({ default: { limit: 20, ttl: 900_000 } })
+  @SkipThrottle()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'تجديد الجلسة مع تدوير الرمز وكشف إعادة الاستخدام.' })
@@ -76,6 +74,7 @@ export class AuthController {
 
   @Post('logout')
   @AllowPendingPasswordChange()
+  @SkipThrottle()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'إنهاء الجلسة الحالية ومسح الكوكيز.' })
   async logout(

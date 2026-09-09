@@ -58,7 +58,7 @@ export function CustomersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { can, user } = useAuth();
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
-  const locale = currentLocale();
+  const locale = currentLocale() === 'he' ? 'he' : 'ar';
   const debtUsageLabels = {
     ar: {
       header: 'استخدام حد الدين',
@@ -85,19 +85,6 @@ export function CustomersPage() {
       debit: 'חייב',
       credit: 'יש לו יתרה',
       settled: 'יתרה אפס',
-    },
-    en: {
-      header: 'Debt limit usage',
-      used: 'Used',
-      remaining: 'Remaining',
-      dueDate: 'Monthly payment day',
-      messageTitle: 'Send payment reminder',
-      paymentDueToday: 'Payment is due or overdue and the account still has debt',
-      allAccounts: 'All accounts',
-      accountState: 'Account status',
-      debit: 'Owes money',
-      credit: 'Has credit',
-      settled: 'Zero balance',
     },
   }[locale];
   const today = isoDateInTimeZone(
@@ -164,12 +151,12 @@ export function CustomersPage() {
     if (!archiveTarget) return;
     archive.mutate(archiveTarget.id, {
       onSuccess: () => {
-        toast.success('أُرشف الزبون');
+        toast.success(t('customers.archived'));
         setArchiveTarget(null);
       },
       onError: (e) => {
         if (e instanceof ApiRequestError) toast.apiError(e.message, e.requestId);
-        else toast.error('تعذّرت الأرشفة.');
+        else toast.error(t('customers.archiveError'));
       },
     });
   };
@@ -177,7 +164,7 @@ export function CustomersPage() {
   const columns: Column<Customer>[] = [
     {
       key: 'name',
-      header: 'الاسم',
+      header: t('customers.name'),
       render: (row) => {
         const dueToday = isPaymentDue(row, today);
         return (
@@ -216,7 +203,7 @@ export function CustomersPage() {
       },
     },
     {
-      header: 'الهاتف',
+      header: t('customers.phone'),
       hideBelow: 'md',
       render: (row) =>
         row.phone ? (
@@ -228,7 +215,7 @@ export function CustomersPage() {
         ),
     },
     {
-      header: 'المدينة',
+      header: t('customers.city'),
       hideBelow: 'lg',
       render: (row) => row.city ?? <span className="text-fg-subtle">—</span>,
     },
@@ -240,7 +227,7 @@ export function CustomersPage() {
     },
     {
       key: 'balance',
-      header: 'الرصيد الحالي',
+      header: t('customers.balance'),
       align: 'end',
       render: (row) => (
         <MoneyText value={toMoneyString(negate(row.balance), 2)} currency={currency} tone="auto" />
@@ -304,7 +291,7 @@ export function CustomersPage() {
                   </a>
                 </Button>
               ) : (
-                <Button variant="outline" size="icon" title="لا يوجد رقم هاتف صالح للزبون" disabled>
+                <Button variant="outline" size="icon" title={t('customers.invalidPhone')} disabled>
                   <MessageCircle aria-hidden />
                 </Button>
               )
@@ -313,8 +300,8 @@ export function CustomersPage() {
               <Button
                 variant="outline"
                 size="icon"
-                title="تعديل"
-                aria-label={`تعديل ${row.name}`}
+                title={t('common.edit')}
+                aria-label={t('customers.editNamed', { name: row.name })}
                 onClick={() => openEdit(row)}
               >
                 <Pencil aria-hidden />
@@ -324,8 +311,8 @@ export function CustomersPage() {
               <Button
                 variant="outline"
                 size="icon"
-                title="أرشفة"
-                aria-label={`أرشفة ${row.name}`}
+                title={t('customers.archive')}
+                aria-label={t('customers.archiveNamed', { name: row.name })}
                 onClick={() => setArchiveTarget(row)}
               >
                 <Trash2 className="text-danger" aria-hidden />
@@ -355,7 +342,7 @@ export function CustomersPage() {
             {can('customers.write') ? (
               <Button variant="accent" onClick={openAdd}>
                 <Plus aria-hidden />
-                إضافة زبون جديد
+                {t('customers.add')}
               </Button>
             ) : null}
           </>
@@ -367,24 +354,29 @@ export function CustomersPage() {
         <StatCardsSkeleton count={4} />
       ) : stats.data ? (
         <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-          <StatCard label="إجمالي الزبائن" value={stats.data.total} icon={Users} tone="accent" />
           <StatCard
-            label="إجمالي الديون"
+            label={t('customers.total')}
+            value={stats.data.total}
+            icon={Users}
+            tone="accent"
+          />
+          <StatCard
+            label={t('customers.totalDebt')}
             money={stats.data.totalDebt}
             currency={currency}
             moneyTone="debit"
             icon={Wallet}
             tone="debit"
-            sublabel={`${stats.data.withDebt} زبون مدين`}
+            sublabel={t('customers.debtorsCount', { count: stats.data.withDebt })}
           />
           <StatCard
-            label="تجاوزوا موعد السداد"
+            label={t('customers.overdue')}
             value={stats.data.overduePaymentCustomers}
             icon={CalendarClock}
             tone="orange"
           />
           <StatCard
-            label="تجاوزوا حد الائتمان"
+            label={t('customers.overCreditLimit')}
             value={stats.data.overCreditLimit}
             icon={Wallet}
             tone="orange"
@@ -403,7 +395,7 @@ export function CustomersPage() {
             else next.delete('search');
             setSearchParams(next, { replace: true });
           }}
-          placeholder="ابحث بالاسم أو الهاتف…"
+          placeholder={t('customers.searchPlaceholder')}
         />
         <SelectFilter
           value={accountState}
@@ -423,7 +415,7 @@ export function CustomersPage() {
 
       <div>
         <DataTable
-          caption="قائمة زبائن المحل مع أرصدتهم"
+          caption={t('customers.list')}
           columns={columns}
           rows={list.data?.items ?? []}
           rowKey={(r) => r.id}
@@ -434,7 +426,7 @@ export function CustomersPage() {
                   message:
                     list.error instanceof ApiRequestError
                       ? list.error.message
-                      : 'تعذّر تحميل الزبائن.',
+                      : t('customers.loadError'),
                   requestId:
                     list.error instanceof ApiRequestError ? list.error.requestId : undefined,
                 }
@@ -444,10 +436,10 @@ export function CustomersPage() {
           isFiltered={isFiltered}
           onResetFilters={resetFilters}
           empty={{
-            title: 'لا يوجد زبائن بعد',
-            description: 'ابدأ بإضافة أول زبون إلى محلك.',
+            title: t('customers.empty'),
+            description: t('customers.emptyDescription'),
             action: can('customers.write')
-              ? { label: 'إضافة زبون جديد', onClick: openAdd }
+              ? { label: t('customers.add'), onClick: openAdd }
               : undefined,
           }}
           sort={sort}
@@ -530,7 +522,7 @@ export function CustomersPage() {
                       <Button
                         variant="outline"
                         size="icon"
-                        title="لا يوجد رقم هاتف صالح للزبون"
+                        title={t('customers.invalidPhone')}
                         disabled
                       >
                         <MessageCircle aria-hidden />
@@ -541,7 +533,7 @@ export function CustomersPage() {
                     <Button
                       variant="outline"
                       size="icon"
-                      aria-label={`تعديل ${row.name}`}
+                      aria-label={t('customers.editNamed', { name: row.name })}
                       onClick={() => openEdit(row)}
                     >
                       <Pencil aria-hidden />
@@ -551,7 +543,7 @@ export function CustomersPage() {
                     <Button
                       variant="outline"
                       size="icon"
-                      aria-label={`أرشفة ${row.name}`}
+                      aria-label={t('customers.archiveNamed', { name: row.name })}
                       onClick={() => setArchiveTarget(row)}
                     >
                       <Trash2 className="text-danger" aria-hidden />
@@ -575,7 +567,7 @@ export function CustomersPage() {
                 setPageSize(s);
                 setPage(1);
               }}
-              itemLabel="زبون"
+              itemLabel={t('customers.item')}
             />
           </div>
         ) : null}
@@ -586,14 +578,12 @@ export function CustomersPage() {
       <ConfirmDialog
         open={archiveTarget !== null}
         onOpenChange={(o) => !o && setArchiveTarget(null)}
-        title="نقل الزبون إلى الأرشيف"
+        title={t('customers.archiveTitle')}
         description={
-          archiveTarget
-            ? `سيُنقل "${archiveTarget.name}" إلى الأرشيف لمدة 30 يومًا ويمكن استعادته خلالها. يجب أن يكون رصيده صفرًا وألا توجد طلبات مستقبلية أو مسودات باسمه.`
-            : ''
+          archiveTarget ? t('customers.archiveDescription', { name: archiveTarget.name }) : ''
         }
-        confirmLabel="موافق"
-        cancelLabel="إلغاء"
+        confirmLabel={t('common.confirm')}
+        cancelLabel={t('common.cancel')}
         variant="danger"
         loading={archive.isPending}
         onConfirm={doArchive}

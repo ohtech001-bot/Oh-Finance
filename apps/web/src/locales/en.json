@@ -36,6 +36,7 @@
     "login": "Sign in",
     "loggingIn": "Signing in…",
     "invalidCredentials": "The entered information is incorrect.",
+    "rateLimited": "Too many failed sign-in attempts. Wait a moment and try again.",
     "logout": "Sign out",
     "twoFactorCode": "Verification code",
     "twoFactorHint": "Enter the 6-digit code from your authenticator app",

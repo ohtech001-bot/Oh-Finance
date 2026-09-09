@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, ArrowLeft, Info, LayoutDashboard, OctagonAlert } from 'lucide-react';
 import { PAYMENT_METHOD_LABELS, type DashboardAlert, type DashboardData } from '@oh/contracts';
@@ -31,6 +32,7 @@ import { RangePicker, type RangeValue } from './range-picker';
  *     الخادم؛ الواجهة تعرض ما تستلمه فقط.
  */
 export function DashboardPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
 
@@ -53,9 +55,9 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="لوحة التحكم"
+        title={t('dashboard.title')}
         icon={LayoutDashboard}
-        description={data ? `${data.meta.storeName} · ${data.meta.range.label}` : user?.store?.name}
+        description={data?.meta.storeName ?? user?.store?.name}
       />
 
       <div className="flex justify-end">
@@ -67,7 +69,7 @@ export function DashboardPage() {
       ) : isError ? (
         <Card>
           <ErrorState
-            message={error instanceof ApiRequestError ? error.message : 'تعذّر تحميل لوحة التحكم.'}
+            message={error instanceof ApiRequestError ? error.message : t('dashboard.loadError')}
             requestId={error instanceof ApiRequestError ? error.requestId : undefined}
             onRetry={() => void refetch()}
           />
@@ -78,7 +80,7 @@ export function DashboardPage() {
 
           {/* ── المؤشرات ─────────────────────────────────────────────── */}
           {cardKpis.length > 0 || collectionRate ? (
-            <section aria-label="المؤشرات المالية">
+            <section aria-label={t('dashboard.financialIndicators')}>
               <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
                 <div className="grid grid-cols-2 gap-3 sm:gap-4">
                   {cardKpis.map((m) => (
@@ -95,7 +97,7 @@ export function DashboardPage() {
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {moneyTrends.length > 0 ? (
                 <Card>
-                  <CardHeader title="اتجاه المبالغ" />
+                  <CardHeader title={t('dashboard.moneyTrend')} />
                   <CardBody>
                     <TrendChart series={moneyTrends} currency={currency} />
                   </CardBody>
@@ -103,7 +105,7 @@ export function DashboardPage() {
               ) : null}
               {countTrends.length > 0 ? (
                 <Card>
-                  <CardHeader title="اتجاه الأعداد" />
+                  <CardHeader title={t('dashboard.countTrend')} />
                   <CardBody>
                     <TrendChart series={countTrends} currency={currency} />
                   </CardBody>
@@ -116,10 +118,10 @@ export function DashboardPage() {
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4">
             {scope?.lists.includes('recentOrders') ? (
               <Card>
-                <CardHeader title="أحدث الطلبات" action={<ViewAll to="/orders" />} />
+                <CardHeader title={t('dashboard.recentOrders')} action={<ViewAll to="/orders" />} />
                 <CardBody className="space-y-1">
                   {data.recentOrders.length === 0 ? (
-                    <Empty text="لا توجد طلبات في هذه الفترة." />
+                    <Empty text={t('dashboard.noOrders')} />
                   ) : (
                     data.recentOrders.map((o) => {
                       const badge = ORDER_STATUS_BADGE[o.status];
@@ -144,10 +146,13 @@ export function DashboardPage() {
 
             {scope?.lists.includes('recentPayments') ? (
               <Card>
-                <CardHeader title="أحدث الدفعات" action={<ViewAll to="/payments" />} />
+                <CardHeader
+                  title={t('dashboard.recentPayments')}
+                  action={<ViewAll to="/payments" />}
+                />
                 <CardBody className="space-y-1">
                   {data.recentPayments.length === 0 ? (
-                    <Empty text="لا توجد دفعات في هذه الفترة." />
+                    <Empty text={t('dashboard.noPayments')} />
                   ) : (
                     data.recentPayments.map((p) => (
                       <div
@@ -162,7 +167,7 @@ export function DashboardPage() {
                           <span className="text-fg truncate text-[13px]">{p.customerName}</span>
                           {p.createdByName ? (
                             <span className="text-fg-subtle text-[11px]">
-                              سجّلها: {p.createdByName}
+                              {t('dashboard.recordedBy', { name: p.createdByName })}
                             </span>
                           ) : null}
                         </div>
@@ -175,10 +180,13 @@ export function DashboardPage() {
 
             {scope?.lists.includes('topDebtors') ? (
               <Card>
-                <CardHeader title="أعلى المدينين" action={<ViewAll to="/customers" />} />
+                <CardHeader
+                  title={t('dashboard.topDebtors')}
+                  action={<ViewAll to="/customers" />}
+                />
                 <CardBody className="space-y-1">
                   {data.topDebtors.length === 0 ? (
-                    <Empty text="لا يوجد زبائن مدينون." />
+                    <Empty text={t('dashboard.noDebtors')} />
                   ) : (
                     data.topDebtors.map((c) => (
                       <Link
@@ -193,7 +201,7 @@ export function DashboardPage() {
                               {c.name}
                             </span>
                             <span className="text-fg-subtle text-[11px]">
-                              {c.openOrders} طلب مفتوح
+                              {t('dashboard.openOrders', { count: c.openOrders })}
                             </span>
                           </div>
                         </div>
@@ -209,14 +217,14 @@ export function DashboardPage() {
                 <CardHeader
                   title={
                     data.meta.topCustomersBasis === 'sales'
-                      ? 'أعلى الزبائن مبيعًا'
-                      : 'أعلى الزبائن تحصيلًا'
+                      ? t('dashboard.topCustomersSales')
+                      : t('dashboard.topCustomersCollections')
                   }
                   action={<ViewAll to="/customers" />}
                 />
                 <CardBody className="space-y-1">
                   {data.topCustomers.length === 0 ? (
-                    <Empty text="لا توجد بيانات في هذه الفترة." />
+                    <Empty text={t('dashboard.noData')} />
                   ) : (
                     data.topCustomers.map((c) => (
                       <Link
@@ -283,12 +291,13 @@ function AlertsPanel({ alerts, currency }: { alerts: DashboardAlert[]; currency:
 }
 
 function ViewAll({ to }: { to: string }) {
+  const { t } = useTranslation();
   return (
     <Link
       to={to}
       className="text-accent flex items-center gap-1 text-[13px] font-medium hover:underline"
     >
-      عرض الكل
+      {t('dashboard.viewAll')}
       <ArrowLeft className="size-3.5 ltr:rotate-180" aria-hidden />
     </Link>
   );

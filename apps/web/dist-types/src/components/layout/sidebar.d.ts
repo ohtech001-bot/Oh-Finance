@@ -5,6 +5,8 @@ export interface SidebarProps {
     title: string;
     subtitle: string;
     onNavigate?: () => void;
+    collapsed?: boolean;
+    onToggleCollapsed?: () => void;
     className?: string;
 }
 /**
@@ -22,5 +24,5 @@ export interface SidebarProps {
  *     العادي داخل حاوية `dir=rtl` — لا نحدد `right: 0` يدويًا. لو فعلنا،
  *     لبقي على اليمين في الإنجليزية أيضًا وانكسر التخطيط.
  */
-export declare function Sidebar({ items, title, subtitle, onNavigate, className }: SidebarProps): import("react").JSX.Element;
+export declare function Sidebar({ items, title, subtitle, onNavigate, collapsed, onToggleCollapsed, className, }: SidebarProps): import("react").JSX.Element;
 //# sourceMappingURL=sidebar.d.ts.map

@@ -45,6 +45,15 @@ export class AppError extends HttpException {
     );
   }
 
+  static rateLimited(retryAfterSeconds: number): AppError {
+    const minutes = Math.max(1, Math.ceil(retryAfterSeconds / 60));
+    return new AppError(
+      ERROR_CODES.RATE_LIMITED,
+      `محاولات دخول فاشلة كثيرة. حاول مجددًا بعد ${minutes} دقيقة.`,
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
+  }
+
   static accountInactive(): AppError {
     return new AppError(
       ERROR_CODES.ACCOUNT_INACTIVE,

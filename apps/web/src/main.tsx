@@ -1,4 +1,5 @@
 import { StrictMode, Suspense } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -16,6 +17,11 @@ import { currentLocale } from './lib/i18n';
 import { LOCALES } from '@oh/config';
 import { StartupLoader } from './features/loading/startup-loader';
 import { FullPageLoader } from './components/full-page-loader';
+
+function LocalizedToaster() {
+  useTranslation();
+  return <Toaster dir={LOCALES[currentLocale()].dir} />;
+}
 
 /**
  * إعداد TanStack Query.
@@ -72,7 +78,7 @@ createRoot(root).render(
               <Suspense fallback={<FullPageLoader />}>
                 <RouterProvider router={router} />
               </Suspense>
-              <Toaster dir={LOCALES[currentLocale()].dir} />
+              <LocalizedToaster />
             </StartupLoader>
           </AuthProvider>
         </QueryClientProvider>

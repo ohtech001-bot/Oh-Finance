@@ -65,11 +65,11 @@ export function PaymentsPage() {
   const columns: Column<Payment>[] = [
     {
       key: 'number',
-      header: 'رقم الدفعة',
+      header: t('payments.number'),
       render: (row) => <span className="text-accent font-semibold">{row.number}</span>,
     },
     {
-      header: 'الزبون',
+      header: t('payments.customer'),
       render: (row) => (
         <Link to={`/customers/${row.customerId}`} className="min-w-0 hover:underline">
           <p className="text-fg truncate text-sm">{row.customerName}</p>
@@ -78,7 +78,7 @@ export function PaymentsPage() {
     },
     {
       key: 'paidAt',
-      header: 'التاريخ والوقت',
+      header: t('payments.dateTime'),
       hideBelow: 'md',
       render: (row) => {
         const d = new Date(row.paidAt);
@@ -95,18 +95,22 @@ export function PaymentsPage() {
       },
     },
     {
-      header: 'طريقة الدفع',
+      header: t('payments.method'),
       align: 'center',
-      render: (row) => <StatusBadge tone="credit">{PAYMENT_METHOD_LABELS[row.method]}</StatusBadge>,
+      render: (row) => (
+        <StatusBadge tone="credit">
+          {t(`payments.methods.${row.method}`, { defaultValue: PAYMENT_METHOD_LABELS[row.method] })}
+        </StatusBadge>
+      ),
     },
     {
       key: 'amount',
-      header: 'المبلغ المدفوع',
+      header: t('payments.amount'),
       align: 'end',
       render: (row) => <MoneyText value={row.amount} currency={currency} tone="credit" />,
     },
     {
-      header: 'الرصيد قبل',
+      header: t('payments.balanceBefore'),
       align: 'end',
       hideBelow: 'lg',
       render: (row) => (
@@ -119,7 +123,7 @@ export function PaymentsPage() {
       ),
     },
     {
-      header: 'الرصيد بعد',
+      header: t('payments.balanceAfter'),
       align: 'end',
       hideBelow: 'lg',
       render: (row) => (
@@ -131,9 +135,9 @@ export function PaymentsPage() {
       align: 'center',
       render: (row) =>
         row.status === 'REVERSED' ? (
-          <StatusBadge tone="debit">معكوسة</StatusBadge>
+          <StatusBadge tone="debit">{t('payments.reversed')}</StatusBadge>
         ) : (
-          <StatusBadge tone="credit">مقبوضة</StatusBadge>
+          <StatusBadge tone="credit">{t('payments.received')}</StatusBadge>
         ),
     },
   ];
@@ -149,7 +153,7 @@ export function PaymentsPage() {
           can('payments.create') ? (
             <Button variant="brand" onClick={() => setRecordOpen(true)}>
               <Plus aria-hidden />
-              تسجيل دفعة جديدة
+              {t('payments.add')}
             </Button>
           ) : undefined
         }
@@ -162,7 +166,7 @@ export function PaymentsPage() {
             setSearch(v);
             setPage(1);
           }}
-          placeholder="ابحث برقم الدفعة أو الزبون…"
+          placeholder={t('payments.searchPlaceholder')}
         />
         <DateRangeFilter
           from={from}
@@ -180,7 +184,7 @@ export function PaymentsPage() {
 
       <div>
         <DataTable
-          caption="قائمة الدفعات المستلمة"
+          caption={t('payments.list')}
           columns={columns}
           rows={list.data?.items ?? []}
           rowKey={(r) => r.id}
@@ -191,7 +195,7 @@ export function PaymentsPage() {
                   message:
                     list.error instanceof ApiRequestError
                       ? list.error.message
-                      : 'تعذّر تحميل الدفعات.',
+                      : t('payments.loadError'),
                   requestId:
                     list.error instanceof ApiRequestError ? list.error.requestId : undefined,
                 }
@@ -201,10 +205,10 @@ export function PaymentsPage() {
           isFiltered={isFiltered}
           onResetFilters={resetFilters}
           empty={{
-            title: 'لا توجد دفعات بعد',
-            description: 'سجّل أول دفعة من زبائنك.',
+            title: t('payments.empty'),
+            description: t('payments.emptyDescription'),
             action: can('payments.create')
-              ? { label: 'تسجيل دفعة', onClick: () => setRecordOpen(true) }
+              ? { label: t('payments.record'), onClick: () => setRecordOpen(true) }
               : undefined,
           }}
           mobileRender={(row) => {
@@ -235,13 +239,17 @@ export function PaymentsPage() {
                   <div className="text-end">
                     <MoneyText value={row.amount} currency={currency} tone="credit" size="lg" />
                     <StatusBadge tone={row.status === 'REVERSED' ? 'debit' : 'credit'}>
-                      {row.status === 'REVERSED' ? 'معكوسة' : 'مقبوضة'}
+                      {row.status === 'REVERSED' ? t('payments.reversed') : t('payments.received')}
                     </StatusBadge>
                   </div>
                 </div>
 
                 <div className="border-border-subtle mt-3 flex items-center justify-between gap-3 border-t pt-3">
-                  <StatusBadge tone="credit">{PAYMENT_METHOD_LABELS[row.method]}</StatusBadge>
+                  <StatusBadge tone="credit">
+                    {t(`payments.methods.${row.method}`, {
+                      defaultValue: PAYMENT_METHOD_LABELS[row.method],
+                    })}
+                  </StatusBadge>
                 </div>
               </article>
             );
@@ -260,7 +268,7 @@ export function PaymentsPage() {
                 setPageSize(sz);
                 setPage(1);
               }}
-              itemLabel="دفعة"
+              itemLabel={t('payments.item')}
             />
           </div>
         ) : null}

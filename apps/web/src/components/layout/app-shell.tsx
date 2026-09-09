@@ -1,12 +1,13 @@
-import { useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Drawer, DrawerContent } from '@oh/ui';
 import { useAuth } from '@/app/auth-context';
 import { PLATFORM_NAV, TENANT_NAV } from './nav-items';
 import { MobileTabBar } from './mobile-tabbar';
 import { Sidebar } from './sidebar';
 import { Topbar } from './topbar';
-import { currentLocale } from '@/lib/i18n';
+import { prefetchPrimaryRoutes } from '@/app/route-prefetch';
+import { useTranslation } from 'react-i18next';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -26,25 +27,46 @@ import { currentLocale } from '@/lib/i18n';
  */
 export function AppShell() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => window.localStorage.getItem('oh_sidebar_collapsed') === '1',
+  );
 
   const isPlatform = user?.isSuperAdmin ?? false;
   const items = isPlatform ? PLATFORM_NAV : TENANT_NAV;
 
   const title = isPlatform ? 'OH Finance' : (user?.store?.name ?? user?.tenant?.name ?? '—');
 
-  const subtitle = isPlatform ? 'المدير العام' : '';
-  const newOrderLabel = {
-    ar: 'إضافة طلبية',
-    he: 'הזמנה חדשה',
-    en: 'New order',
-  }[currentLocale()];
+  const subtitle = isPlatform ? t('platform.superAdmin') : '';
+  const newOrderLabel = t('nav.addOrder');
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => prefetchPrimaryRoutes(isPlatform), 350);
+    return () => window.clearTimeout(timer);
+  }, [isPlatform]);
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      window.localStorage.setItem('oh_sidebar_collapsed', next ? '1' : '0');
+      return next;
+    });
+  };
 
   return (
     <div className="bg-bg flex h-dvh overflow-hidden">
       {/* الشريط الجانبي — ديسكتوب */}
-      <Sidebar items={items} title={title} subtitle={subtitle} className="hidden lg:flex" />
+      <Sidebar
+        items={items}
+        title={title}
+        subtitle={subtitle}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={toggleSidebar}
+        className="hidden lg:flex"
+      />
 
       {/* الدرج — موبايل */}
       <Drawer open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
@@ -68,7 +90,9 @@ export function AppShell() {
           className="min-h-0 flex-1 overflow-y-auto overscroll-y-none p-3 pb-[calc(84px+env(safe-area-inset-bottom))] sm:p-6 lg:pb-6"
           tabIndex={-1}
         >
-          <Outlet />
+          <div key={location.pathname} className="page-enter min-h-full">
+            <Outlet />
+          </div>
         </main>
       </div>
 

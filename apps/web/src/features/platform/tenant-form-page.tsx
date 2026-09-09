@@ -14,7 +14,8 @@ import {
   type UpdateTenantRequest,
 } from '@oh/contracts';
 import { CURRENCY_CODES, CURRENCIES, type CurrencyCode } from '@oh/money';
-import { LOCALES, LOCALE_CODES, TIMEZONES } from '@oh/config';
+import { LOCALES, TIMEZONES } from '@oh/config';
+import { APP_LOCALE_CODES } from '@/lib/i18n';
 import {
   Button,
   Card,
@@ -405,7 +406,7 @@ export function TenantFormPage() {
                       {...register('locale')}
                       className="rounded-ctrl border-border bg-card text-fg focus-visible:ring-ring h-11 w-full border px-3 text-sm focus-visible:outline-none focus-visible:ring-2"
                     >
-                      {LOCALE_CODES.map((code) => (
+                      {APP_LOCALE_CODES.map((code) => (
                         <option key={code} value={code}>
                           {LOCALES[code].nameNative}
                         </option>

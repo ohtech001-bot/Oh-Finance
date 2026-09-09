@@ -38,7 +38,27 @@ const AXIS = '#94A3B8';
 const COLLECTION_LABELS = {
   ar: { title: 'نسبة التحصيل', collected: 'تم تحصيله من المبالغ المستحقة' },
   he: { title: 'שיעור הגבייה', collected: 'נגבה מתוך הסכומים לתשלום' },
-  en: { title: 'Collection rate', collected: 'Collected from amounts due' },
+} as const;
+
+const TREND_LABELS = {
+  ar: {
+    revenue: 'إجمالي الطلبات',
+    payments: 'المقبوضات',
+    orders: 'الطلبات',
+    outstanding_balance: 'إجمالي الديون',
+    new_customers: 'زبائن جدد',
+    date: 'التاريخ',
+    empty: 'لا توجد بيانات في هذه الفترة.',
+  },
+  he: {
+    revenue: 'סך ההזמנות',
+    payments: 'תקבולים',
+    orders: 'הזמנות',
+    outstanding_balance: 'סך החובות',
+    new_customers: 'לקוחות חדשים',
+    date: 'תאריך',
+    empty: 'אין נתונים בתקופה זו.',
+  },
 } as const;
 
 export function CollectionRateChart({
@@ -48,7 +68,7 @@ export function CollectionRateChart({
   metric: KpiMetric;
   large?: boolean;
 }) {
-  const locale = currentLocale();
+  const locale = currentLocale() === 'he' ? 'he' : 'ar';
   const value = Number(metric.value);
   const displayed = Number.isFinite(value) ? value : 0;
   const progress = Math.min(100, Math.max(0, displayed));
@@ -129,13 +149,15 @@ export function TrendChart({
   series,
   currency,
   height = 260,
-  emptyText = 'لا توجد بيانات في هذه الفترة.',
+  emptyText,
 }: {
   series: TrendSeries[];
   currency: CurrencyCode;
   height?: number;
   emptyText?: string;
 }) {
+  const locale = currentLocale() === 'he' ? 'he' : 'ar';
+  const resolvedEmptyText = emptyText ?? TREND_LABELS[locale].empty;
   const { data, ids } = useMemo(() => {
     const byBucket = new Map<string, Record<string, number | string>>();
     for (const s of series) {
@@ -156,7 +178,7 @@ export function TrendChart({
   if (!hasData) {
     return (
       <div className="text-fg-muted flex items-center justify-center text-sm" style={{ height }}>
-        {emptyText}
+        {resolvedEmptyText}
       </div>
     );
   }
@@ -167,7 +189,7 @@ export function TrendChart({
     const meta = TREND_META[id];
     const formatted =
       meta?.unit === 'money' ? formatMoney(String(value), { currency }) : String(value);
-    return [formatted, meta?.label ?? name];
+    return [formatted, TREND_LABELS[locale][id] ?? meta?.label ?? name];
   };
 
   if (data.length === 1) {
@@ -191,12 +213,16 @@ export function TrendChart({
           />
           <Tooltip
             formatter={tooltipFormatter}
-            labelFormatter={(label) => `التاريخ: ${label}`}
+            labelFormatter={(label) => `${TREND_LABELS[locale].date}: ${label}`}
             contentStyle={tooltipStyle}
           />
           {ids.length > 1 ? (
             <Legend
-              formatter={(value) => TREND_META[value as DashboardTrendId]?.label ?? value}
+              formatter={(value) =>
+                TREND_LABELS[locale][value as DashboardTrendId] ??
+                TREND_META[value as DashboardTrendId]?.label ??
+                value
+              }
               iconType="circle"
               wrapperStyle={{ fontSize: 12 }}
             />
@@ -237,12 +263,16 @@ export function TrendChart({
         />
         <Tooltip
           formatter={tooltipFormatter}
-          labelFormatter={(l) => `التاريخ: ${l}`}
+          labelFormatter={(l) => `${TREND_LABELS[locale].date}: ${l}`}
           contentStyle={tooltipStyle}
         />
         {ids.length > 1 ? (
           <Legend
-            formatter={(value) => TREND_META[value as DashboardTrendId]?.label ?? value}
+            formatter={(value) =>
+              TREND_LABELS[locale][value as DashboardTrendId] ??
+              TREND_META[value as DashboardTrendId]?.label ??
+              value
+            }
             iconType="circle"
             wrapperStyle={{ fontSize: 12 }}
           />

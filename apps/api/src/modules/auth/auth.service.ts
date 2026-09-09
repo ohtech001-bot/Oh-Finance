@@ -21,6 +21,7 @@ import {
   type PasswordResetTokenPayload,
 } from './token.service.js';
 import { MailService } from '../../core/mail/mail.service.js';
+import { LoginFailureRateLimiter } from './login-failure-rate-limiter.js';
 
 /** ما تُرجعه دالة app_auth_lookup (SECURITY DEFINER). */
 interface AuthLookupRow {
@@ -49,6 +50,7 @@ export class AuthService {
     private readonly audit: AuditService,
     private readonly env: EnvService,
     private readonly mail: MailService,
+    private readonly loginFailures: LoginFailureRateLimiter,
   ) {}
 
   /**
@@ -89,6 +91,7 @@ export class AuthService {
 
     if (!found) {
       await this.recordFailedLogin(null, dto.email, 'مستخدم غير موجود');
+      await this.loginFailures.registerFailure(dto.email, context.ip);
       throw AppError.invalidCredentials();
     }
 
@@ -101,6 +104,7 @@ export class AuthService {
     if (!passwordValid) {
       await this.registerAttempt(found.id, false);
       await this.recordFailedLogin(found.id, dto.email, 'كلمة مرور خاطئة');
+      await this.loginFailures.registerFailure(dto.email, context.ip);
       throw AppError.invalidCredentials();
     }
 
@@ -123,6 +127,9 @@ export class AuthService {
       // العلم مطفأ افتراضيًا، فلا مسار حيّ يصل هنا الآن.
       throw AppError.validation('التحقق بخطوتين قيد التفعيل (المرحلة 8).');
     }
+
+    // لا تُحسب محاولات الدخول الناجحة. النجاح يمحو فقط عداد الفشل لنفس IP والبريد.
+    await this.loginFailures.clear(dto.email, context.ip);
 
     // ── إصدار الجلسة ─────────────────────────────────────────────────────
     const authState = await this.prisma.runUnscoped((tx) =>

@@ -1,6 +1,6 @@
 import { lazy } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
-import { CreditCard, Settings } from 'lucide-react';
+import { CreditCard } from 'lucide-react';
 import {
   RedirectIfAuthenticated,
   RequireAuth,
@@ -177,17 +177,6 @@ export const router = createBrowserRouter([
                     path: 'settings',
                     element: <RequirePermission permission="settings.read" />,
                     children: [{ index: true, element: <SettingsPage /> }],
-                  },
-                  {
-                    path: 'profile',
-                    element: (
-                      <PlaceholderPage
-                        titleKey="common.profile"
-                        icon={Settings}
-                        description="الملف الشخصي، تغيير كلمة المرور، التحقق بخطوتين، الجلسات النشطة."
-                        phase="المرحلة 8"
-                      />
-                    ),
                   },
                 ],
               },
