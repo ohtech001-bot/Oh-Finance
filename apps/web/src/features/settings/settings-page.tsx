@@ -1,29 +1,25 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   ChevronLeft,
   CircleDollarSign,
-  Clock3,
   Crown,
-  FileText,
   MessageSquare,
-  Printer,
   Settings as SettingsIcon,
   Store,
+  TriangleAlert,
 } from 'lucide-react';
 import {
   financialSettingsSchema,
   generalSettingsSchema,
-  invoiceSettingsSchema,
   messagingSettingsSchema,
-  printingSettingsSchema,
   type FinancialSettings,
   type GeneralSettings,
-  type InvoiceSettings,
   type MessagingSettings,
-  type PrintingSettings,
+  type Subscription,
   type SettingsSection,
   type StoreSettings,
 } from '@oh/contracts';
@@ -36,6 +32,7 @@ import {
   ErrorState,
   Field,
   Input,
+  MoneyText,
   PageHeader,
   Switch,
   Tabs,
@@ -44,10 +41,10 @@ import {
   TabsTrigger,
   toast,
 } from '@oh/ui';
-import { ApiRequestError } from '@/lib/api';
+import type { CurrencyCode } from '@oh/money';
+import { ApiRequestError, api } from '@/lib/api';
+import { currentLocale } from '@/lib/i18n';
 import { useAuth } from '@/app/auth-context';
-import { ActivityFeed } from '@/features/activity/activity-feed';
-import { useStoreActivityFeed } from '@/features/activity/api';
 import { useSettings, useUpdateSettingsSection } from './api';
 
 /**
@@ -75,28 +72,10 @@ export function SettingsPage() {
       icon: CircleDollarSign,
     },
     {
-      value: 'invoices',
-      label: t('settings.invoices'),
-      description: t('settings.invoicesDescription'),
-      icon: FileText,
-    },
-    {
-      value: 'printing',
-      label: t('settings.printing'),
-      description: t('settings.printingDescription'),
-      icon: Printer,
-    },
-    {
       value: 'messaging',
       label: t('settings.messaging'),
       description: t('settings.messagingDescription'),
       icon: MessageSquare,
-    },
-    {
-      value: 'activity',
-      label: t('settings.activity'),
-      description: t('settings.activityDescription'),
-      icon: Clock3,
     },
     {
       value: 'subscription',
@@ -141,7 +120,11 @@ export function SettingsPage() {
             </TabsList>
           ) : (
             <div key={activeTab} className="page-enter">
-              {isLoading || !data ? (
+              {activeTab === 'subscription' ? (
+                <TabsContent value="subscription">
+                  <SubscriptionTab />
+                </TabsContent>
+              ) : isLoading || !data ? (
                 <Card>
                   <CardBody>{t('common.loading')}</CardBody>
                 </Card>
@@ -153,20 +136,8 @@ export function SettingsPage() {
                   <TabsContent value="financial">
                     <FinancialForm data={data} canManage={canManage} />
                   </TabsContent>
-                  <TabsContent value="invoices">
-                    <InvoicesForm data={data} canManage={canManage} />
-                  </TabsContent>
-                  <TabsContent value="printing">
-                    <PrintingForm data={data} canManage={canManage} />
-                  </TabsContent>
                   <TabsContent value="messaging">
                     <MessagingForm data={data} canManage={canManage} />
-                  </TabsContent>
-                  <TabsContent value="activity">
-                    <ActivityTab />
-                  </TabsContent>
-                  <TabsContent value="subscription">
-                    <SubscriptionTab />
                   </TabsContent>
                 </>
               )}
@@ -429,134 +400,6 @@ function FinancialForm({ data, canManage }: { data: StoreSettings; canManage: bo
   );
 }
 
-// ── الفواتير ─────────────────────────────────────────────────────────────────
-
-function InvoicesForm({ data, canManage }: { data: StoreSettings; canManage: boolean }) {
-  const { t } = useTranslation();
-  const { form, onSubmit, saving } = useSectionForm<InvoiceSettings>(
-    'invoices',
-    invoiceSettingsSchema,
-    data.invoices,
-  );
-  const {
-    register,
-    formState: { errors },
-    watch,
-    setValue,
-  } = form;
-  return (
-    <form onSubmit={onSubmit}>
-      <SectionCard title={t('settings.invoiceTitle')}>
-        <Field label={t('settings.invoiceStart')} error={errors.startNumber?.message}>
-          {(p) => (
-            <Input
-              {...p}
-              type="number"
-              {...register('startNumber', { valueAsNumber: true })}
-              dir="ltr"
-              disabled={!canManage}
-            />
-          )}
-        </Field>
-        <Field label={t('settings.prefix')}>
-          {(p) => <Input {...p} {...register('prefix')} dir="ltr" disabled={!canManage} />}
-        </Field>
-        <Field label={t('settings.suffix')}>
-          {(p) => <Input {...p} {...register('suffix')} dir="ltr" disabled={!canManage} />}
-        </Field>
-        <Field label={t('settings.invoiceNumberFormat')}>
-          {(p) => (
-            <Input
-              {...p}
-              {...register('numberFormat')}
-              dir="ltr"
-              disabled={!canManage}
-              placeholder="INV-{0001}"
-            />
-          )}
-        </Field>
-        <ToggleRow
-          label={t('settings.priceIncludesTax')}
-          checked={!!watch('priceIncludesTax')}
-          disabled={!canManage}
-          onChange={(v) => setValue('priceIncludesTax', v, { shouldDirty: true })}
-        />
-        <ToggleRow
-          label={t('settings.showTaxColumn')}
-          checked={!!watch('showTaxColumn')}
-          disabled={!canManage}
-          onChange={(v) => setValue('showTaxColumn', v, { shouldDirty: true })}
-        />
-        <Field label={t('settings.invoiceNotes')}>
-          {(p) => (
-            <textarea
-              {...p}
-              {...register('notes')}
-              className={areaCls}
-              rows={3}
-              disabled={!canManage}
-            />
-          )}
-        </Field>
-        {canManage ? <SaveBar disabled={saving} loading={saving} /> : null}
-      </SectionCard>
-    </form>
-  );
-}
-
-// ── الطباعة ──────────────────────────────────────────────────────────────────
-
-function PrintingForm({ data, canManage }: { data: StoreSettings; canManage: boolean }) {
-  const { t } = useTranslation();
-  const { form, onSubmit, saving } = useSectionForm<PrintingSettings>(
-    'printing',
-    printingSettingsSchema,
-    data.printing,
-  );
-  const { register, watch, setValue } = form;
-  const check = (k: keyof PrintingSettings, label: string) => (
-    <ToggleRow
-      label={label}
-      checked={!!watch(k)}
-      disabled={!canManage}
-      onChange={(v) => setValue(k, v as never, { shouldDirty: true })}
-    />
-  );
-  return (
-    <form onSubmit={onSubmit}>
-      <SectionCard title={t('settings.printTitle')}>
-        <Field label={t('settings.printer')}>
-          {(p) => <Input {...p} {...register('printer')} disabled={!canManage} />}
-        </Field>
-        <Field label={t('settings.paperSize')}>
-          {(p) => (
-            <select {...p} {...register('paperSize')} className={selectCls} disabled={!canManage}>
-              <option value="80mm">80mm</option>
-              <option value="58mm">58mm</option>
-              <option value="A4">A4</option>
-              <option value="A5">A5</option>
-            </select>
-          )}
-        </Field>
-        <Field label={t('settings.orientation')}>
-          {(p) => (
-            <select {...p} {...register('orientation')} className={selectCls} disabled={!canManage}>
-              <option value="portrait">{t('settings.portrait')}</option>
-              <option value="landscape">{t('settings.landscape')}</option>
-            </select>
-          )}
-        </Field>
-        <p className="text-fg pt-2 text-[13px] font-semibold">{t('settings.printOptions')}</p>
-        {check('printLogo', t('settings.printLogo'))}
-        {check('printInvoiceNumber', t('settings.printInvoiceNumber'))}
-        {check('printDateTime', t('settings.printDateTime'))}
-        {check('printBarcode', t('settings.printBarcode'))}
-        {canManage ? <SaveBar disabled={saving} loading={saving} /> : null}
-      </SectionCard>
-    </form>
-  );
-}
-
 // ── الرسائل ──────────────────────────────────────────────────────────────────
 
 function MessagingForm({ data, canManage }: { data: StoreSettings; canManage: boolean }) {
@@ -635,42 +478,113 @@ function MessagingForm({ data, canManage }: { data: StoreSettings; canManage: bo
   );
 }
 
-// ── سجل النشاط (إعادة استخدام موجز النشاط) ─────────────────────────────────────
-
-function ActivityTab() {
-  const { t } = useTranslation();
-  const { can } = useAuth();
-  const canSee = can(PERMISSIONS.ACTIVITY_READ);
-  const feed = useStoreActivityFeed({ pageSize: 15 }, canSee);
-  return (
-    <SectionCard title={t('settings.activity')}>
-      {canSee ? (
-        <ActivityFeed
-          items={feed.data?.items ?? []}
-          loading={feed.isLoading}
-          emptyText={t('settings.noActivity')}
-        />
-      ) : (
-        <p className="text-fg-subtle py-8 text-center text-[13px]">
-          {t('settings.noActivityPermission')}
-        </p>
-      )}
-    </SectionCard>
-  );
-}
-
 // ── إدارة الاشتراك (عرض الاشتراك القائم) ───────────────────────────────────────
 
 function SubscriptionTab() {
   const { t } = useTranslation();
-  // تجنّبًا لتكرار منطق وحدة الاشتراك، نوجّه إلى شاشتها المخصّصة.
+  const subscription = useQuery({
+    queryKey: ['subscription'],
+    queryFn: () => api.get<Subscription>('/subscription'),
+    staleTime: 5 * 60_000,
+  });
+
+  if (subscription.isLoading) {
+    return (
+      <SectionCard title={t('settings.subscription')}>
+        <p className="text-fg-muted text-sm">{t('common.loading')}</p>
+      </SectionCard>
+    );
+  }
+
+  if (subscription.isError || !subscription.data) {
+    return (
+      <SectionCard title={t('settings.subscription')}>
+        <ErrorState
+          message={
+            subscription.error instanceof ApiRequestError
+              ? subscription.error.message
+              : t('settings.subscriptionLoadError')
+          }
+          onRetry={() => void subscription.refetch()}
+        />
+      </SectionCard>
+    );
+  }
+
+  const data = subscription.data;
+  const locale = currentLocale();
+  const planName = locale === 'he' ? data.plan.nameHe : data.plan.nameAr;
+  const currency = data.plan.currency as CurrencyCode;
+  const end = new Date(data.currentPeriodEnd);
+  const daysLeft = Math.ceil((end.getTime() - Date.now()) / 86_400_000);
+  const paymentApproaching = daysLeft <= 5 && data.remainingAmount !== '0.00';
+
   return (
     <SectionCard title={t('settings.subscription')}>
-      <p className="text-fg-muted text-[13px]">{t('settings.subscriptionHint')}</p>
-      <a href="/subscription" className="text-accent text-[13px] font-medium hover:underline">
-        {t('settings.openSubscription')}
-      </a>
+      {paymentApproaching ? (
+        <div className="rounded-ctrl border-warning/40 bg-warning-soft text-warning flex items-start gap-3 border p-3 text-sm">
+          <TriangleAlert className="mt-0.5 size-5 shrink-0" aria-hidden />
+          <span>
+            {daysLeft < 0
+              ? t('settings.subscriptionOverdueNotice')
+              : t('settings.subscriptionDueNotice', { count: daysLeft })}
+          </span>
+        </div>
+      ) : null}
+      <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <SubscriptionInfo label={t('subscription.currentPlan')} value={planName} />
+        <SubscriptionInfo
+          label={t('subscription.startDate')}
+          value={data.currentPeriodStart.slice(0, 10)}
+          ltr
+        />
+        <SubscriptionInfo
+          label={t('subscription.endDate')}
+          value={data.currentPeriodEnd.slice(0, 10)}
+          ltr
+        />
+        <div className="rounded-ctrl border-border-subtle bg-card-muted border p-3">
+          <dt className="text-fg-muted text-xs">{t('subscription.monthlyPrice')}</dt>
+          <dd className="mt-1">
+            <MoneyText value={data.agreedMonthlyAmount} currency={currency} size="md" />
+          </dd>
+        </div>
+        <div className="rounded-ctrl border-border-subtle bg-card-muted border p-3">
+          <dt className="text-fg-muted text-xs">{t('subscription.remainingAmount')}</dt>
+          <dd className="mt-1">
+            <MoneyText
+              value={data.remainingAmount}
+              currency={currency}
+              tone={data.remainingAmount === '0.00' ? 'credit' : 'debit'}
+              size="md"
+            />
+          </dd>
+        </div>
+        <SubscriptionInfo
+          label={t('subscription.paymentStatus')}
+          value={t(`subscription.paymentStatuses.${data.paymentStatus}`)}
+        />
+      </dl>
     </SectionCard>
+  );
+}
+
+function SubscriptionInfo({
+  label,
+  value,
+  ltr = false,
+}: {
+  label: string;
+  value: string;
+  ltr?: boolean;
+}) {
+  return (
+    <div className="rounded-ctrl border-border-subtle bg-card-muted border p-3">
+      <dt className="text-fg-muted text-xs">{label}</dt>
+      <dd className="text-fg mt-1 text-sm font-semibold" dir={ltr ? 'ltr' : undefined}>
+        {value}
+      </dd>
+    </div>
   );
 }
 

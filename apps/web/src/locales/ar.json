@@ -232,8 +232,8 @@
     "messagingDescription": "واتساب والتنبيهات والقوالب",
     "activity": "سجل النشاط",
     "activityDescription": "جميع العمليات والتغييرات",
-    "subscription": "إدارة الاشتراك",
-    "subscriptionDescription": "تفاصيل الباقة والاستخدام",
+    "subscription": "متابعة الاشتراك",
+    "subscriptionDescription": "موعد التجديد والمبلغ المستحق",
     "allSettings": "جميع الإعدادات",
     "backToSettings": "العودة إلى الإعدادات الرئيسية",
     "saved": "حُفظت التغييرات",
@@ -284,7 +284,10 @@
     "noActivity": "لا يوجد نشاط في المحل بعد.",
     "noActivityPermission": "لا تملك صلاحية عرض سجل النشاط.",
     "subscriptionHint": "تُدار تفاصيل الباقة والفواتير والاستخدام من شاشة الاشتراك المخصّصة.",
-    "openSubscription": "فتح إدارة الاشتراك ←"
+    "openSubscription": "فتح متابعة الاشتراك ←",
+    "subscriptionLoadError": "تعذّر تحميل بيانات الاشتراك.",
+    "subscriptionDueNotice": "اقترب موعد دفعة الاشتراك الشهرية. متبقٍ {{count}} يوم.",
+    "subscriptionOverdueNotice": "تجاوز الاشتراك موعد الدفع وما زال هناك مبلغ مستحق."
   },
   "notificationFeed": {
     "loadError": "تعذّر تحميل الإشعارات.",

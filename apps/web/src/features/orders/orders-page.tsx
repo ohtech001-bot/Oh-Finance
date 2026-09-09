@@ -7,11 +7,17 @@ import {
   ChevronLeft,
   Pencil,
   Plus,
-  Printer,
   ShoppingBag,
   Wallet,
 } from 'lucide-react';
-import type { Order, OrderDetail, OrderListQuery, SessionUser } from '@oh/contracts';
+import type {
+  Customer,
+  Order,
+  OrderDetail,
+  OrderListQuery,
+  Payment,
+  StoreSettings,
+} from '@oh/contracts';
 import type { CurrencyCode } from '@oh/money';
 import {
   Button,
@@ -36,6 +42,8 @@ import { OrderDetailsDialog } from './order-details-dialog';
 import { useOrderStats, useOrders } from './api';
 import { displayOrderNumber } from './order-number';
 import { printOrder } from './print-order';
+import type { PrintPaperSize } from './print-order';
+import { PrintOrderMenu } from './print-order-menu';
 
 export function OrdersPage() {
   const { t } = useTranslation();
@@ -106,19 +114,38 @@ export function OrdersPage() {
     }
   };
 
-  const runPrint = async (row: Order) => {
-    const printWindow = window.open('', '_blank', 'width=420,height=720');
+  const runPrint = async (row: Order, paperSize: PrintPaperSize) => {
+    const printWindow = window.open(
+      '',
+      '_blank',
+      paperSize === 'A4' ? 'width=1000,height=850' : 'width=420,height=720',
+    );
     if (!printWindow) {
       toast.error(t('orders.allowPrintPopup'));
       return;
     }
     try {
-      const [order, freshUser] = await Promise.all([
+      const [order, settings, customer] = await Promise.all([
         loadOrder(row.id),
-        api.get<SessionUser>('/auth/me'),
+        api.get<StoreSettings>('/settings'),
+        api.get<Customer>(`/customers/${row.customerId}`),
       ]);
+      const latestAllocation = order.allocations.at(-1);
+      const payment = latestAllocation
+        ? await api.get<Payment>(`/payments/${latestAllocation.paymentId}`)
+        : null;
       printOrder(order, currency, {
-        store: freshUser.store,
+        store: user?.store
+          ? {
+              ...user.store,
+              logoUrl: settings.general.logoUrl || user.store.logoUrl,
+              email: settings.general.email,
+              address: settings.general.address,
+            }
+          : null,
+        customer,
+        payment,
+        paperSize,
         targetWindow: printWindow,
       });
     } catch (error) {
@@ -248,10 +275,7 @@ export function OrdersPage() {
               <Pencil aria-hidden />
               {t('common.edit')}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => void runPrint(row)}>
-              <Printer aria-hidden />
-              {t('common.print')}
-            </Button>
+            <PrintOrderMenu compact onSelect={(size) => void runPrint(row, size)} />
           </div>
         );
       },
@@ -458,10 +482,7 @@ export function OrdersPage() {
                     <Pencil aria-hidden />
                     {t('common.edit')}
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => void runPrint(row)}>
-                    <Printer aria-hidden />
-                    {t('common.print')}
-                  </Button>
+                  <PrintOrderMenu compact onSelect={(size) => void runPrint(row, size)} />
                 </div>
               </article>
             );

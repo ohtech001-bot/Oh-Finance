@@ -14,11 +14,29 @@ interface PrintOrderOptions {
   store?: {
     name: string;
     logoUrl: string | null;
+    phone?: string | null;
+    email?: string | null;
+    address?: string | null;
     taxEnabled: boolean;
     taxRate: number;
   } | null;
+  customer?: {
+    phone?: string | null;
+    email?: string | null;
+    city?: string | null;
+    address?: string | null;
+    balance?: string;
+  } | null;
+  payment?: {
+    amount: string;
+    balanceBefore: string;
+    balanceAfter: string;
+  } | null;
+  paperSize?: PrintPaperSize;
   targetWindow?: Window | null;
 }
+
+export type PrintPaperSize = '80mm' | 'A4';
 
 function escapeHtml(value: string): string {
   return value
@@ -105,6 +123,8 @@ export function printOrder(
   const cashPaid = subtract(order.paidAmount, order.creditAppliedAmount);
   const documentState = order.status === 'DRAFT' ? 'مسودة / טיוטה' : 'طلب مؤكد / הזמנה מאושרת';
   const storeName = escapeHtml(options.store?.name ?? 'OH Finance');
+  const paperSize = options.paperSize ?? '80mm';
+  const a4 = paperSize === 'A4';
   const taxRate = options.store?.taxEnabled ? options.store.taxRate : 0;
   const tax = inclusiveTaxBreakdown(
     order.total,
@@ -147,11 +167,11 @@ export function printOrder(
     <meta charset="utf-8">
     <title>${orderNumber}</title>
     <style>
-      @page{size:80mm auto;margin:3mm}
       *{box-sizing:border-box}
-      html,body{width:74mm;margin:0;padding:0;background:#fff;color:#111}
-      body{font-family:Arial,Tahoma,sans-serif;font-size:11px;line-height:1.45}
-      .receipt{width:100%;padding:1mm 0}
+      @page{size:${a4 ? 'A4' : '80mm auto'};margin:${a4 ? '14mm' : '3mm'}}
+      html,body{width:${a4 ? '100%' : '74mm'};margin:0;padding:0;background:#fff;color:#111}
+      body{font-family:Arial,Tahoma,sans-serif;font-size:${a4 ? '13px' : '11px'};line-height:1.45}
+      .receipt{width:100%;max-width:${a4 ? '182mm' : 'none'};margin:0 auto;padding:1mm 0}
       .store{text-align:center;padding-bottom:3mm;border-bottom:1px dashed #555}
       .logo{display:block;max-width:24mm;max-height:18mm;object-fit:contain;margin:0 auto 1.5mm}
       .store-name{font-size:17px;font-weight:800}
@@ -161,7 +181,7 @@ export function printOrder(
       .info-row,.total-row{display:flex;align-items:flex-start;justify-content:space-between;gap:3mm;padding:.7mm 0}
       .info-row strong,.total-row strong{text-align:left;direction:ltr}
       .payment{display:inline-block;border:1px solid currentColor;padding:.8mm 2mm;font-weight:800;color:${paymentColor}}
-      table{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:1mm;font-size:9px}
+      table{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:1mm;font-size:${a4 ? '12px' : '9px'}}
       th,td{padding:1.4mm .7mm;border-bottom:1px solid #ccc;text-align:center;vertical-align:top}
       th{font-weight:800}
       .product{width:32%;text-align:right;overflow-wrap:anywhere}
@@ -170,7 +190,7 @@ export function printOrder(
       .tax-note{font-size:9px;color:#444;margin-top:1mm}
       .grand-total{font-size:14px;border-top:1.5px solid #111;margin-top:1.5mm;padding-top:1.5mm}
       .footer{text-align:center;padding-top:3mm;font-size:9px}
-      @media print{html,body{width:74mm}.receipt{break-inside:avoid}}
+      @media print{html,body{width:${a4 ? '100%' : '74mm'}}.receipt{break-inside:avoid}}
     </style>
   </head>
   <body>
@@ -178,12 +198,19 @@ export function printOrder(
       <header class="store">
         ${logo}
         <div class="store-name">${storeName}</div>
+        ${options.store?.phone ? `<div dir="ltr">${escapeHtml(options.store.phone)}</div>` : ''}
+        ${options.store?.email ? `<div dir="ltr">${escapeHtml(options.store.email)}</div>` : ''}
+        ${options.store?.address ? `<div>${escapeHtml(options.store.address)}</div>` : ''}
         <div class="document-state">${documentState}</div>
       </header>
 
       <section class="section">
         <div class="section-title">تفاصيل صاحب الطلب</div>
         <div class="info-row"><span>الاسم</span><strong>${escapeHtml(order.customerName)}</strong></div>
+        ${options.customer?.phone ? `<div class="info-row"><span>الهاتف</span><strong>${escapeHtml(options.customer.phone)}</strong></div>` : ''}
+        ${options.customer?.email ? `<div class="info-row"><span>البريد الإلكتروني</span><strong>${escapeHtml(options.customer.email)}</strong></div>` : ''}
+        ${options.customer?.city ? `<div class="info-row"><span>المدينة</span><strong>${escapeHtml(options.customer.city)}</strong></div>` : ''}
+        ${options.customer?.address ? `<div class="info-row"><span>العنوان</span><strong>${escapeHtml(options.customer.address)}</strong></div>` : ''}
       </section>
 
       <section class="section">
@@ -199,6 +226,14 @@ export function printOrder(
         ${greaterThan(cashPaid, '0') ? `<div class="info-row"><span>المدفوع نقدًا</span><strong>${money(cashPaid.toString())}</strong></div>` : ''}
         <div class="info-row"><span>إجمالي المسدد</span><strong>${money(order.paidAmount)}</strong></div>
         <div class="info-row"><span>المتبقي للسداد</span><strong>${money(order.remainingAmount)}</strong></div>
+        ${options.customer?.balance !== undefined ? `<div class="info-row"><span>رصيد الحساب الحالي</span><strong>${money(options.customer.balance)}</strong></div>` : ''}
+        ${
+          options.payment
+            ? `<div class="info-row"><span>قيمة الدفعة</span><strong>${money(options.payment.amount)}</strong></div>
+        <div class="info-row"><span>الرصيد قبل الدفع</span><strong>${money(options.payment.balanceBefore)}</strong></div>
+        <div class="info-row"><span>الرصيد بعد الدفع</span><strong>${money(options.payment.balanceAfter)}</strong></div>`
+            : ''
+        }
       </section>
 
       <section class="section">

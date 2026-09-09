@@ -77,6 +77,17 @@ export const reportTopCustomerSchema = z.object({
   purchases: z.string(),
 });
 
+export const reportDebtorSchema = z.object({
+  id: uuidSchema,
+  code: z.string(),
+  name: z.string(),
+  balance: z.string(),
+  creditLimit: z.string(),
+  paymentDueDay: z.number().int().min(1).max(31),
+  dueReached: z.boolean(),
+  overCreditLimit: z.boolean(),
+});
+
 export const reportTopProductSchema = z.object({
   name: z.string(),
   quantity: z.string(),
@@ -131,6 +142,8 @@ export const reportsSchema = z.object({
   ordersByStatus: z.array(ordersByStatusSchema),
   paymentMethods: z.array(paymentMethodBreakdownSchema),
   topCustomers: z.array(reportTopCustomerSchema),
+  topDebtors: z.array(reportDebtorSchema),
+  urgentCustomers: z.array(reportDebtorSchema),
   topProducts: z.array(reportTopProductSchema),
   employeePerformance: z.array(employeePerformanceSchema),
 
@@ -140,4 +153,12 @@ export const reportsSchema = z.object({
 });
 export type ReportsData = z.infer<typeof reportsSchema>;
 
-export const WEEKDAY_LABELS_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+export const WEEKDAY_LABELS_AR = [
+  'الأحد',
+  'الاثنين',
+  'الثلاثاء',
+  'الأربعاء',
+  'الخميس',
+  'الجمعة',
+  'السبت',
+];

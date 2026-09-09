@@ -32,11 +32,31 @@ const LOCAL_BOUNDS: Record<
   { cs: string; ce: string; ps: string; pe: string }
 > = {
   today: { cs: 'd0', ce: "d0 + interval '1 day'", ps: "d0 - interval '1 day'", pe: 'd0' },
-  yesterday: { cs: "d0 - interval '1 day'", ce: 'd0', ps: "d0 - interval '2 day'", pe: "d0 - interval '1 day'" },
-  last_7_days: { cs: "d0 - interval '6 day'", ce: "d0 + interval '1 day'", ps: "d0 - interval '13 day'", pe: "d0 - interval '6 day'" },
-  last_30_days: { cs: "d0 - interval '29 day'", ce: "d0 + interval '1 day'", ps: "d0 - interval '59 day'", pe: "d0 - interval '29 day'" },
+  yesterday: {
+    cs: "d0 - interval '1 day'",
+    ce: 'd0',
+    ps: "d0 - interval '2 day'",
+    pe: "d0 - interval '1 day'",
+  },
+  last_7_days: {
+    cs: "d0 - interval '6 day'",
+    ce: "d0 + interval '1 day'",
+    ps: "d0 - interval '13 day'",
+    pe: "d0 - interval '6 day'",
+  },
+  last_30_days: {
+    cs: "d0 - interval '29 day'",
+    ce: "d0 + interval '1 day'",
+    ps: "d0 - interval '59 day'",
+    pe: "d0 - interval '29 day'",
+  },
   this_month: { cs: 'm0', ce: "m0 + interval '1 month'", ps: "m0 - interval '1 month'", pe: 'm0' },
-  previous_month: { cs: "m0 - interval '1 month'", ce: 'm0', ps: "m0 - interval '2 month'", pe: "m0 - interval '1 month'" },
+  previous_month: {
+    cs: "m0 - interval '1 month'",
+    ce: 'm0',
+    ps: "m0 - interval '2 month'",
+    pe: "m0 - interval '1 month'",
+  },
   this_year: { cs: 'y0', ce: "y0 + interval '1 year'", ps: "y0 - interval '1 year'", pe: 'y0' },
 };
 
@@ -76,19 +96,31 @@ export class ReportsService {
       const ps = new Date(range.previousFrom);
       const pe = new Date(range.previousTo);
 
-      const [flows, stock, series, weekday, byStatus, methods, customers, products, employees, durations] =
-        await Promise.all([
-          this.flows(tx, tenantId, cs, ce, ps, pe),
-          this.stock(tx, tenantId, cs, now),
-          this.series(tx, tenantId, timezone, range),
-          this.ordersByWeekday(tx, tenantId, timezone, cs, ce),
-          this.ordersByStatus(tx, tenantId, cs, ce),
-          this.paymentMethods(tx, tenantId, cs, ce),
-          this.topCustomers(tx, tenantId, cs, ce),
-          this.topProducts(tx, tenantId, cs, ce),
-          this.employeePerformance(tx, tenantId, cs, ce),
-          this.avgPaymentDuration(tx, tenantId, cs, ce),
-        ]);
+      const [
+        flows,
+        stock,
+        series,
+        weekday,
+        byStatus,
+        methods,
+        customers,
+        debtors,
+        products,
+        employees,
+        durations,
+      ] = await Promise.all([
+        this.flows(tx, tenantId, cs, ce, ps, pe),
+        this.stock(tx, tenantId, cs, now),
+        this.series(tx, tenantId, timezone, range),
+        this.ordersByWeekday(tx, tenantId, timezone, cs, ce),
+        this.ordersByStatus(tx, tenantId, cs, ce),
+        this.paymentMethods(tx, tenantId, cs, ce),
+        this.topCustomers(tx, tenantId, cs, ce),
+        this.debtCustomers(tx, tenantId, timezone),
+        this.topProducts(tx, tenantId, cs, ce),
+        this.employeePerformance(tx, tenantId, cs, ce),
+        this.avgPaymentDuration(tx, tenantId, cs, ce),
+      ]);
 
       return {
         meta: {
@@ -119,6 +151,8 @@ export class ReportsService {
         ordersByStatus: byStatus,
         paymentMethods: methods,
         topCustomers: customers,
+        topDebtors: debtors.top,
+        urgentCustomers: debtors.urgent,
         topProducts: products,
         employeePerformance: employees,
         salesByCategory: {
@@ -179,7 +213,8 @@ export class ReportsService {
       previousFrom: row.prev_start.toISOString(),
       previousTo: row.prev_end.toISOString(),
       granularity,
-      label: query.preset === 'custom' ? `من ${query.from} إلى ${query.to}` : PRESET_LABEL[query.preset],
+      label:
+        query.preset === 'custom' ? `من ${query.from} إلى ${query.to}` : PRESET_LABEL[query.preset],
     };
   }
 
@@ -188,9 +223,16 @@ export class ReportsService {
   private async flows(tx: TxClient, tenantId: string, cs: Date, ce: Date, ps: Date, pe: Date) {
     const [row] = await tx.$queryRawUnsafe<
       {
-        rev_cur: string; rev_prev: string; ord_cur: bigint; ord_prev: bigint;
-        tax_cur: string; tax_prev: string; disc_cur: string; disc_prev: string;
-        pay_cur: string; pay_prev: string;
+        rev_cur: string;
+        rev_prev: string;
+        ord_cur: bigint;
+        ord_prev: bigint;
+        tax_cur: string;
+        tax_prev: string;
+        disc_cur: string;
+        disc_prev: string;
+        pay_cur: string;
+        pay_prev: string;
       }[]
     >(
       `SELECT
@@ -204,14 +246,24 @@ export class ReportsService {
          COALESCE((SELECT SUM(discount_amount) FROM orders WHERE tenant_id=$1::uuid AND ${CONFIRMED_SALE} AND confirmed_at>=$4 AND confirmed_at<$5),0)::text disc_prev,
          COALESCE((SELECT SUM(amount) FROM payments WHERE tenant_id=$1::uuid AND status='POSTED' AND paid_at>=$2 AND paid_at<$3),0)::text pay_cur,
          COALESCE((SELECT SUM(amount) FROM payments WHERE tenant_id=$1::uuid AND status='POSTED' AND paid_at>=$4 AND paid_at<$5),0)::text pay_prev`,
-      tenantId, cs, ce, ps, pe,
+      tenantId,
+      cs,
+      ce,
+      ps,
+      pe,
     );
     return row!;
   }
 
   private async stock(tx: TxClient, tenantId: string, cs: Date, now: Date) {
     const [row] = await tx.$queryRawUnsafe<
-      { outstanding_now: string; outstanding_prev: string; active_now: bigint; active_prev: bigint; total_customers: bigint }[]
+      {
+        outstanding_now: string;
+        outstanding_prev: string;
+        active_now: bigint;
+        active_prev: bigint;
+        total_customers: bigint;
+      }[]
     >(
       `WITH bal_now AS (
          SELECT DISTINCT ON (le.customer_id) le.customer_id, le.running_balance
@@ -227,7 +279,9 @@ export class ReportsService {
          (SELECT COUNT(*) FROM customers WHERE tenant_id=$1::uuid AND archived_at IS NULL AND status='ACTIVE') active_now,
          (SELECT COUNT(*) FROM customers WHERE tenant_id=$1::uuid AND created_at<$2 AND (archived_at IS NULL OR archived_at>=$2)) active_prev,
          (SELECT COUNT(*) FROM customers WHERE tenant_id=$1::uuid AND archived_at IS NULL) total_customers`,
-      tenantId, cs, now,
+      tenantId,
+      cs,
+      now,
     );
     return row!;
   }
@@ -244,9 +298,16 @@ export class ReportsService {
          COALESCE((SELECT SUM(total) FROM orders o WHERE o.tenant_id=$4::uuid AND o.status NOT IN ('DRAFT','QUOTE','CANCELLED') AND o.confirmed_at>=b.b_start AND o.confirmed_at<b.b_end),0)::text sales,
          COALESCE((SELECT SUM(amount) FROM payments p WHERE p.tenant_id=$4::uuid AND p.status='POSTED' AND p.paid_at>=b.b_start AND p.paid_at<b.b_end),0)::text payments
        FROM b ORDER BY b.b_local`,
-      tz, new Date(range.from), new Date(range.to), tenantId,
+      tz,
+      new Date(range.from),
+      new Date(range.to),
+      tenantId,
     );
-    return rows.map((r) => ({ date: r.date, sales: toMoneyString(r.sales, 2), payments: toMoneyString(r.payments, 2) }));
+    return rows.map((r) => ({
+      date: r.date,
+      sales: toMoneyString(r.sales, 2),
+      payments: toMoneyString(r.payments, 2),
+    }));
   }
 
   private async ordersByWeekday(tx: TxClient, tenantId: string, tz: string, cs: Date, ce: Date) {
@@ -254,26 +315,41 @@ export class ReportsService {
       `SELECT EXTRACT(DOW FROM (issued_at AT TIME ZONE $2))::int weekday, COUNT(*) count
        FROM orders WHERE tenant_id=$1::uuid AND ${CONFIRMED_SALE} AND issued_at>=$3 AND issued_at<$4
        GROUP BY 1`,
-      tenantId, tz, cs, ce,
+      tenantId,
+      tz,
+      cs,
+      ce,
     );
     const byDay = new Map(rows.map((r) => [Number(r.weekday), Number(r.count)]));
-    return WEEKDAY_LABELS_AR.map((label, weekday) => ({ weekday, label, count: byDay.get(weekday) ?? 0 }));
+    return WEEKDAY_LABELS_AR.map((label, weekday) => ({
+      weekday,
+      label,
+      count: byDay.get(weekday) ?? 0,
+    }));
   }
 
   private async ordersByStatus(tx: TxClient, tenantId: string, cs: Date, ce: Date) {
     const rows = await tx.$queryRawUnsafe<{ status: string; count: bigint; amount: string }[]>(
       `SELECT status::text, COUNT(*) count, COALESCE(SUM(total),0)::text amount
        FROM orders WHERE tenant_id=$1::uuid AND issued_at>=$2 AND issued_at<$3 GROUP BY status ORDER BY COUNT(*) DESC`,
-      tenantId, cs, ce,
+      tenantId,
+      cs,
+      ce,
     );
-    return rows.map((r) => ({ status: r.status as never, count: Number(r.count), amount: toMoneyString(r.amount, 2) }));
+    return rows.map((r) => ({
+      status: r.status as never,
+      count: Number(r.count),
+      amount: toMoneyString(r.amount, 2),
+    }));
   }
 
   private async paymentMethods(tx: TxClient, tenantId: string, cs: Date, ce: Date) {
     const rows = await tx.$queryRawUnsafe<{ method: string; amount: string; count: bigint }[]>(
       `SELECT method::text, COALESCE(SUM(amount),0)::text amount, COUNT(*) count
        FROM payments WHERE tenant_id=$1::uuid AND status='POSTED' AND paid_at>=$2 AND paid_at<$3 GROUP BY method ORDER BY SUM(amount) DESC`,
-      tenantId, cs, ce,
+      tenantId,
+      cs,
+      ce,
     );
     const total = rows.reduce((s, r) => s.plus(toMoney(r.amount)), toMoney('0'));
     return rows.map((r) => ({
@@ -285,15 +361,79 @@ export class ReportsService {
   }
 
   private async topCustomers(tx: TxClient, tenantId: string, cs: Date, ce: Date) {
-    const rows = await tx.$queryRawUnsafe<{ id: string; code: string; name: string; purchases: string }[]>(
+    const rows = await tx.$queryRawUnsafe<
+      { id: string; code: string; name: string; purchases: string }[]
+    >(
       `SELECT c.id, c.code, c.name, COALESCE(SUM(o.total),0)::text purchases
        FROM customers c JOIN orders o ON o.customer_id=c.id
        WHERE c.tenant_id=$1::uuid AND c.archived_at IS NULL AND o.status NOT IN ('DRAFT','QUOTE','CANCELLED')
          AND o.confirmed_at>=$2 AND o.confirmed_at<$3
        GROUP BY c.id, c.code, c.name HAVING SUM(o.total)>0 ORDER BY SUM(o.total) DESC, c.id LIMIT 5`,
-      tenantId, cs, ce,
+      tenantId,
+      cs,
+      ce,
     );
-    return rows.map((r) => ({ id: r.id, code: r.code, name: r.name, purchases: toMoneyString(r.purchases, 2) }));
+    return rows.map((r) => ({
+      id: r.id,
+      code: r.code,
+      name: r.name,
+      purchases: toMoneyString(r.purchases, 2),
+    }));
+  }
+
+  private async debtCustomers(tx: TxClient, tenantId: string, timezone: string) {
+    const rows = await tx.$queryRawUnsafe<
+      {
+        id: string;
+        code: string;
+        name: string;
+        balance: string;
+        credit_limit: string;
+        payment_due_day: number;
+        due_reached: boolean;
+        over_credit_limit: boolean;
+      }[]
+    >(
+      `WITH latest_balance AS (
+         SELECT DISTINCT ON (customer_id) customer_id, running_balance
+         FROM ledger_entries
+         WHERE tenant_id=$1::uuid
+         ORDER BY customer_id, seq DESC
+       ), local_date AS (
+         SELECT (now() AT TIME ZONE $2)::date AS today
+       )
+       SELECT c.id, c.code, c.name, lb.running_balance::text AS balance,
+              c.credit_limit::text AS credit_limit,
+              COALESCE(EXTRACT(DAY FROM c.payment_due_date)::int, 1) AS payment_due_day,
+              c.payment_due_date IS NOT NULL AND EXTRACT(DAY FROM ld.today)::int >= LEAST(
+                COALESCE(EXTRACT(DAY FROM c.payment_due_date)::int, 1),
+                EXTRACT(DAY FROM (date_trunc('month', ld.today) + interval '1 month - 1 day'))::int
+              ) AS due_reached,
+              c.credit_limit > 0 AND lb.running_balance >= c.credit_limit AS over_credit_limit
+       FROM customers c
+       JOIN latest_balance lb ON lb.customer_id=c.id
+       CROSS JOIN local_date ld
+       WHERE c.tenant_id=$1::uuid AND c.archived_at IS NULL AND lb.running_balance > 0
+       ORDER BY lb.running_balance DESC, c.id`,
+      tenantId,
+      timezone,
+    );
+
+    const mapped = rows.map((row) => ({
+      id: row.id,
+      code: row.code,
+      name: row.name,
+      balance: toMoneyString(row.balance, 2),
+      creditLimit: toMoneyString(row.credit_limit, 2),
+      paymentDueDay: row.payment_due_day,
+      dueReached: row.due_reached,
+      overCreditLimit: row.over_credit_limit,
+    }));
+
+    return {
+      top: mapped.slice(0, 5),
+      urgent: mapped.filter((row) => row.dueReached || row.overCreditLimit).slice(0, 5),
+    };
   }
 
   private async topProducts(tx: TxClient, tenantId: string, cs: Date, ce: Date) {
@@ -302,9 +442,15 @@ export class ReportsService {
        FROM order_items oi JOIN orders o ON o.id=oi.order_id
        WHERE oi.tenant_id=$1::uuid AND o.status NOT IN ('DRAFT','QUOTE','CANCELLED') AND o.confirmed_at>=$2 AND o.confirmed_at<$3
        GROUP BY oi.name HAVING SUM(oi.line_total)>0 ORDER BY SUM(oi.line_total) DESC LIMIT 5`,
-      tenantId, cs, ce,
+      tenantId,
+      cs,
+      ce,
     );
-    return rows.map((r) => ({ name: r.name, quantity: toMoneyString(r.quantity, 2), sales: toMoneyString(r.sales, 2) }));
+    return rows.map((r) => ({
+      name: r.name,
+      quantity: toMoneyString(r.quantity, 2),
+      sales: toMoneyString(r.sales, 2),
+    }));
   }
 
   private async employeePerformance(tx: TxClient, tenantId: string, cs: Date, ce: Date) {
@@ -321,7 +467,9 @@ export class ReportsService {
               COALESCE(ord.orders,0) orders, COALESCE(ord.sales,0)::text sales, COALESCE(pay.payments,0)::text payments
        FROM ord FULL OUTER JOIN pay ON ord.created_by = pay.created_by
        ORDER BY COALESCE(ord.sales,0) + COALESCE(pay.payments,0) DESC LIMIT 10`,
-      tenantId, cs, ce,
+      tenantId,
+      cs,
+      ce,
     );
     const ids = [...new Set(rows.map((r) => r.user_id).filter((v): v is string => !!v))];
     const users = ids.length
@@ -337,14 +485,21 @@ export class ReportsService {
     }));
   }
 
-  private async avgPaymentDuration(tx: TxClient, tenantId: string, cs: Date, ce: Date): Promise<number | null> {
+  private async avgPaymentDuration(
+    tx: TxClient,
+    tenantId: string,
+    cs: Date,
+    ce: Date,
+  ): Promise<number | null> {
     const [row] = await tx.$queryRawUnsafe<{ days: number | null }[]>(
       `SELECT AVG(EXTRACT(EPOCH FROM (p.paid_at - o.issued_at))/86400)::float8 days
        FROM payment_allocations pa
        JOIN payments p ON p.id=pa.payment_id AND p.status='POSTED'
        JOIN orders o ON o.id=pa.order_id
        WHERE pa.tenant_id=$1::uuid AND p.paid_at>=$2 AND p.paid_at<$3`,
-      tenantId, cs, ce,
+      tenantId,
+      cs,
+      ce,
     );
     // eslint-disable-next-line no-restricted-properties -- متوسط أيام للعرض، لا مبلغ.
     return row?.days === null || row?.days === undefined ? null : Math.round(row.days * 10) / 10;

@@ -232,8 +232,8 @@
     "messagingDescription": "וואטסאפ, התראות ותבניות",
     "activity": "יומן פעילות",
     "activityDescription": "כל הפעולות והשינויים",
-    "subscription": "ניהול מנוי",
-    "subscriptionDescription": "פרטי החבילה והשימוש",
+    "subscription": "מעקב מנוי",
+    "subscriptionDescription": "מועד החידוש והסכום לתשלום",
     "allSettings": "כל ההגדרות",
     "backToSettings": "חזרה להגדרות הראשיות",
     "saved": "השינויים נשמרו",
@@ -284,7 +284,10 @@
     "noActivity": "אין עדיין פעילות בחנות.",
     "noActivityPermission": "אין לך הרשאה לצפות ביומן הפעילות.",
     "subscriptionHint": "פרטי החבילה, החשבוניות והשימוש מנוהלים במסך המנוי.",
-    "openSubscription": "פתיחת ניהול המנוי ←"
+    "openSubscription": "פתיחת מעקב המנוי ←",
+    "subscriptionLoadError": "לא ניתן לטעון את פרטי המנוי.",
+    "subscriptionDueNotice": "מועד תשלום המנוי החודשי מתקרב. נותרו {{count}} ימים.",
+    "subscriptionOverdueNotice": "מועד התשלום של המנוי עבר ועדיין נותר סכום לתשלום."
   },
   "notificationFeed": {
     "loadError": "לא ניתן לטעון את ההתראות.",

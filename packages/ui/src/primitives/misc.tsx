@@ -179,19 +179,18 @@ export const Switch = forwardRef<
   <SwitchPrimitive.Root
     ref={ref}
     className={cn(
-      'peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full',
-      'border-2 border-transparent transition-colors',
+      'peer relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full p-1',
+      'border border-border-strong transition-colors duration-200',
       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
       'disabled:cursor-not-allowed disabled:opacity-50',
-      'data-[state=checked]:bg-brand data-[state=unchecked]:bg-border',
+        'data-[state=checked]:border-brand data-[state=checked]:bg-brand data-[state=unchecked]:bg-card-muted',
       className,
     )}
     {...props}
   >
     <SwitchPrimitive.Thumb
       className={cn(
-        'pointer-events-none block size-5 rounded-full bg-white shadow-sm ring-0 transition-transform',
-        // منطقي: في RTL ينزلق الإبهام إلى اليسار عند التفعيل.
+        'pointer-events-none absolute start-1 block size-[18px] rounded-full bg-white shadow-sm ring-0 transition-transform duration-200',
         'data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0',
         'rtl:data-[state=checked]:-translate-x-5',
       )}

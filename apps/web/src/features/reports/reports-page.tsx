@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, ShoppingBag, User, Users, Wallet } from 'lucide-react';
+import {
+  BarChart3,
+  CalendarClock,
+  ShoppingBag,
+  TriangleAlert,
+  User,
+  Users,
+  Wallet,
+} from 'lucide-react';
 import { PAYMENT_METHOD_LABELS } from '@oh/contracts';
 import { formatMoney, type CurrencyCode } from '@oh/money';
 import {
@@ -15,6 +23,7 @@ import {
 } from '@oh/ui';
 import { ApiRequestError } from '@/lib/api';
 import { useAuth } from '@/app/auth-context';
+import { currentLocale } from '@/lib/i18n';
 import { RangePicker, type RangeValue } from '@/features/dashboard/range-picker';
 import { useReports } from './api';
 import { PaymentMethodsDonut, SalesPaymentsLine, WeekdayBars } from './reports-charts';
@@ -28,6 +37,8 @@ import { PaymentMethodsDonut, SalesPaymentsLine, WeekdayBars } from './reports-c
  */
 export function ReportsPage() {
   const { user } = useAuth();
+  const locale = currentLocale();
+  const copy = REPORT_DEBT_COPY[locale];
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
   const [range, setRange] = useState<RangeValue>({ preset: 'last_30_days' });
   const ready = range.preset !== 'custom' || Boolean(range.from && range.to);
@@ -102,6 +113,27 @@ export function ReportsPage() {
                 <WeekdayBars data={data.ordersByWeekday} />
               </CardBody>
             </Card>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <DebtList
+              title={copy.topDebtors}
+              empty={copy.noDebt}
+              rows={data.topDebtors}
+              currency={currency}
+              icon="debt"
+              dueLabel={copy.monthlyDue}
+              limitLabel={copy.creditLimit}
+            />
+            <DebtList
+              title={copy.urgent}
+              empty={copy.noUrgent}
+              rows={data.urgentCustomers}
+              currency={currency}
+              icon="urgent"
+              dueLabel={copy.monthlyDue}
+              limitLabel={copy.creditLimit}
+            />
           </div>
 
           {/* ── صف القوائم الثلاثة ───────────────────────────────────── */}
@@ -240,4 +272,103 @@ export function ReportsPage() {
 
 function Empty({ text }: { text: string }) {
   return <p className="text-fg-subtle py-8 text-center text-[13px]">{text}</p>;
+}
+
+const REPORT_DEBT_COPY = {
+  ar: {
+    topDebtors: 'أكثر 5 زبائن دينًا',
+    urgent: 'زبائن يجب أن يسارعوا في الدفع',
+    noDebt: 'لا يوجد زبائن عليهم ديون.',
+    noUrgent: 'لا توجد حسابات تستدعي متابعة عاجلة.',
+    monthlyDue: 'موعد السداد الشهري',
+    creditLimit: 'بلغ حد الائتمان',
+  },
+  he: {
+    topDebtors: '5 הלקוחות בעלי החוב הגבוה ביותר',
+    urgent: 'לקוחות הדורשים תשלום בהקדם',
+    noDebt: 'אין לקוחות עם חוב.',
+    noUrgent: 'אין חשבונות הדורשים טיפול דחוף.',
+    monthlyDue: 'מועד התשלום החודשי',
+    creditLimit: 'הגיע למסגרת האשראי',
+  },
+  en: {
+    topDebtors: 'Top 5 debtors',
+    urgent: 'Customers requiring prompt payment',
+    noDebt: 'No customers have outstanding debt.',
+    noUrgent: 'No accounts need urgent follow-up.',
+    monthlyDue: 'Monthly due day',
+    creditLimit: 'Credit limit reached',
+  },
+} as const;
+
+function DebtList({
+  title,
+  empty,
+  rows,
+  currency,
+  icon,
+  dueLabel,
+  limitLabel,
+}: {
+  title: string;
+  empty: string;
+  rows: Array<{
+    id: string;
+    name: string;
+    balance: string;
+    paymentDueDay: number;
+    dueReached: boolean;
+    overCreditLimit: boolean;
+  }>;
+  currency: CurrencyCode;
+  icon: 'debt' | 'urgent';
+  dueLabel: string;
+  limitLabel: string;
+}) {
+  const Icon = icon === 'urgent' ? TriangleAlert : CalendarClock;
+  return (
+    <Card>
+      <CardHeader title={title} />
+      <CardBody>
+        {rows.length === 0 ? (
+          <Empty text={empty} />
+        ) : (
+          <ol className="divide-border-subtle divide-y">
+            {rows.map((customer, index) => (
+              <li key={customer.id}>
+                <Link
+                  to={`/customers/${customer.id}`}
+                  className="hover:bg-card-muted flex items-center gap-3 px-2 py-3 transition-colors"
+                >
+                  <span className="bg-danger-soft text-danger flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-fg block truncate text-sm font-semibold">
+                      {customer.name}
+                    </span>
+                    <span className="text-fg-muted mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                      {customer.dueReached ? (
+                        <span>
+                          {dueLabel}: {customer.paymentDueDay}
+                        </span>
+                      ) : null}
+                      {customer.overCreditLimit ? (
+                        <span className="text-danger">{limitLabel}</span>
+                      ) : null}
+                    </span>
+                  </div>
+                  <MoneyText value={customer.balance} currency={currency} tone="debit" size="sm" />
+                  <Icon
+                    className={icon === 'urgent' ? 'text-danger size-4' : 'text-fg-subtle size-4'}
+                    aria-hidden
+                  />
+                </Link>
+              </li>
+            ))}
+          </ol>
+        )}
+      </CardBody>
+    </Card>
+  );
 }

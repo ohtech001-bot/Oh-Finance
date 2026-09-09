@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Check, Pencil, Printer, Trash2, WalletCards } from 'lucide-react';
-import type { OrderDetail, SessionUser } from '@oh/contracts';
+import { Check, Pencil, Trash2, WalletCards } from 'lucide-react';
+import type { Customer, OrderDetail, Payment, StoreSettings } from '@oh/contracts';
 import type { CurrencyCode } from '@oh/money';
 import {
   Button,
@@ -26,6 +26,8 @@ import { useConfirmOrder, useDeleteOrder, useOrder } from './api';
 import { CreateOrderDialog } from './create-order-dialog';
 import { displayOrderNumber } from './order-number';
 import { formatOrderDate, formatOrderTime, orderSettlementDate, printOrder } from './print-order';
+import type { PrintPaperSize } from './print-order';
+import { PrintOrderMenu } from './print-order-menu';
 import { PayOrderDialog } from './pay-order-dialog';
 
 const DATE_COPY = {
@@ -116,17 +118,43 @@ export function OrderDetailsDialog({
     );
   };
 
-  const handlePrint = async () => {
+  const handlePrint = async (paperSize: PrintPaperSize) => {
     if (!order) return;
-    const printWindow = window.open('', '_blank', 'width=420,height=720');
+    const printWindow = window.open(
+      '',
+      '_blank',
+      paperSize === 'A4' ? 'width=1000,height=850' : 'width=420,height=720',
+    );
     if (!printWindow) {
       toast.error('اسمح بفتح نافذة الطباعة من المتصفح.');
       return;
     }
 
     try {
-      const freshUser = await api.get<SessionUser>('/auth/me');
-      printOrder(order, currency, { store: freshUser.store, targetWindow: printWindow });
+      const latestAllocation = order.allocations.at(-1);
+      const [settings, customer, payment] = await Promise.all([
+        api.get<StoreSettings>('/settings'),
+        customerQuery.data
+          ? Promise.resolve(customerQuery.data)
+          : api.get<Customer>(`/customers/${order.customerId}`),
+        latestAllocation
+          ? api.get<Payment>(`/payments/${latestAllocation.paymentId}`)
+          : Promise.resolve(null),
+      ]);
+      printOrder(order, currency, {
+        store: user?.store
+          ? {
+              ...user.store,
+              logoUrl: settings.general.logoUrl || user.store.logoUrl,
+              email: settings.general.email,
+              address: settings.general.address,
+            }
+          : null,
+        customer,
+        payment,
+        paperSize,
+        targetWindow: printWindow,
+      });
     } catch (error) {
       printWindow.close();
       if (error instanceof ApiRequestError) toast.apiError(error.message, error.requestId);
@@ -340,10 +368,7 @@ export function OrderDetailsDialog({
               ) : null}
 
               {order ? (
-                <Button variant="outline" onClick={() => void handlePrint()}>
-                  <Printer aria-hidden />
-                  طباعة الطلب
-                </Button>
+                <PrintOrderMenu className="w-full" onSelect={(size) => void handlePrint(size)} />
               ) : null}
             </div>
           </DialogFooter>

@@ -4,11 +4,28 @@ interface PrintOrderOptions {
     store?: {
         name: string;
         logoUrl: string | null;
+        phone?: string | null;
+        email?: string | null;
+        address?: string | null;
         taxEnabled: boolean;
         taxRate: number;
     } | null;
+    customer?: {
+        phone?: string | null;
+        email?: string | null;
+        city?: string | null;
+        address?: string | null;
+        balance?: string;
+    } | null;
+    payment?: {
+        amount: string;
+        balanceBefore: string;
+        balanceAfter: string;
+    } | null;
+    paperSize?: PrintPaperSize;
     targetWindow?: Window | null;
 }
+export type PrintPaperSize = '80mm' | 'A4';
 export declare function inclusiveTaxBreakdown(total: string, taxEnabled: boolean, taxRate: number, currency: CurrencyCode): {
     beforeTax: string;
     taxAmount: string;

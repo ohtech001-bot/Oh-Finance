@@ -38,6 +38,16 @@ export function prefetchRoute(path: string): void {
 export function prefetchPrimaryRoutes(platform: boolean): void {
   const targets = platform
     ? [loaders.platform, loaders.tenants, loaders.subscriptions, loaders.staff]
-    : [loaders.dashboard, loaders.customers, loaders.orders, loaders.payments];
+    : [
+        loaders.dashboard,
+        loaders.customers,
+        loaders.customerArchive,
+        loaders.orders,
+        loaders.payments,
+        loaders.ledger,
+        loaders.reports,
+        loaders.employees,
+        loaders.settings,
+      ];
   for (const load of targets) void load();
 }
