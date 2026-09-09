@@ -246,7 +246,8 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
           size="icon"
           onClick={toggleTheme}
           aria-label={t(theme === 'dark' ? 'common.lightTheme' : 'common.darkTheme')}
-          className="hidden lg:inline-flex"
+          title={t(theme === 'dark' ? 'common.lightTheme' : 'common.darkTheme')}
+          className="size-9 shrink-0 lg:size-10"
         >
           {theme === 'dark' ? <Sun /> : <Moon />}
         </Button>
