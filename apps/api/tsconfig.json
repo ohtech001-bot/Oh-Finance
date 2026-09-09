@@ -16,7 +16,7 @@
     "declaration": false,
     "declarationMap": false
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.mts"],
   "exclude": [
     "node_modules",
     "dist",

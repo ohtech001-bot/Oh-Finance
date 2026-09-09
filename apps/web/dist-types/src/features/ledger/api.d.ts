@@ -14,46 +14,46 @@ export declare function useStatement(customerId: string | undefined, range?: {
     from?: string;
     to?: string;
 }): import("@tanstack/react-query").UseQueryResult<NoInfer<{
-    customerId: string;
-    customerName: string;
-    customerCode: string;
-    openingBalance: string;
     entries: {
         id: string;
         seq: number;
-        customerId: string;
+        occurredAt: string;
         customerName: string;
-        customerCode: string;
-        entryType: "OPENING_BALANCE" | "ORDER_DEBIT" | "PAYMENT_CREDIT" | "ADJUSTMENT_DEBIT" | "ADJUSTMENT_CREDIT" | "REVERSAL" | "WRITE_OFF";
+        createdAt: string;
+        notes: string | null;
         openingBalance: string;
+        customerId: string;
+        customerCode: string;
+        createdBy: string | null;
+        createdByName: string | null;
+        entryType: "OPENING_BALANCE" | "ORDER_DEBIT" | "PAYMENT_CREDIT" | "ADJUSTMENT_DEBIT" | "ADJUSTMENT_CREDIT" | "REVERSAL" | "WRITE_OFF";
         debit: string;
         credit: string;
         runningBalance: string;
-        refType: "CUSTOMER" | "ORDER" | "PAYMENT" | "ADJUSTMENT";
+        refType: "ORDER" | "PAYMENT" | "CUSTOMER" | "ADJUSTMENT";
         refId: string | null;
         refNumber: string | null;
         reversesEntryId: string | null;
         isReversed: boolean;
-        notes: string | null;
-        occurredAt: string;
-        createdAt: string;
-        createdBy: string | null;
-        createdByName: string | null;
     }[];
     from: string | null;
     to: string | null;
-    closingBalance: string;
+    customerName: string;
+    openingBalance: string;
+    customerId: string;
+    customerCode: string;
     orders: {
         orderId: string;
-        paymentState: "PAID_FROM_CREDIT" | "PAID" | "PARTIALLY_PAID" | "UNPAID";
+        paymentState: "PARTIALLY_PAID" | "PAID" | "UNPAID" | "PAID_FROM_CREDIT";
     }[];
+    generatedAt: string;
+    closingBalance: string;
     totals: {
         totalDebit: string;
         totalCredit: string;
         currentBalance: string;
         entryCount: number;
     };
-    generatedAt: string;
 }>, Error>;
 export {};
 //# sourceMappingURL=api.d.ts.map

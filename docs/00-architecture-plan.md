@@ -606,7 +606,7 @@ GET/POST       /platform/invoices
   .editorconfig · eslint.config.js · .prettierrc
   packages/money/{package.json,tsconfig.json,src/index.ts,src/money.ts,src/rounding.ts,src/money.test.ts}
   packages/contracts/{package.json,tsconfig.json,src/index.ts,src/common.ts,src/money.schema.ts}
-  apps/api/{package.json,tsconfig.json,nest-cli.json,src/main.ts,src/app.module.ts,src/core/config/env.ts}
+  apps/api/{package.json,tsconfig.json,nest-cli.json,src/main.mts,src/app.module.ts,src/core/config/env.ts}
   apps/web/{package.json,tsconfig.json,vite.config.ts,index.html,tailwind.config.ts,
             src/main.tsx,src/app/App.tsx,src/styles/tokens.css,src/styles/globals.css,
             src/components/layout/{AppShell,Sidebar,Topbar,MobileTabBar}.tsx,

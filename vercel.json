@@ -33,11 +33,11 @@
     "api": {
       "root": "apps/api",
       "framework": "nestjs",
-      "entrypoint": "src/main.ts",
+      "entrypoint": "src/main.mts",
       "installCommand": "cd ../.. && npm install --include=dev",
       "buildCommand": "cd ../.. && npm run build:api",
       "functions": {
-        "src/main.ts": {
+        "src/main.mts": {
           "maxDuration": 30
         }
       }

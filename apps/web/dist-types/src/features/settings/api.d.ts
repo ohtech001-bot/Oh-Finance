@@ -4,8 +4,8 @@ export declare function useSettings(): import("@tanstack/react-query").UseQueryR
         email: string | null;
         name: string;
         logoUrl: string | null;
-        address: string | null;
         timezone: string;
+        address: string | null;
         language: "ar" | "he" | "en";
     };
     financial: {
@@ -51,8 +51,8 @@ export declare function useUpdateSettingsSection(): import("@tanstack/react-quer
         email: string | null;
         name: string;
         logoUrl: string | null;
-        address: string | null;
         timezone: string;
+        address: string | null;
         language: "ar" | "he" | "en";
     };
     financial: {

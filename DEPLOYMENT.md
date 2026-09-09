@@ -14,7 +14,7 @@ native adapter.
 - Service definitions and public routing: use the root `vercel.json`
 
 The `web` service builds `apps/web` with Vite. The `api` service builds
-`apps/api` with Vercel's NestJS adapter and recognizes `src/main.ts` as its
+`apps/api` with Vercel's NestJS adapter and recognizes `src/main.mts` as its
 entrypoint. Top-level service rewrites route `/api/*` to NestJS and all remaining
 paths to the web service. The original request path is preserved, including the
 existing `/api` global prefix.

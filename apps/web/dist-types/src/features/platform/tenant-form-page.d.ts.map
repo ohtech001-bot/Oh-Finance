@@ -1,1 +1,1 @@
-{"version":3,"file":"tenant-form-page.d.ts","sourceRoot":"","sources":["../../../../src/features/platform/tenant-form-page.tsx"],"names":[],"mappings":"AAMA,OAAO,EAAiC,KAAK,EAAQ,MAAM,cAAc,CAAC;AA+B1E;;;;;;;;;;;;;;;GAeG;AACH,wBAAgB,cAAc,gCAioB7B;AAED,OAAO,EAAE,KAAK,EAAE,CAAC"}
+{"version":3,"file":"tenant-form-page.d.ts","sourceRoot":"","sources":["../../../../src/features/platform/tenant-form-page.tsx"],"names":[],"mappings":"AAMA,OAAO,EAAiC,KAAK,EAAQ,MAAM,cAAc,CAAC;AA+B1E;;;;;;;;;;;;;;;GAeG;AACH,wBAAgB,cAAc,gCAyoB7B;AAED,OAAO,EAAE,KAAK,EAAE,CAAC"}

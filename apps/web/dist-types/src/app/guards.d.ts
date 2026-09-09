@@ -18,4 +18,5 @@ export declare function RequirePermission({ permission }: {
 }): import("react").JSX.Element;
 /** يمنع الوصول لصفحة الدخول وأنت مسجّل أصلًا. */
 export declare function RedirectIfAuthenticated(): import("react").JSX.Element;
+export declare function RequireNotGeneralManager(): import("react").JSX.Element;
 //# sourceMappingURL=guards.d.ts.map

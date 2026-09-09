@@ -6,7 +6,7 @@
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
-    "start": "node dist/main.js",
+    "start": "node dist/main.mjs",
     "seed": "tsx prisma/seed.ts",
     "test": "vitest run",
     "audit:verify": "tsx src/scripts/verify-audit-chain.ts"

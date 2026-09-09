@@ -55,14 +55,14 @@ export declare function useReports(query: Partial<ReportsQuery>): import("@tanst
         purchases: string;
     }[];
     meta: {
-        storeName: string;
         currency: string;
         timezone: string;
+        storeName: string;
         generatedAt: string;
         range: {
-            preset: "today" | "yesterday" | "last_7_days" | "last_30_days" | "this_month" | "previous_month" | "this_year" | "custom";
             from: string;
             to: string;
+            preset: "custom" | "today" | "yesterday" | "last_7_days" | "last_30_days" | "this_month" | "previous_month" | "this_year";
             granularity: "day" | "week" | "month";
             previousFrom: string;
             previousTo: string;
@@ -71,45 +71,45 @@ export declare function useReports(query: Partial<ReportsQuery>): import("@tanst
         scope: string[];
     };
     salesVsPayments: {
-        payments: string;
         date: string;
+        payments: string;
         sales: string;
     }[];
     ordersByWeekday: {
-        label: string;
         count: number;
+        label: string;
         weekday: number;
     }[];
     ordersByStatus: {
-        status: "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
-        count: number;
+        status: "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID";
         amount: string;
+        count: number;
     }[];
     paymentMethods: {
-        count: number;
         amount: string;
         method: "CASH" | "BANK_TRANSFER" | "CARD" | "CHECK";
+        count: number;
         pct: number;
     }[];
     topProducts: {
         name: string;
-        sales: string;
         quantity: string;
+        sales: string;
     }[];
     employeePerformance: {
+        name: string;
         payments: string;
         orders: number;
-        name: string;
         sales: string;
         userId: string | null;
     }[];
     salesByCategory: {
-        available: boolean;
         reason: string;
+        available: boolean;
     };
     branchReports: {
-        available: boolean;
         reason: string;
+        available: boolean;
     };
 }>, Error>;
 //# sourceMappingURL=api.d.ts.map
