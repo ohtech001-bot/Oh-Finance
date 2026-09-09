@@ -38,7 +38,8 @@
       "buildCommand": "cd ../.. && npm run build:api",
       "functions": {
         "src/main.mts": {
-          "maxDuration": 30
+          "maxDuration": 30,
+          "includeFiles": "package.json"
         }
       }
     }
