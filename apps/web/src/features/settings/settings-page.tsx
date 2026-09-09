@@ -58,18 +58,71 @@ import { useSettings, useUpdateSettingsSection } from './api';
 export function SettingsPage() {
   const { t } = useTranslation();
   const { can } = useAuth();
-  const [activeTab, setActiveTab] = useState('general');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState<string | null>(null);
   const canManage = can(PERMISSIONS.SETTINGS_MANAGE);
   const { data, isLoading, isError, error, refetch } = useSettings();
+  const sections = [
+    {
+      value: 'general',
+      label: t('settings.general'),
+      description: t('settings.generalDescription'),
+      icon: Store,
+    },
+    {
+      value: 'financial',
+      label: t('settings.financial'),
+      description: t('settings.financialDescription'),
+      icon: CircleDollarSign,
+    },
+    {
+      value: 'invoices',
+      label: t('settings.invoices'),
+      description: t('settings.invoicesDescription'),
+      icon: FileText,
+    },
+    {
+      value: 'printing',
+      label: t('settings.printing'),
+      description: t('settings.printingDescription'),
+      icon: Printer,
+    },
+    {
+      value: 'messaging',
+      label: t('settings.messaging'),
+      description: t('settings.messagingDescription'),
+      icon: MessageSquare,
+    },
+    {
+      value: 'activity',
+      label: t('settings.activity'),
+      description: t('settings.activityDescription'),
+      icon: Clock3,
+    },
+    {
+      value: 'subscription',
+      label: t('settings.subscription'),
+      description: t('settings.subscriptionDescription'),
+      icon: Crown,
+    },
+  ];
+  const selectedSection = sections.find((section) => section.value === activeTab);
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={t('nav.settings')}
-        icon={SettingsIcon}
-        description={t('settings.description')}
-      />
+      {selectedSection ? (
+        <SettingsSectionHeader
+          label={selectedSection.label}
+          description={selectedSection.description}
+          icon={selectedSection.icon}
+          onBack={() => setActiveTab(null)}
+        />
+      ) : (
+        <PageHeader
+          title={t('nav.settings')}
+          icon={SettingsIcon}
+          description={t('settings.description')}
+        />
+      )}
 
       {isError ? (
         <Card>
@@ -79,102 +132,84 @@ export function SettingsPage() {
           />
         </Card>
       ) : (
-        <Tabs
-          value={activeTab}
-          onValueChange={(value) => {
-            setActiveTab(value);
-            setMobileMenuOpen(false);
-          }}
-        >
-          <div className={mobileMenuOpen ? 'block' : 'hidden sm:block'}>
+        <Tabs value={activeTab ?? ''} onValueChange={setActiveTab}>
+          {!activeTab ? (
             <TabsList className="grid h-auto w-full grid-cols-2 gap-2 bg-transparent p-0">
-              <SettingsTab
-                value="general"
-                label={t('settings.general')}
-                description={t('settings.generalDescription')}
-                icon={Store}
-              />
-              <SettingsTab
-                value="financial"
-                label={t('settings.financial')}
-                description={t('settings.financialDescription')}
-                icon={CircleDollarSign}
-              />
-              <SettingsTab
-                value="invoices"
-                label={t('settings.invoices')}
-                description={t('settings.invoicesDescription')}
-                icon={FileText}
-              />
-              <SettingsTab
-                value="printing"
-                label={t('settings.printing')}
-                description={t('settings.printingDescription')}
-                icon={Printer}
-              />
-              <SettingsTab
-                value="messaging"
-                label={t('settings.messaging')}
-                description={t('settings.messagingDescription')}
-                icon={MessageSquare}
-              />
-              <SettingsTab
-                value="activity"
-                label={t('settings.activity')}
-                description={t('settings.activityDescription')}
-                icon={Clock3}
-              />
-              <SettingsTab
-                value="subscription"
-                label={t('settings.subscription')}
-                description={t('settings.subscriptionDescription')}
-                icon={Crown}
-              />
+              {sections.map((section) => (
+                <SettingsTab key={section.value} {...section} />
+              ))}
             </TabsList>
-          </div>
-
-          <div className={mobileMenuOpen ? 'hidden sm:block' : 'block'}>
-            <Button
-              variant="ghost"
-              className="mb-2 sm:hidden"
-              onClick={() => setMobileMenuOpen(true)}
-            >
-              <ChevronLeft className="rtl:rotate-180" aria-hidden />
-              {t('settings.allSettings')}
-            </Button>
-
-            {isLoading || !data ? (
-              <Card className="mt-4">
-                <CardBody>{t('common.loading')}</CardBody>
-              </Card>
-            ) : (
-              <>
-                <TabsContent value="general">
-                  <GeneralForm data={data} canManage={canManage} />
-                </TabsContent>
-                <TabsContent value="financial">
-                  <FinancialForm data={data} canManage={canManage} />
-                </TabsContent>
-                <TabsContent value="invoices">
-                  <InvoicesForm data={data} canManage={canManage} />
-                </TabsContent>
-                <TabsContent value="printing">
-                  <PrintingForm data={data} canManage={canManage} />
-                </TabsContent>
-                <TabsContent value="messaging">
-                  <MessagingForm data={data} canManage={canManage} />
-                </TabsContent>
-                <TabsContent value="activity">
-                  <ActivityTab />
-                </TabsContent>
-                <TabsContent value="subscription">
-                  <SubscriptionTab />
-                </TabsContent>
-              </>
-            )}
-          </div>
+          ) : (
+            <div key={activeTab} className="page-enter">
+              {isLoading || !data ? (
+                <Card>
+                  <CardBody>{t('common.loading')}</CardBody>
+                </Card>
+              ) : (
+                <>
+                  <TabsContent value="general">
+                    <GeneralForm data={data} canManage={canManage} />
+                  </TabsContent>
+                  <TabsContent value="financial">
+                    <FinancialForm data={data} canManage={canManage} />
+                  </TabsContent>
+                  <TabsContent value="invoices">
+                    <InvoicesForm data={data} canManage={canManage} />
+                  </TabsContent>
+                  <TabsContent value="printing">
+                    <PrintingForm data={data} canManage={canManage} />
+                  </TabsContent>
+                  <TabsContent value="messaging">
+                    <MessagingForm data={data} canManage={canManage} />
+                  </TabsContent>
+                  <TabsContent value="activity">
+                    <ActivityTab />
+                  </TabsContent>
+                  <TabsContent value="subscription">
+                    <SubscriptionTab />
+                  </TabsContent>
+                </>
+              )}
+            </div>
+          )}
         </Tabs>
       )}
+    </div>
+  );
+}
+
+function SettingsSectionHeader({
+  label,
+  description,
+  icon: Icon,
+  onBack,
+}: {
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  onBack: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="border-border-subtle flex items-center gap-3 border-b pb-4">
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        onClick={onBack}
+        aria-label={t('settings.backToSettings')}
+        title={t('settings.backToSettings')}
+        className="shrink-0"
+      >
+        <ChevronLeft className="size-5 rtl:rotate-180" aria-hidden />
+      </Button>
+      <span className="bg-brand-soft text-brand rounded-icon flex size-11 shrink-0 items-center justify-center">
+        <Icon className="size-5" aria-hidden />
+      </span>
+      <div className="min-w-0">
+        <h1 className="text-fg text-xl font-bold sm:text-2xl">{label}</h1>
+        <p className="text-fg-muted mt-1 text-sm">{description}</p>
+      </div>
     </div>
   );
 }
