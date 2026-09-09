@@ -25,6 +25,20 @@ describe('createCustomerSchema — بيانات التواصل الإلزامي�
     expect(createCustomerSchema.safeParse({ ...valid, phone: '' }).success).toBe(false);
     expect(createCustomerSchema.safeParse({ ...valid, city: '' }).success).toBe(false);
   });
+
+  it('يفرض عشرة أرقام وبداية 05 مع سبب واضح للرفض', () => {
+    const cases = [
+      ['050123456', 'رقم الهاتف يجب أن يتكوّن من 10 أرقام بالضبط.'],
+      ['0412345678', 'رقم الهاتف يجب أن يبدأ بـ 05.'],
+      ['050-123456', 'رقم الهاتف يجب أن يحتوي على أرقام فقط دون مسافات أو رموز.'],
+    ] as const;
+
+    for (const [phone, message] of cases) {
+      const result = createCustomerSchema.safeParse({ ...valid, phone });
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error.issues[0]?.message).toBe(message);
+    }
+  });
 });
 
 describe('moneySchema — المبالغ نصوص لا أرقام', () => {

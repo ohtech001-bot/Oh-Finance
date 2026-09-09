@@ -43,6 +43,20 @@ export const ACCOUNT_STATE_LABELS: Record<AccountState, string> = {
 
 const optionalText = (max: number) => z.string().trim().max(max).optional().or(z.literal(''));
 
+const customerMobilePhoneSchema = z
+  .string()
+  .trim()
+  .superRefine((value, ctx) => {
+    let message: string | null = null;
+    if (!value) message = 'رقم الهاتف مطلوب.';
+    else if (!/^\d+$/.test(value))
+      message = 'رقم الهاتف يجب أن يحتوي على أرقام فقط دون مسافات أو رموز.';
+    else if (value.length !== 10) message = 'رقم الهاتف يجب أن يتكوّن من 10 أرقام بالضبط.';
+    else if (!value.startsWith('05')) message = 'رقم الهاتف يجب أن يبدأ بـ 05.';
+
+    if (message) ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+  });
+
 // ── القراءة ─────────────────────────────────────────────────────────────────
 
 export const customerSchema = z.object({
@@ -139,7 +153,7 @@ export const createCustomerSchema = z.object({
   name: z.string().trim().min(2, 'اسم الزبون مطلوب.').max(160),
   company: optionalText(160),
 
-  phone: phoneSchema,
+  phone: customerMobilePhoneSchema,
   phoneAlt: phoneSchema.optional().or(z.literal('')),
   email: emailSchema.optional().or(z.literal('')),
 

@@ -44,6 +44,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
       paymentDueDate: 'يوم السداد الشهري',
       paymentDueDateHint: 'مثال: 15 يعني أن موعد السداد هو يوم 15 من كل شهر.',
       openingHint: 'الرقم الموجب رصيد للزبون. الرقم السالب (-x أو x-) دين على الزبون.',
+      phoneHint: 'يجب أن يتكوّن من 10 أرقام ويبدأ بـ 05.',
     },
     he: {
       debtLimit: 'מסגרת',
@@ -51,6 +52,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
       paymentDueDate: 'יום התשלום החודשי',
       paymentDueDateHint: 'לדוגמה: 15 פירושו שמועד התשלום הוא בכל 15 בחודש.',
       openingHint: 'מספר חיובי הוא יתרה לזכות הלקוח. מספר שלילי (-x או x-) הוא חוב.',
+      phoneHint: 'המספר חייב להכיל 10 ספרות ולהתחיל ב־05.',
     },
     en: {
       debtLimit: 'Debt limit',
@@ -58,6 +60,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
       paymentDueDate: 'Monthly payment day',
       paymentDueDateHint: 'For example, 15 means payment is due on the 15th of every month.',
       openingHint: 'A positive number is customer credit. A negative number (-x or x-) is debt.',
+      phoneHint: 'Must contain exactly 10 digits and start with 05.',
     },
   }[locale];
   const create = useCreateCustomer();
@@ -169,8 +172,18 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
               {(p) => <Input {...p} {...register('company')} placeholder="اختياري" />}
             </Field>
 
-            <Field label="الهاتف" error={errors.phone?.message} required>
-              {(p) => <Input {...p} {...register('phone')} dir="ltr" placeholder="0501234567" />}
+            <Field label="الهاتف" hint={labels.phoneHint} error={errors.phone?.message} required>
+              {(p) => (
+                <Input
+                  {...p}
+                  {...register('phone')}
+                  dir="ltr"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  placeholder="0501234567"
+                  error={Boolean(errors.phone)}
+                />
+              )}
             </Field>
 
             <Field label="البريد الإلكتروني" error={errors.email?.message}>
@@ -186,7 +199,14 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
             </Field>
 
             <Field label="المدينة" error={errors.city?.message} required>
-              {(p) => <Input {...p} {...register('city')} placeholder="الرياض" />}
+              {(p) => (
+                <Input
+                  {...p}
+                  {...register('city')}
+                  placeholder="صندلة"
+                  error={Boolean(errors.city)}
+                />
+              )}
             </Field>
 
             <Field label="الرقم الضريبي" error={errors.taxNumber?.message}>
