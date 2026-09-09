@@ -1,0 +1,22 @@
+{
+  "id": "/",
+  "name": "OH Finance",
+  "short_name": "OH Finance",
+  "description": "نظام إدارة الزبائن والطلبات والدفعات والديون",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#ffffff",
+  "theme_color": "#21833f",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

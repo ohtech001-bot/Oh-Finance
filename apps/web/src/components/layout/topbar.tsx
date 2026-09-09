@@ -110,7 +110,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
   const roleLabel = user?.role ? (ROLE_LABELS[user.role as RoleName]?.[locale] ?? user.role) : '';
 
   return (
-    <header className="border-border bg-card lg:h-topbar relative flex h-[124px] shrink-0 items-center gap-1 border-b px-3 pb-[52px] lg:gap-3 lg:px-6 lg:pb-0">
+    <header className="border-border bg-card lg:h-topbar relative flex h-[calc(124px+env(safe-area-inset-top))] shrink-0 items-center gap-1 border-b px-3 pb-[52px] pt-[env(safe-area-inset-top)] lg:gap-3 lg:px-6 lg:pb-0 lg:pt-0">
       {/* زر القائمة — موبايل فقط */}
       <Button
         variant="ghost"

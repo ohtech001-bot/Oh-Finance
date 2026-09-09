@@ -18,6 +18,12 @@ import { LOCALES } from '@oh/config';
 import { StartupLoader } from './features/loading/startup-loader';
 import { FullPageLoader } from './components/full-page-loader';
 
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register('/service-worker.js');
+  });
+}
+
 function LocalizedToaster() {
   useTranslation();
   return <Toaster dir={LOCALES[currentLocale()].dir} />;
