@@ -7,6 +7,7 @@
 export declare function useEntityActivity(entityType: string, entityId: string | undefined, enabled?: boolean): import("@tanstack/react-query").UseQueryResult<NoInfer<{
     id: string;
     seq: string;
+    createdAt: string;
     action: string;
     actorId: string | null;
     actorName: string | null;
@@ -14,6 +15,5 @@ export declare function useEntityActivity(entityType: string, entityId: string |
     entityId: string | null;
     actorIp: string | null;
     summary: string;
-    createdAt: string;
 }[]>, Error>;
 //# sourceMappingURL=api.d.ts.map

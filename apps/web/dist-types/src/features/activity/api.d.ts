@@ -10,14 +10,14 @@ import type { ActivityFilters, PaginatedResult } from '@oh/contracts';
 export declare function useStoreActivityFeed(filters: Partial<ActivityFilters>, enabled?: boolean): import("@tanstack/react-query").UseQueryResult<NoInfer<PaginatedResult<{
     id: string;
     seq: string;
-    category: "ORDER" | "PAYMENT" | "CUSTOMER" | "LEDGER" | "SYSTEM";
+    occurredAt: string;
+    category: "CUSTOMER" | "ORDER" | "PAYMENT" | "LEDGER" | "SYSTEM";
     action: string;
     title: string;
     actorId: string | null;
     actorName: string | null;
     entityType: string | null;
     entityId: string | null;
-    occurredAt: string;
 }>>, Error>;
 /**
  * الخط الزمني لزبون. يتطلب `customers.read` للوصول؛ وتُرشَّح أنواع الأحداث
@@ -26,13 +26,13 @@ export declare function useStoreActivityFeed(filters: Partial<ActivityFilters>, 
 export declare function useCustomerActivityFeed(customerId: string, filters: Partial<ActivityFilters>, enabled?: boolean): import("@tanstack/react-query").UseQueryResult<NoInfer<PaginatedResult<{
     id: string;
     seq: string;
-    category: "ORDER" | "PAYMENT" | "CUSTOMER" | "LEDGER" | "SYSTEM";
+    occurredAt: string;
+    category: "CUSTOMER" | "ORDER" | "PAYMENT" | "LEDGER" | "SYSTEM";
     action: string;
     title: string;
     actorId: string | null;
     actorName: string | null;
     entityType: string | null;
     entityId: string | null;
-    occurredAt: string;
 }>>, Error>;
 //# sourceMappingURL=api.d.ts.map

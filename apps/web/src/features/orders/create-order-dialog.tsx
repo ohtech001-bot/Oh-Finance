@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Plus, Search, Trash2 } from 'lucide-react';
 import type { Customer, OrderDetail, OrderItemInput, PaginatedResult } from '@oh/contracts';
 import {
   add,
@@ -73,6 +73,9 @@ export function CreateOrderDialog({
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
 
   const [customerId, setCustomerId] = useState(fixedCustomerId ?? '');
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [debouncedCustomerSearch, setDebouncedCustomerSearch] = useState('');
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
   const [items, setItems] = useState<DraftItem[]>([emptyItem()]);
   const [discount, setDiscount] = useState('0');
   const [notes, setNotes] = useState('');
@@ -85,14 +88,25 @@ export function CreateOrderDialog({
   const customerCredit = useCustomerCredit(customerId || undefined, open && !order);
 
   const customersQuery = useQuery({
-    queryKey: ['customers', 'picker'],
+    queryKey: ['customers', 'picker', debouncedCustomerSearch],
     queryFn: () =>
-      api.get<PaginatedResult<Customer>>('/customers?pageSize=100&sortBy=name&sortOrder=asc'),
-    enabled: open && !fixedCustomerId && !order,
+      api.get<PaginatedResult<Customer>>(
+        `/customers?pageSize=5&sortBy=name&sortOrder=asc&search=${encodeURIComponent(debouncedCustomerSearch)}`,
+      ),
+    enabled: open && !fixedCustomerId && !order && debouncedCustomerSearch.length > 0,
   });
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedCustomerSearch(customerSearch.trim()), 150);
+    return () => window.clearTimeout(timer);
+  }, [customerSearch]);
+
   useEffect(() => {
     if (open) {
       setCustomerId(order?.customerId ?? fixedCustomerId ?? '');
+      setCustomerSearch('');
+      setDebouncedCustomerSearch('');
+      setCustomerPickerOpen(false);
       setItems(
         order
           ? order.items.map((item) => ({
@@ -286,19 +300,61 @@ export function CreateOrderDialog({
           {!fixedCustomerId && !order ? (
             <Field label="الزبون" required>
               {(p) => (
-                <select
-                  {...p}
-                  value={customerId}
-                  onChange={(e) => setCustomerId(e.target.value)}
-                  className="rounded-ctrl border-border bg-card focus-visible:ring-ring h-11 w-full border px-3 text-sm focus-visible:outline-none focus-visible:ring-2"
-                >
-                  <option value="">اختر زبونًا…</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <Input
+                    {...p}
+                    value={customerSearch}
+                    onChange={(event) => {
+                      setCustomerSearch(event.target.value);
+                      setCustomerId('');
+                      setCustomerPickerOpen(true);
+                    }}
+                    onFocus={() => setCustomerPickerOpen(true)}
+                    onBlur={() => window.setTimeout(() => setCustomerPickerOpen(false), 150)}
+                    placeholder="اكتب اسم الزبون…"
+                    startIcon={<Search className="size-4" />}
+                    autoComplete="off"
+                  />
+                  {customerPickerOpen && debouncedCustomerSearch ? (
+                    <div className="border-border bg-card shadow-pop rounded-card absolute inset-x-0 top-[calc(100%+6px)] z-50 max-h-64 overflow-y-auto border p-1.5">
+                      {customersQuery.isLoading ? (
+                        <p className="text-fg-muted px-3 py-4 text-center text-sm">جارٍ البحث…</p>
+                      ) : customers.length === 0 ? (
+                        <p className="text-fg-muted px-3 py-4 text-center text-sm">
+                          لا يوجد زبون مطابق.
+                        </p>
+                      ) : (
+                        customers.map((customer) => (
+                          <button
+                            key={customer.id}
+                            type="button"
+                            className="hover:bg-card-muted rounded-ctrl flex w-full items-center gap-3 px-3 py-2.5 text-start transition-colors"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => {
+                              setCustomerId(customer.id);
+                              setCustomerSearch(customer.name);
+                              setCustomerPickerOpen(false);
+                            }}
+                          >
+                            <span className="min-w-0 flex-1">
+                              <span className="text-fg block truncate text-sm font-semibold">
+                                {customer.name}
+                              </span>
+                              {customer.phone ? (
+                                <span className="text-fg-muted mt-0.5 block text-xs" dir="ltr">
+                                  {customer.phone}
+                                </span>
+                              ) : null}
+                            </span>
+                            {customerId === customer.id ? (
+                              <Check className="text-brand size-4 shrink-0" aria-hidden />
+                            ) : null}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  ) : null}
+                </div>
               )}
             </Field>
           ) : null}

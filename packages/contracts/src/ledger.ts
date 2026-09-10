@@ -71,6 +71,8 @@ export const ledgerEntrySchema = z.object({
   refId: uuidSchema.nullable(),
   /** رقم الطلب/الدفعة المرجعي — للعرض في الجدول. */
   refNumber: z.string().nullable(),
+  /** أرقام الطلبات التي وُزّعت عليها الدفعة؛ فارغة للدفعة العامة وبقية الحركات. */
+  relatedOrderNumbers: z.array(z.string()),
 
   reversesEntryId: uuidSchema.nullable(),
   /** true إن كان هذا القيد قد عُكس بقيد لاحق. */

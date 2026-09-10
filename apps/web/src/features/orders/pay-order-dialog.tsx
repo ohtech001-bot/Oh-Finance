@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { OrderDetail } from '@oh/contracts';
-import { greaterThan, type CurrencyCode } from '@oh/money';
+import { greaterThan, min, subtract, toMoneyString, type CurrencyCode } from '@oh/money';
 import {
   Button,
   Dialog,
@@ -43,6 +43,11 @@ export function PayOrderDialog({
   const createPayment = useCreatePayment();
   const applyCredit = useApplyCustomerCredit();
   const pending = createPayment.isPending || applyCredit.isPending;
+  const validAmount = /^\d+(\.\d{1,4})?$/.test(amount) && greaterThan(amount, '0');
+  const excessAmount =
+    order && validAmount && greaterThan(amount, order.remainingAmount)
+      ? toMoneyString(subtract(amount, order.remainingAmount), 2)
+      : '0.00';
 
   useEffect(() => {
     if (!open) return;
@@ -56,11 +61,6 @@ export function PayOrderDialog({
       toast.error('أدخل مبلغًا صحيحًا أكبر من صفر.');
       return;
     }
-    if (greaterThan(amount, order.remainingAmount)) {
-      toast.error('المبلغ يتجاوز المتبقي على الطلب.');
-      return;
-    }
-
     const callbacks = {
       onSuccess: () => {
         toast.success(
@@ -81,10 +81,15 @@ export function PayOrderDialog({
         toast.error('المبلغ يتجاوز رصيد الزبون المتاح.');
         return;
       }
+      if (greaterThan(amount, order.remainingAmount)) {
+        toast.error('لا يمكن استخدام رصيد أكبر من المبلغ المتبقي على الطلب.');
+        return;
+      }
       applyCredit.mutate({ body: { orderId: order.id, amount }, idempotencyKey }, callbacks);
       return;
     }
 
+    const allocationAmount = toMoneyString(min(amount, order.remainingAmount), 2);
     createPayment.mutate(
       {
         body: {
@@ -92,7 +97,7 @@ export function PayOrderDialog({
           amount,
           method: 'CASH',
           strategy: 'MANUAL',
-          allocations: [{ orderId: order.id, amount }],
+          allocations: [{ orderId: order.id, amount: allocationAmount }],
         },
         idempotencyKey,
       },
@@ -155,6 +160,13 @@ export function PayOrderDialog({
               ? 'لن تُسجّل دفعة نقدية جديدة؛ سيُستخدم الرصيد السابق فقط.'
               : 'سيُسجّل المبلغ كدفعة نقدية استلمها المحل.'}
           </p>
+
+          {!useCredit && greaterThan(excessAmount, '0') ? (
+            <div className="bg-success-soft text-success rounded-ctrl border-current/20 border p-3 text-sm">
+              سيُسدَّد الطلب بالكامل، ويُحفظ المبلغ الزائد كرصيد للزبون بقيمة{' '}
+              <MoneyText value={excessAmount} currency={currency} tone="credit" size="sm" />.
+            </div>
+          ) : null}
         </DialogBody>
         <DialogFooter>
           <Button variant="brand" onClick={submit} loading={pending}>

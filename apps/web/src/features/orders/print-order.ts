@@ -38,6 +38,12 @@ interface PrintOrderOptions {
 
 export type PrintPaperSize = '80mm' | 'A4';
 
+type OrderPrintWindow = Window & {
+  closePrintPreview?: () => void;
+  printReceipt?: () => void;
+  shareReceiptPdf?: () => Promise<void>;
+};
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
@@ -96,12 +102,65 @@ export function formatOrderTime(value: string | Date): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+function whatsappNumber(phone?: string | null): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, '');
+  if (/^05\d{8}$/.test(digits)) return `972${digits.slice(1)}`;
+  if (digits.startsWith('00')) return digits.slice(2);
+  return digits.length >= 8 ? digits : null;
+}
+
+async function createReceiptPdf(win: Window, paperSize: PrintPaperSize): Promise<Blob> {
+  const receipt = win.document.querySelector<HTMLElement>('.receipt');
+  if (!receipt) throw new Error('Receipt element is missing');
+
+  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+    import('html2canvas'),
+    import('jspdf'),
+  ]);
+  const canvas = await html2canvas(receipt, {
+    backgroundColor: '#ffffff',
+    scale: 2,
+    useCORS: true,
+  });
+  const image = canvas.toDataURL('image/jpeg', 0.96);
+
+  if (paperSize === '80mm') {
+    const pageWidth = 80;
+    const imageHeight = (canvas.height * pageWidth) / canvas.width;
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: [pageWidth, Math.max(imageHeight, 40)],
+    });
+    pdf.addImage(image, 'JPEG', 0, 0, pageWidth, imageHeight);
+    return pdf.output('blob');
+  }
+
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const margin = 10;
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const imageWidth = pageWidth - margin * 2;
+  const imageHeight = (canvas.height * imageWidth) / canvas.width;
+  const printableHeight = pageHeight - margin * 2;
+
+  let offset = 0;
+  while (offset < imageHeight) {
+    if (offset > 0) pdf.addPage();
+    pdf.addImage(image, 'JPEG', margin, margin - offset, imageWidth, imageHeight);
+    offset += printableHeight;
+  }
+  return pdf.output('blob');
+}
+
 export function printOrder(
   order: OrderDetail,
   currency: CurrencyCode,
   options: PrintOrderOptions = {},
 ) {
-  const win = options.targetWindow ?? window.open('', '_blank', 'width=420,height=720');
+  const win = (options.targetWindow ??
+    window.open('', '_blank', 'width=420,height=720')) as OrderPrintWindow | null;
   if (!win) return;
 
   const money = (value: string) => escapeHtml(formatMoney(value, { currency }));
@@ -161,6 +220,62 @@ export function printOrder(
       ? `<div class="total-row"><span>الخصم</span><strong>- ${money(order.discountAmount)}</strong></div>`
       : '';
 
+  const filename = `order-${displayOrderNumber(order.number)}.pdf`;
+  const customerWhatsapp = whatsappNumber(options.customer?.phone);
+
+  win.closePrintPreview = () => {
+    win.opener?.focus();
+    win.close();
+  };
+  win.printReceipt = () => win.print();
+  win.shareReceiptPdf = async () => {
+    const shareButton = win.document.querySelector<HTMLButtonElement>('[data-share-pdf]');
+    const originalText = shareButton?.textContent ?? '';
+    if (shareButton) {
+      shareButton.disabled = true;
+      shareButton.textContent = 'جارٍ تجهيز PDF...';
+    }
+
+    try {
+      const blob = await createReceiptPdf(win, paperSize);
+      const file = new File([blob], filename, { type: 'application/pdf' });
+      const shareData: ShareData = {
+        files: [file],
+        title: `طلب ${displayOrderNumber(order.number)}`,
+        text: `طلب ${displayOrderNumber(order.number)} - ${order.customerName}`,
+      };
+
+      if (win.navigator.share && (!win.navigator.canShare || win.navigator.canShare(shareData))) {
+        await win.navigator.share(shareData);
+        return;
+      }
+
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = win.document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 30_000);
+
+      if (customerWhatsapp) {
+        win.open(
+          `https://wa.me/${customerWhatsapp}?text=${encodeURIComponent(`طلب ${displayOrderNumber(order.number)} جاهز بصيغة PDF. أرفق الملف الذي تم تنزيله.`)}`,
+          '_blank',
+          'noopener,noreferrer',
+        );
+      }
+      win.alert('تم تنزيل ملف PDF. أرفقه في محادثة واتساب للزبون.');
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      win.alert('تعذر إنشاء ملف PDF. حاول مرة أخرى.');
+    } finally {
+      if (shareButton) {
+        shareButton.disabled = false;
+        shareButton.textContent = originalText;
+      }
+    }
+  };
+
   win.document.write(`<!doctype html>
   <html lang="ar" dir="rtl">
   <head>
@@ -171,6 +286,10 @@ export function printOrder(
       @page{size:${a4 ? 'A4' : '80mm auto'};margin:${a4 ? '14mm' : '3mm'}}
       html,body{width:${a4 ? '100%' : '74mm'};margin:0;padding:0;background:#fff;color:#111}
       body{font-family:Arial,Tahoma,sans-serif;font-size:${a4 ? '13px' : '11px'};line-height:1.45}
+      .print-toolbar{position:sticky;top:0;z-index:10;display:flex;gap:8px;justify-content:center;width:100%;padding:10px;background:#f8fafc;border-bottom:1px solid #dbe3ed;direction:rtl}
+      .print-toolbar button{min-height:38px;padding:7px 12px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#172033;font:700 13px Arial,Tahoma,sans-serif;cursor:pointer}
+      .print-toolbar button.primary{border-color:#218a43;background:#218a43;color:#fff}
+      .print-toolbar button:disabled{cursor:wait;opacity:.65}
       .receipt{width:100%;max-width:${a4 ? '182mm' : 'none'};margin:0 auto;padding:1mm 0}
       .store{text-align:center;padding-bottom:3mm;border-bottom:1px dashed #555}
       .logo{display:block;max-width:24mm;max-height:18mm;object-fit:contain;margin:0 auto 1.5mm}
@@ -190,10 +309,15 @@ export function printOrder(
       .tax-note{font-size:9px;color:#444;margin-top:1mm}
       .grand-total{font-size:14px;border-top:1.5px solid #111;margin-top:1.5mm;padding-top:1.5mm}
       .footer{text-align:center;padding-top:3mm;font-size:9px}
-      @media print{html,body{width:${a4 ? '100%' : '74mm'}}.receipt{break-inside:avoid}}
+      @media print{html,body{width:${a4 ? '100%' : '74mm'}}.print-toolbar{display:none!important}.receipt{break-inside:avoid}}
     </style>
   </head>
   <body>
+    <nav class="print-toolbar" aria-label="إجراءات الطباعة">
+      <button type="button" onclick="window.closePrintPreview()">رجوع ←</button>
+      <button class="primary" type="button" onclick="window.printReceipt()">طباعة</button>
+      <button type="button" data-share-pdf onclick="window.shareReceiptPdf()">مشاركة PDF</button>
+    </nav>
     <main class="receipt">
       <header class="store">
         ${logo}

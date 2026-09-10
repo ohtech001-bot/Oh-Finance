@@ -99,6 +99,8 @@ export interface DateRangeFilterProps {
   onFromChange: (value: string) => void;
   onToChange: (value: string) => void;
   className?: string;
+  fromLabel?: string;
+  toLabel?: string;
 }
 
 /**
@@ -114,28 +116,36 @@ export function DateRangeFilter({
   onFromChange,
   onToChange,
   className,
+  fromLabel = 'من تاريخ',
+  toLabel = 'إلى تاريخ',
 }: DateRangeFilterProps) {
   return (
-    <div className={cn('flex items-center gap-2', className)}>
-      <Input
-        type="date"
-        value={from}
-        onChange={(e) => onFromChange(e.target.value)}
-        // `max` يمنع اختيار مدى مقلوب في الواجهة أصلًا — الخادم يتحقق أيضًا.
-        max={to || undefined}
-        startIcon={<Calendar className="size-4" />}
-        aria-label="من تاريخ"
-        className="w-[165px]"
-      />
-      <Input
-        type="date"
-        value={to}
-        onChange={(e) => onToChange(e.target.value)}
-        min={from || undefined}
-        startIcon={<Calendar className="size-4" />}
-        aria-label="إلى تاريخ"
-        className="w-[165px]"
-      />
+    <div className={cn('grid w-full grid-cols-2 gap-2 sm:w-auto', className)}>
+      <label className="min-w-0 space-y-1">
+        <span className="text-fg-muted block text-xs font-medium">{fromLabel}</span>
+        <Input
+          type="date"
+          value={from}
+          onChange={(e) => onFromChange(e.target.value)}
+          // `max` يمنع اختيار مدى مقلوب في الواجهة أصلًا — الخادم يتحقق أيضًا.
+          max={to || undefined}
+          startIcon={<Calendar className="size-4" />}
+          aria-label={fromLabel}
+          className="w-full sm:w-[165px]"
+        />
+      </label>
+      <label className="min-w-0 space-y-1">
+        <span className="text-fg-muted block text-xs font-medium">{toLabel}</span>
+        <Input
+          type="date"
+          value={to}
+          onChange={(e) => onToChange(e.target.value)}
+          min={from || undefined}
+          startIcon={<Calendar className="size-4" />}
+          aria-label={toLabel}
+          className="w-full sm:w-[165px]"
+        />
+      </label>
     </div>
   );
 }

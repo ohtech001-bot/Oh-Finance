@@ -1,14 +1,14 @@
 import type { CreateOrderRequest, OrderListQuery, PaginatedResult } from '@oh/contracts';
 export declare function useOrders(query: Partial<OrderListQuery>, enabled?: boolean): import("@tanstack/react-query").UseQueryResult<NoInfer<PaginatedResult<{
     number: string;
-    status: "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID";
-    total: string;
     id: string;
-    customerName: string;
-    createdAt: string;
-    notes: string | null;
     customerId: string;
+    customerName: string;
     customerCode: string;
+    status: "PAID" | "PARTIALLY_PAID" | "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED";
+    notes: string | null;
+    createdAt: string;
+    total: string;
     issuedAt: string;
     dueAt: string | null;
     subtotal: string;
@@ -39,7 +39,13 @@ export declare function useOrderStats(query: Partial<OrderListQuery>): import("@
 }>, Error>;
 export declare function useOrder(id: string | undefined): import("@tanstack/react-query").UseQueryResult<NoInfer<{
     number: string;
-    status: "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID";
+    id: string;
+    customerId: string;
+    customerName: string;
+    customerCode: string;
+    status: "PAID" | "PARTIALLY_PAID" | "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED";
+    notes: string | null;
+    createdAt: string;
     items: {
         id: string;
         description: string | null;
@@ -54,12 +60,6 @@ export declare function useOrder(id: string | undefined): import("@tanstack/reac
         lineTotal: string;
     }[];
     total: string;
-    id: string;
-    customerName: string;
-    createdAt: string;
-    notes: string | null;
-    customerId: string;
-    customerCode: string;
     issuedAt: string;
     dueAt: string | null;
     subtotal: string;
@@ -86,7 +86,13 @@ export declare function useOrder(id: string | undefined): import("@tanstack/reac
 }>, Error>;
 export declare function useCreateOrder(): import("@tanstack/react-query").UseMutationResult<{
     number: string;
-    status: "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID";
+    id: string;
+    customerId: string;
+    customerName: string;
+    customerCode: string;
+    status: "PAID" | "PARTIALLY_PAID" | "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED";
+    notes: string | null;
+    createdAt: string;
     items: {
         id: string;
         description: string | null;
@@ -101,12 +107,6 @@ export declare function useCreateOrder(): import("@tanstack/react-query").UseMut
         lineTotal: string;
     }[];
     total: string;
-    id: string;
-    customerName: string;
-    createdAt: string;
-    notes: string | null;
-    customerId: string;
-    customerCode: string;
     issuedAt: string;
     dueAt: string | null;
     subtotal: string;
@@ -131,6 +131,7 @@ export declare function useCreateOrder(): import("@tanstack/react-query").UseMut
         method: string;
     }[];
 }, Error, {
+    customerId: string;
     status: "DRAFT" | "QUOTE" | "CONFIRMED";
     items: {
         name: string;
@@ -142,7 +143,6 @@ export declare function useCreateOrder(): import("@tanstack/react-query").UseMut
         description?: string | undefined;
         sourceId?: string | undefined;
     }[];
-    customerId: string;
     discountAmount: string;
     notes?: string | undefined;
     issuedAt?: string | undefined;
@@ -150,7 +150,13 @@ export declare function useCreateOrder(): import("@tanstack/react-query").UseMut
 }, unknown>;
 export declare function useUpdateOrder(id: string): import("@tanstack/react-query").UseMutationResult<{
     number: string;
-    status: "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID";
+    id: string;
+    customerId: string;
+    customerName: string;
+    customerCode: string;
+    status: "PAID" | "PARTIALLY_PAID" | "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED";
+    notes: string | null;
+    createdAt: string;
     items: {
         id: string;
         description: string | null;
@@ -165,12 +171,6 @@ export declare function useUpdateOrder(id: string): import("@tanstack/react-quer
         lineTotal: string;
     }[];
     total: string;
-    id: string;
-    customerName: string;
-    createdAt: string;
-    notes: string | null;
-    customerId: string;
-    customerCode: string;
     issuedAt: string;
     dueAt: string | null;
     subtotal: string;
@@ -196,6 +196,8 @@ export declare function useUpdateOrder(id: string): import("@tanstack/react-quer
     }[];
 }, Error, {
     version: number;
+    customerId?: string | undefined;
+    notes?: string | undefined;
     items?: {
         name: string;
         taxRate: string;
@@ -206,8 +208,6 @@ export declare function useUpdateOrder(id: string): import("@tanstack/react-quer
         description?: string | undefined;
         sourceId?: string | undefined;
     }[] | undefined;
-    notes?: string | undefined;
-    customerId?: string | undefined;
     issuedAt?: string | undefined;
     dueAt?: string | undefined;
     discountAmount?: string | undefined;
@@ -225,7 +225,13 @@ export declare function usePreviewOrder(): import("@tanstack/react-query").UseMu
 }, unknown>;
 export declare function useConfirmOrder(id: string): import("@tanstack/react-query").UseMutationResult<{
     number: string;
-    status: "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID";
+    id: string;
+    customerId: string;
+    customerName: string;
+    customerCode: string;
+    status: "PAID" | "PARTIALLY_PAID" | "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED";
+    notes: string | null;
+    createdAt: string;
     items: {
         id: string;
         description: string | null;
@@ -240,12 +246,6 @@ export declare function useConfirmOrder(id: string): import("@tanstack/react-que
         lineTotal: string;
     }[];
     total: string;
-    id: string;
-    customerName: string;
-    createdAt: string;
-    notes: string | null;
-    customerId: string;
-    customerCode: string;
     issuedAt: string;
     dueAt: string | null;
     subtotal: string;
@@ -277,7 +277,13 @@ export declare function useConfirmOrder(id: string): import("@tanstack/react-que
 }, unknown>;
 export declare function useCancelOrder(id: string): import("@tanstack/react-query").UseMutationResult<{
     number: string;
-    status: "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID";
+    id: string;
+    customerId: string;
+    customerName: string;
+    customerCode: string;
+    status: "PAID" | "PARTIALLY_PAID" | "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED";
+    notes: string | null;
+    createdAt: string;
     items: {
         id: string;
         description: string | null;
@@ -292,12 +298,6 @@ export declare function useCancelOrder(id: string): import("@tanstack/react-quer
         lineTotal: string;
     }[];
     total: string;
-    id: string;
-    customerName: string;
-    createdAt: string;
-    notes: string | null;
-    customerId: string;
-    customerCode: string;
     issuedAt: string;
     dueAt: string | null;
     subtotal: string;
@@ -322,12 +322,18 @@ export declare function useCancelOrder(id: string): import("@tanstack/react-quer
         method: string;
     }[];
 }, Error, {
-    version: number;
     reason: string;
+    version: number;
 }, unknown>;
 export declare function useDuplicateOrder(): import("@tanstack/react-query").UseMutationResult<{
     number: string;
-    status: "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID";
+    id: string;
+    customerId: string;
+    customerName: string;
+    customerCode: string;
+    status: "PAID" | "PARTIALLY_PAID" | "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED";
+    notes: string | null;
+    createdAt: string;
     items: {
         id: string;
         description: string | null;
@@ -342,12 +348,6 @@ export declare function useDuplicateOrder(): import("@tanstack/react-query").Use
         lineTotal: string;
     }[];
     total: string;
-    id: string;
-    customerName: string;
-    createdAt: string;
-    notes: string | null;
-    customerId: string;
-    customerCode: string;
     issuedAt: string;
     dueAt: string | null;
     subtotal: string;
@@ -378,7 +378,13 @@ export declare function useDeleteOrder(): import("@tanstack/react-query").UseMut
 }, unknown>;
 export declare function useArchiveOrder(): import("@tanstack/react-query").UseMutationResult<{
     number: string;
-    status: "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID";
+    id: string;
+    customerId: string;
+    customerName: string;
+    customerCode: string;
+    status: "PAID" | "PARTIALLY_PAID" | "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED";
+    notes: string | null;
+    createdAt: string;
     items: {
         id: string;
         description: string | null;
@@ -393,12 +399,6 @@ export declare function useArchiveOrder(): import("@tanstack/react-query").UseMu
         lineTotal: string;
     }[];
     total: string;
-    id: string;
-    customerName: string;
-    createdAt: string;
-    notes: string | null;
-    customerId: string;
-    customerCode: string;
     issuedAt: string;
     dueAt: string | null;
     subtotal: string;
@@ -429,7 +429,13 @@ export declare function useArchiveOrder(): import("@tanstack/react-query").UseMu
 }, unknown>;
 export declare function useRevertToDraft(): import("@tanstack/react-query").UseMutationResult<{
     number: string;
-    status: "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID";
+    id: string;
+    customerId: string;
+    customerName: string;
+    customerCode: string;
+    status: "PAID" | "PARTIALLY_PAID" | "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED";
+    notes: string | null;
+    createdAt: string;
     items: {
         id: string;
         description: string | null;
@@ -444,12 +450,6 @@ export declare function useRevertToDraft(): import("@tanstack/react-query").UseM
         lineTotal: string;
     }[];
     total: string;
-    id: string;
-    customerName: string;
-    createdAt: string;
-    notes: string | null;
-    customerId: string;
-    customerCode: string;
     issuedAt: string;
     dueAt: string | null;
     subtotal: string;

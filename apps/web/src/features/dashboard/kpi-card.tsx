@@ -17,6 +17,7 @@ import { formatMoney, type CurrencyCode } from '@oh/money';
 import { Card, CardBody, cn } from '@oh/ui';
 import { useTranslation } from 'react-i18next';
 import { currentLocale } from '@/lib/i18n';
+import { useState } from 'react';
 
 /**
  * بطاقة مؤشر — قيمة منسّقة حسب الوحدة، مقارنة بالفترة السابقة، واتجاه ملوّن.
@@ -94,6 +95,7 @@ function formatValue(m: KpiMetric, currency: CurrencyCode): string {
 }
 
 export function KpiCard({ metric, currency }: { metric: KpiMetric; currency: CurrencyCode }) {
+  const [showDefinition, setShowDefinition] = useState(false);
   const { t } = useTranslation();
   const meta = DASHBOARD_KPI_META[metric.id];
   const Icon = KPI_ICON[metric.id];
@@ -120,15 +122,23 @@ export function KpiCard({ metric, currency }: { metric: KpiMetric; currency: Cur
             </span>
             {label}
           </span>
-          <span
-            className="text-fg-subtle cursor-help"
+          <button
+            type="button"
+            className="text-fg-subtle hover:bg-card-muted hover:text-fg rounded-full p-1 transition-colors"
             title={definition}
             aria-label={t('dashboard.calculationMethod', { label, definition })}
-            tabIndex={0}
+            aria-expanded={showDefinition}
+            onClick={() => setShowDefinition((current) => !current)}
           >
             <Info className="size-3.5" aria-hidden />
-          </span>
+          </button>
         </div>
+
+        {showDefinition ? (
+          <div className="border-border-subtle bg-card/80 text-fg-muted rounded-ctrl border px-3 py-2 text-xs leading-5">
+            {definition}
+          </div>
+        ) : null}
 
         <p className="text-fg text-xl font-semibold tabular-nums" dir="ltr">
           {formatValue(metric, currency)}

@@ -1,18 +1,20 @@
 import type { ApplyCustomerCreditRequest, CreatePaymentRequest, PaginatedResult, PaymentListQuery } from '@oh/contracts';
 export declare function usePayments(query: Partial<PaymentListQuery>, enabled?: boolean): import("@tanstack/react-query").UseQueryResult<NoInfer<PaginatedResult<{
     number: string;
-    status: "POSTED" | "REVERSED";
     id: string;
-    customerName: string;
-    amount: string;
-    createdAt: string;
-    notes: string | null;
     customerId: string;
+    customerName: string;
     customerCode: string;
+    status: "POSTED" | "REVERSED";
+    notes: string | null;
+    createdAt: string;
+    createdBy: string | null;
+    createdByName: string | null;
+    amount: string;
     allocations: {
+        orderId: string;
         amount: string;
         orderNumber: string;
-        orderId: string;
         orderTotal: string;
     }[];
     paidAt: string;
@@ -23,8 +25,6 @@ export declare function usePayments(query: Partial<PaymentListQuery>, enabled?: 
     unallocatedAmount: string;
     reversedAt: string | null;
     reverseReason: string | null;
-    createdBy: string | null;
-    createdByName: string | null;
 }>>, Error>;
 export declare function usePaymentStats(query: Partial<PaymentListQuery>): import("@tanstack/react-query").UseQueryResult<NoInfer<{
     totalAmount: string;
@@ -51,18 +51,20 @@ export declare function usePaymentStats(query: Partial<PaymentListQuery>): impor
 }>, Error>;
 export declare function usePayment(id: string | undefined): import("@tanstack/react-query").UseQueryResult<NoInfer<{
     number: string;
-    status: "POSTED" | "REVERSED";
     id: string;
-    customerName: string;
-    amount: string;
-    createdAt: string;
-    notes: string | null;
     customerId: string;
+    customerName: string;
     customerCode: string;
+    status: "POSTED" | "REVERSED";
+    notes: string | null;
+    createdAt: string;
+    createdBy: string | null;
+    createdByName: string | null;
+    amount: string;
     allocations: {
+        orderId: string;
         amount: string;
         orderNumber: string;
-        orderId: string;
         orderTotal: string;
     }[];
     paidAt: string;
@@ -73,8 +75,6 @@ export declare function usePayment(id: string | undefined): import("@tanstack/re
     unallocatedAmount: string;
     reversedAt: string | null;
     reverseReason: string | null;
-    createdBy: string | null;
-    createdByName: string | null;
 }>, Error>;
 /**
  * تسجيل دفعة.
@@ -85,18 +85,20 @@ export declare function usePayment(id: string | undefined): import("@tanstack/re
  */
 export declare function useCreatePayment(): import("@tanstack/react-query").UseMutationResult<{
     number: string;
-    status: "POSTED" | "REVERSED";
     id: string;
-    customerName: string;
-    amount: string;
-    createdAt: string;
-    notes: string | null;
     customerId: string;
+    customerName: string;
     customerCode: string;
+    status: "POSTED" | "REVERSED";
+    notes: string | null;
+    createdAt: string;
+    createdBy: string | null;
+    createdByName: string | null;
+    amount: string;
     allocations: {
+        orderId: string;
         amount: string;
         orderNumber: string;
-        orderId: string;
         orderTotal: string;
     }[];
     paidAt: string;
@@ -107,8 +109,6 @@ export declare function useCreatePayment(): import("@tanstack/react-query").UseM
     unallocatedAmount: string;
     reversedAt: string | null;
     reverseReason: string | null;
-    createdBy: string | null;
-    createdByName: string | null;
 }, Error, {
     body: CreatePaymentRequest;
     idempotencyKey: string;
@@ -117,10 +117,10 @@ export declare function useCustomerCredit(customerId: string | undefined, enable
     availableAmount: string;
 }>, Error>;
 export declare function useApplyCustomerCredit(): import("@tanstack/react-query").UseMutationResult<{
-    status: "PARTIALLY_PAID" | "PAID";
+    status: "PAID" | "PARTIALLY_PAID";
+    orderId: string;
     paidAmount: string;
     remainingAmount: string;
-    orderId: string;
     appliedAmount: string;
 }, Error, {
     body: ApplyCustomerCreditRequest;
@@ -128,18 +128,20 @@ export declare function useApplyCustomerCredit(): import("@tanstack/react-query"
 }, unknown>;
 export declare function useReversePayment(id: string): import("@tanstack/react-query").UseMutationResult<{
     number: string;
-    status: "POSTED" | "REVERSED";
     id: string;
-    customerName: string;
-    amount: string;
-    createdAt: string;
-    notes: string | null;
     customerId: string;
+    customerName: string;
     customerCode: string;
+    status: "POSTED" | "REVERSED";
+    notes: string | null;
+    createdAt: string;
+    createdBy: string | null;
+    createdByName: string | null;
+    amount: string;
     allocations: {
+        orderId: string;
         amount: string;
         orderNumber: string;
-        orderId: string;
         orderTotal: string;
     }[];
     paidAt: string;
@@ -150,8 +152,6 @@ export declare function useReversePayment(id: string): import("@tanstack/react-q
     unallocatedAmount: string;
     reversedAt: string | null;
     reverseReason: string | null;
-    createdBy: string | null;
-    createdByName: string | null;
 }, Error, {
     reason: string;
 }, unknown>;

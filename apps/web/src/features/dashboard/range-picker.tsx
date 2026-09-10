@@ -40,20 +40,24 @@ export function RangePicker({
 }) {
   const { t } = useTranslation();
   const locale = currentLocale() === 'he' ? 'he' : 'ar';
-  const selectedPreset = value.preset === 'custom' ? 'today' : value.preset;
   return (
-    <div className="flex flex-col items-end gap-3">
-      <div className="flex items-center gap-2" role="group" aria-label={t('dashboard.timeRange')}>
+    <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:items-end">
+      <div
+        className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"
+        role="group"
+        aria-label={t('dashboard.timeRange')}
+      >
         <select
-          value={selectedPreset}
+          value={value.preset}
           onChange={(event) => onChange({ preset: event.target.value as DashboardRangePreset })}
-          className="rounded-ctrl border-border bg-card text-fg focus-visible:ring-ring h-9 min-w-36 border px-3 text-sm focus-visible:outline-none focus-visible:ring-2"
+          className="rounded-ctrl border-border bg-card text-fg focus-visible:ring-ring h-9 min-w-0 border px-3 text-sm focus-visible:outline-none focus-visible:ring-2 sm:min-w-36"
         >
           {PRESETS.map((preset) => (
             <option key={preset.value} value={preset.value}>
               {preset.label[locale]}
             </option>
           ))}
+          <option value="custom">{CUSTOM_LABEL[locale]}</option>
         </select>
         <button
           type="button"
@@ -80,6 +84,8 @@ export function RangePicker({
           to={value.to ?? ''}
           onFromChange={(from) => onChange({ ...value, preset: 'custom', from })}
           onToChange={(to) => onChange({ ...value, preset: 'custom', to })}
+          fromLabel={locale === 'he' ? 'מתאריך' : 'من تاريخ'}
+          toLabel={locale === 'he' ? 'עד תאריך' : 'إلى تاريخ'}
         />
       ) : null}
     </div>

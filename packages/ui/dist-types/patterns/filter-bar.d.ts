@@ -35,6 +35,8 @@ export interface DateRangeFilterProps {
     onFromChange: (value: string) => void;
     onToChange: (value: string) => void;
     className?: string;
+    fromLabel?: string;
+    toLabel?: string;
 }
 /**
  * مدى تاريخي — «من تاريخ» / «إلى تاريخ».
@@ -43,7 +45,7 @@ export interface DateRangeFilterProps {
  * ومترجم للغة النظام، ويحترم إعدادات التقويم — كلها أشياء يخسرها المنتقي
  * المخصّص عادةً.
  */
-export declare function DateRangeFilter({ from, to, onFromChange, onToChange, className, }: DateRangeFilterProps): import("react").JSX.Element;
+export declare function DateRangeFilter({ from, to, onFromChange, onToChange, className, fromLabel, toLabel, }: DateRangeFilterProps): import("react").JSX.Element;
 export declare function AdvancedFilterButton({ onClick, activeCount, }: {
     onClick: () => void;
     activeCount?: number;

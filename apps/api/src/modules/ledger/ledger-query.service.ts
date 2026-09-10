@@ -63,7 +63,10 @@ export class LedgerQueryService {
         rows.map((r) => r.id),
       );
 
-      const refNumbers = await this.fetchRefNumbers(tx, tenantId, rows);
+      const [refNumbers, relatedOrders] = await Promise.all([
+        this.fetchRefNumbers(tx, tenantId, rows),
+        this.fetchPaymentOrderNumbers(tx, tenantId, rows),
+      ]);
 
       const totalDebit = toMoney(agg._sum.debit?.toString() ?? '0');
       const totalCredit = toMoney(agg._sum.credit?.toString() ?? '0');
@@ -75,7 +78,12 @@ export class LedgerQueryService {
 
       return {
         items: rows.map((row) =>
-          this.toDto(row, reversedIds.has(row.id), refNumbers.get(row.id) ?? null),
+          this.toDto(
+            row,
+            reversedIds.has(row.id),
+            refNumbers.get(row.id) ?? null,
+            relatedOrders.get(row.id) ?? [],
+          ),
         ),
         page: query.page,
         pageSize: query.pageSize,
@@ -144,7 +152,10 @@ export class LedgerQueryService {
         tenantId,
         entries.map((e) => e.id),
       );
-      const refNumbers = await this.fetchRefNumbers(tx, tenantId, entries);
+      const [refNumbers, relatedOrders] = await Promise.all([
+        this.fetchRefNumbers(tx, tenantId, entries),
+        this.fetchPaymentOrderNumbers(tx, tenantId, entries),
+      ]);
       const orderIds = [
         ...new Set(
           entries
@@ -175,7 +186,12 @@ export class LedgerQueryService {
         closingBalance: toMoneyString(closingBalance, 2),
 
         entries: entries.map((row) =>
-          this.toDto(row, reversedIds.has(row.id), refNumbers.get(row.id) ?? null),
+          this.toDto(
+            row,
+            reversedIds.has(row.id),
+            refNumbers.get(row.id) ?? null,
+            relatedOrders.get(row.id) ?? [],
+          ),
         ),
         orders: statementOrders.map((order) => {
           const paidAmount = toMoney(order.paidAmount.toString());
@@ -347,7 +363,8 @@ export class LedgerQueryService {
       const reversed = await this.fetchReversedIds(tx, tenantId, [id]);
       const refs = await this.fetchRefNumbers(tx, tenantId, [row]);
 
-      return this.toDto(row, reversed.has(id), refs.get(id) ?? null);
+      const relatedOrders = await this.fetchPaymentOrderNumbers(tx, tenantId, [row]);
+      return this.toDto(row, reversed.has(id), refs.get(id) ?? null, relatedOrders.get(id) ?? []);
     });
   }
 
@@ -446,7 +463,44 @@ export class LedgerQueryService {
     return result;
   }
 
-  private toDto(row: EntryRow, isReversed: boolean, refNumber: string | null): LedgerEntry {
+  private async fetchPaymentOrderNumbers(
+    tx: TxClient,
+    tenantId: string,
+    entries: { id: string; refType: string; refId: string | null }[],
+  ): Promise<Map<string, string[]>> {
+    const paymentEntries = entries.filter(
+      (entry): entry is typeof entry & { refId: string } =>
+        entry.refType === 'PAYMENT' && entry.refId !== null,
+    );
+    if (paymentEntries.length === 0) return new Map();
+
+    const allocations = await tx.paymentAllocation.findMany({
+      where: {
+        tenantId,
+        paymentId: { in: [...new Set(paymentEntries.map((entry) => entry.refId))] },
+      },
+      select: { paymentId: true, order: { select: { number: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const byPayment = new Map<string, string[]>();
+    for (const allocation of allocations) {
+      const numbers = byPayment.get(allocation.paymentId) ?? [];
+      if (!numbers.includes(allocation.order.number)) numbers.push(allocation.order.number);
+      byPayment.set(allocation.paymentId, numbers);
+    }
+
+    return new Map(
+      paymentEntries.map((entry) => [entry.id, byPayment.get(entry.refId) ?? []] as const),
+    );
+  }
+
+  private toDto(
+    row: EntryRow,
+    isReversed: boolean,
+    refNumber: string | null,
+    relatedOrderNumbers: string[],
+  ): LedgerEntry {
     return {
       id: row.id,
       seq: row.seq,
@@ -465,6 +519,7 @@ export class LedgerQueryService {
       refType: row.refType,
       refId: row.refId,
       refNumber,
+      relatedOrderNumbers,
 
       reversesEntryId: row.reversesEntryId,
       isReversed,

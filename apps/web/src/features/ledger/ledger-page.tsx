@@ -131,9 +131,7 @@ export function LedgerPage() {
     {
       header: 'نوع الحركة',
       render: (row) => (
-        <StatusBadge tone={TYPE_TONE[row.entryType] ?? 'neutral'}>
-          {LEDGER_TYPE_LABELS[row.entryType]}
-        </StatusBadge>
+        <StatusBadge tone={TYPE_TONE[row.entryType] ?? 'neutral'}>{movementLabel(row)}</StatusBadge>
       ),
     },
     {
@@ -170,7 +168,7 @@ export function LedgerPage() {
       ),
     },
     {
-      header: 'المدين',
+      header: 'الدين',
       align: 'end',
       render: (row) =>
         row.debit !== '0.00' ? (
@@ -180,7 +178,7 @@ export function LedgerPage() {
         ),
     },
     {
-      header: 'الدائن',
+      header: 'المدفوع',
       align: 'end',
       render: (row) =>
         row.credit !== '0.00' ? (
@@ -351,7 +349,7 @@ export function LedgerPage() {
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <StatusBadge tone={TYPE_TONE[row.entryType] ?? 'neutral'}>
-                        {LEDGER_TYPE_LABELS[row.entryType]}
+                        {movementLabel(row)}
                       </StatusBadge>
                       {row.refNumber ? (
                         <span className="text-fg-muted text-xs">
@@ -467,4 +465,14 @@ function Totals({
       />
     </div>
   );
+}
+
+function movementLabel(entry: LedgerEntry): string {
+  if (entry.entryType !== 'PAYMENT_CREDIT') return LEDGER_TYPE_LABELS[entry.entryType];
+  if (entry.relatedOrderNumbers.length === 0) return 'دفعة';
+
+  const orderNumbers = entry.relatedOrderNumbers.map(displayOrderNumber);
+  return orderNumbers.length === 1
+    ? `دفعة للطلب ${orderNumbers[0]}`
+    : `دفعة للطلبات ${orderNumbers.join('، ')}`;
 }

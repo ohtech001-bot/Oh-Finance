@@ -7,15 +7,15 @@ import type { DashboardQuery } from '@oh/contracts';
  */
 export declare function useDashboard(query: Partial<DashboardQuery>): import("@tanstack/react-query").UseQueryResult<NoInfer<{
     kpis: {
+        id: "orders" | "revenue" | "payments" | "outstanding_balance" | "overdue_balance" | "overdue_customers" | "active_customers" | "average_order_value" | "collection_rate" | "unallocated_payments";
         value: string;
-        id: "revenue" | "payments" | "orders" | "outstanding_balance" | "overdue_balance" | "overdue_customers" | "active_customers" | "average_order_value" | "collection_rate" | "unallocated_payments";
         unit: "count" | "money" | "percent";
         previous: string | null;
         deltaPct: number | null;
         trend: "flat" | "up" | "down";
     }[];
     trends: {
-        id: "revenue" | "payments" | "orders" | "outstanding_balance" | "new_customers";
+        id: "orders" | "revenue" | "payments" | "outstanding_balance" | "new_customers";
         unit: "count" | "money" | "percent";
         points: {
             value: string;
@@ -23,14 +23,14 @@ export declare function useDashboard(query: Partial<DashboardQuery>): import("@t
         }[];
     }[];
     topCustomers: {
-        code: string;
         id: string;
+        code: string;
         amount: string;
         name: string;
     }[];
     topDebtors: {
-        code: string;
         id: string;
+        code: string;
         balance: string;
         name: string;
         oldestOverdueAt: string | null;
@@ -39,27 +39,27 @@ export declare function useDashboard(query: Partial<DashboardQuery>): import("@t
     recentPayments: {
         number: string;
         id: string;
-        customerName: string;
-        amount: string;
         customerId: string;
+        customerName: string;
+        createdByName: string | null;
+        amount: string;
         paidAt: string;
         method: "CASH" | "BANK_TRANSFER" | "CARD" | "CHECK";
-        createdByName: string | null;
     }[];
     recentOrders: {
         number: string;
-        status: "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED" | "PARTIALLY_PAID" | "PAID";
-        total: string;
         id: string;
-        customerName: string;
         customerId: string;
+        customerName: string;
+        status: "PAID" | "PARTIALLY_PAID" | "CANCELLED" | "DRAFT" | "QUOTE" | "CONFIRMED";
+        total: string;
         issuedAt: string;
     }[];
     meta: {
+        generatedAt: string;
         currency: string;
         timezone: string;
         storeName: string;
-        generatedAt: string;
         range: {
             from: string;
             to: string;
@@ -71,20 +71,20 @@ export declare function useDashboard(query: Partial<DashboardQuery>): import("@t
         };
         topCustomersBasis: "sales" | "collection";
         scope: {
-            kpis: ("revenue" | "payments" | "orders" | "outstanding_balance" | "overdue_balance" | "overdue_customers" | "active_customers" | "average_order_value" | "collection_rate" | "unallocated_payments")[];
-            trends: ("revenue" | "payments" | "orders" | "outstanding_balance" | "new_customers")[];
+            kpis: ("orders" | "revenue" | "payments" | "outstanding_balance" | "overdue_balance" | "overdue_customers" | "active_customers" | "average_order_value" | "collection_rate" | "unallocated_payments")[];
+            trends: ("orders" | "revenue" | "payments" | "outstanding_balance" | "new_customers")[];
             lists: ("topCustomers" | "topDebtors" | "recentPayments" | "recentOrders")[];
         };
     };
     alerts: {
+        id: string;
         message: string;
         date: string | null;
-        id: string;
+        amount: string | null;
         entityType: string | null;
         entityId: string | null;
         kind: "unallocated_payments" | "approaching_credit_limit" | "over_credit_limit" | "long_overdue" | "stale_draft_orders" | "inactive_no_activity" | "subscription_ending";
         severity: "info" | "warning" | "critical";
-        amount: string | null;
         actionHref: string | null;
     }[];
 }>, Error>;
