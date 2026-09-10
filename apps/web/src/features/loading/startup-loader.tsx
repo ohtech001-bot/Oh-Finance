@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/app/auth-context';
 
@@ -85,15 +85,10 @@ export function StartupLoader({ children }: { children: ReactNode }) {
                   <div className="startup-loader__vault-plaque">OH RESERVE</div>
                   <div className="startup-loader__vault-shelf startup-loader__vault-shelf--1" />
                   <div className="startup-loader__vault-shelf startup-loader__vault-shelf--2" />
-                  <div className="startup-loader__gold-stack">
-                    {Array.from({ length: 30 }, (_, index) => (
-                      <span
-                        key={index}
-                        className="startup-loader__gold-bar"
-                        data-loaded={progress >= Math.ceil(((30 - index) / 30) * 92)}
-                        style={{ transitionDelay: `${(index % 5) * 35}ms` }}
-                      >
-                        <i>OH</i>
+                  <div className="startup-loader__cash-stacks">
+                    {Array.from({ length: 6 }, (_, index) => (
+                      <span key={index}>
+                        <i>₪</i>
                       </span>
                     ))}
                   </div>
@@ -113,6 +108,22 @@ export function StartupLoader({ children }: { children: ReactNode }) {
                   <i />
                 </div>
               </div>
+            </div>
+            <div className="startup-loader__flying-cash">
+              {Array.from({ length: 8 }, (_, index) => (
+                <span
+                  key={index}
+                  style={
+                    {
+                      animationDelay: `${index * -0.38}s`,
+                      '--cash-x': `${(index % 2 === 0 ? -1 : 1) * (60 + (index % 4) * 20)}px`,
+                      '--cash-turn': `${(index % 2 === 0 ? -1 : 1) * (25 + index * 9)}deg`,
+                    } as CSSProperties
+                  }
+                >
+                  <i>₪</i>
+                </span>
+              ))}
             </div>
             <div className="startup-loader__vault-floor" />
           </div>

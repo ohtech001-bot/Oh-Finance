@@ -94,7 +94,12 @@ export function CreateOrderDialog({
         `/customers/lookup?search=${encodeURIComponent(debouncedCustomerSearch)}`,
         { signal },
       ),
-    enabled: open && !fixedCustomerId && !order,
+    enabled:
+      open &&
+      !fixedCustomerId &&
+      !order &&
+      customerSearch.trim().length > 0 &&
+      debouncedCustomerSearch.length > 0,
     retry: false,
   });
 
@@ -317,7 +322,7 @@ export function CreateOrderDialog({
                     startIcon={<Search className="size-4" />}
                     autoComplete="off"
                   />
-                  {customerPickerOpen ? (
+                  {customerPickerOpen && customerSearch.trim().length > 0 ? (
                     <div className="border-border bg-card shadow-pop rounded-card absolute inset-x-0 top-[calc(100%+6px)] z-50 max-h-64 overflow-y-auto border p-1.5">
                       {customerSearch.trim() !== debouncedCustomerSearch ||
                       customersQuery.isLoading ? (
