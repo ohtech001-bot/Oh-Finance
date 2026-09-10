@@ -1,4 +1,4 @@
-import { Calendar, Search, SlidersHorizontal } from 'lucide-react';
+import { Search, SlidersHorizontal } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 import { Button } from '../primitives/button.js';
 import { Input } from '../primitives/input.js';
@@ -120,7 +120,7 @@ export function DateRangeFilter({
   toLabel = 'إلى تاريخ',
 }: DateRangeFilterProps) {
   return (
-    <div className={cn('grid w-full grid-cols-2 gap-2 sm:w-auto', className)}>
+    <div className={cn('grid w-full min-w-0 grid-cols-1 gap-3 sm:w-auto sm:grid-cols-2', className)}>
       <label className="min-w-0 space-y-1">
         <span className="text-fg-muted block text-xs font-medium">{fromLabel}</span>
         <Input
@@ -129,9 +129,9 @@ export function DateRangeFilter({
           onChange={(e) => onFromChange(e.target.value)}
           // `max` يمنع اختيار مدى مقلوب في الواجهة أصلًا — الخادم يتحقق أيضًا.
           max={to || undefined}
-          startIcon={<Calendar className="size-4" />}
+          dir="ltr"
           aria-label={fromLabel}
-          className="w-full sm:w-[165px]"
+          className="block min-w-0 max-w-full appearance-none w-full sm:w-[180px]"
         />
       </label>
       <label className="min-w-0 space-y-1">
@@ -141,9 +141,9 @@ export function DateRangeFilter({
           value={to}
           onChange={(e) => onToChange(e.target.value)}
           min={from || undefined}
-          startIcon={<Calendar className="size-4" />}
+          dir="ltr"
           aria-label={toLabel}
-          className="w-full sm:w-[165px]"
+          className="block min-w-0 max-w-full appearance-none w-full sm:w-[180px]"
         />
       </label>
     </div>

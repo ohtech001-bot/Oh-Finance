@@ -46,7 +46,8 @@ export const DialogContent = forwardRef<
       className={cn(
         'fixed start-1/2 top-1/2 z-50 w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 rtl:translate-x-1/2',
         'rounded-card border border-border bg-card shadow-pop',
-        'max-h-[calc(100vh-4rem)] overflow-y-auto',
+        'max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-2rem)] overflow-y-auto overscroll-contain',
+        'top-[calc((100dvh+env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))/2)]',
         'data-[state=open]:animate-fade-in',
         { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' }[size],
         className,
@@ -131,7 +132,7 @@ export const DrawerContent = forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed inset-y-0 z-50 flex w-[300px] max-w-[85vw] flex-col bg-card shadow-pop',
+        'fixed inset-y-0 z-50 flex w-[300px] max-w-[85vw] flex-col bg-card shadow-pop pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]',
         'data-[state=open]:animate-slide-in-start',
         // خصائص منطقية: تنعكس تلقائيًا مع dir.
         side === 'start' ? 'start-0 border-e border-border' : 'end-0 border-s border-border',
@@ -142,7 +143,7 @@ export const DrawerContent = forwardRef<
       {children}
       <DialogPrimitive.Close
         className={cn(
-          'absolute end-4 top-4 rounded-ctrl p-1.5 text-fg-muted',
+          'absolute end-4 top-[calc(1rem+env(safe-area-inset-top,0px))] rounded-ctrl p-1.5 text-fg-muted',
           'hover:bg-card-muted hover:text-fg',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         )}

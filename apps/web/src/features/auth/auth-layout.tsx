@@ -35,7 +35,7 @@ export function AuthLayout({ title, subtitle, icon: Icon, children }: AuthLayout
       </picture>
       <div className="absolute inset-0 bg-black/20 lg:bg-transparent" aria-hidden />
 
-      <div className="relative z-10 flex min-h-dvh flex-col p-4 sm:p-6 lg:p-8">
+      <div className="auth-safe-frame relative z-10 flex min-h-dvh flex-col p-4 sm:p-6 lg:p-8">
         <div className="flex justify-end">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

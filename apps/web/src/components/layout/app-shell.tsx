@@ -57,7 +57,7 @@ export function AppShell() {
   };
 
   return (
-    <div className="bg-bg flex h-dvh overflow-hidden">
+    <div className="app-safe-frame bg-bg flex h-dvh overflow-hidden">
       {/* الشريط الجانبي — ديسكتوب */}
       <Sidebar
         items={items}
