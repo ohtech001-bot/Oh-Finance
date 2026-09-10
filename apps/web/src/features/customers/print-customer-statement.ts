@@ -213,6 +213,14 @@ export function printCustomerStatement({
   const text = labels[locale];
   const dir = locale === 'en' ? 'ltr' : 'rtl';
   const money = (value: string) => escapeHtml(formatMoney(value, { currency }));
+  const signedBalance = (value: string) => {
+    const sign = isPositive(value) ? '-' : isNegative(value) ? '+' : '';
+    const tone = isPositive(value) ? 'debt' : isNegative(value) ? 'credit' : '';
+    return `<bdi dir="ltr" class="${tone}">${sign}${money(toMoneyString(abs(value), 2))}</bdi>`;
+  };
+  const returnUrl = new URL(`/customers/${encodeURIComponent(customer.id)}`, window.location.origin)
+    .href;
+  const backLabel = { ar: 'العودة إلى الزبون', he: 'חזרה ללקוח', en: 'Back to customer' }[locale];
   const optional = (value: string | null | undefined) => (value ? escapeHtml(value) : text.noValue);
   const formatDate = (value: string) =>
     escapeHtml(
@@ -305,18 +313,26 @@ export function printCustomerStatement({
       </article>`;
     })
     .join('');
+  const paymentStates = new Map(
+    statement.orders.map((order) => [order.orderId, order.paymentState]),
+  );
   const rows = statement.entries
-    .map(
-      (entry) => `<tr>
+    .map((entry) => {
+      const state = entry.refId ? paymentStates.get(entry.refId) : undefined;
+      const settled =
+        entry.entryType === 'ORDER_DEBIT' && (state === 'PAID' || state === 'PAID_FROM_CREDIT');
+      const paymentLabel =
+        state === 'PAID_FROM_CREDIT' ? text.statusPaidFromCredit : text.statusPaid;
+      return `<tr>
         <td>${formatDate(entry.occurredAt)}</td>
         <td>${formatTime(entry.occurredAt)}</td>
-        <td>${escapeHtml(movementLabels[locale][entry.entryType])}</td>
-        <td>${entry.debit !== '0.00' ? money(entry.debit) : text.noValue}</td>
+        <td>${escapeHtml(movementLabels[locale][entry.entryType])}${settled ? `<br><strong style="color:#16733a">${escapeHtml(paymentLabel)}</strong>` : ''}</td>
+        <td>${entry.debit !== '0.00' ? (settled ? `<s style="color:#667085">${money(entry.debit)}</s>` : money(entry.debit)) : text.noValue}</td>
         <td>${entry.credit !== '0.00' ? money(entry.credit) : text.noValue}</td>
-        <td>${money(entry.runningBalance)}</td>
+        <td>${signedBalance(entry.runningBalance)}</td>
         <td>${optional(entry.refType === 'ORDER' ? entry.refNumber?.replace(/^ORD-?/i, '') : entry.refNumber)}</td>
-      </tr>`,
-    )
+      </tr>`;
+    })
     .join('');
 
   win.document.write(`<!doctype html>
@@ -327,6 +343,8 @@ export function printCustomerStatement({
   <style>
     *{box-sizing:border-box}
     body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;margin:24px;color:#101828;font-size:13px}
+    .preview-toolbar{position:sticky;top:0;z-index:10;background:#fff;padding:calc(10px + env(safe-area-inset-top,0px)) 0 12px;margin-bottom:16px;border-bottom:1px solid #d0d5dd}
+    .preview-back{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid #d0d5dd;border-radius:6px;color:#101828;text-decoration:none;font-size:16px;min-height:44px}
     .store-header{display:flex;align-items:center;justify-content:center;gap:14px;border-bottom:2px solid #c69a21;padding-bottom:16px;text-align:center}
     .logo{width:68px;height:68px;object-fit:contain}
     .store-name{font-size:24px;font-weight:800;margin:0}
@@ -353,10 +371,11 @@ export function printCustomerStatement({
     th{background:#f2f4f7;font-weight:700}
     tbody tr:nth-child(even){background:#f9fafb}
     @page{size:A4;margin:12mm}
-    @media print{body{margin:0}.section,.summary-item,.order-card,tr{break-inside:avoid}}
+    @media print{body{margin:0}.preview-toolbar{display:none}.section,.summary-item,.order-card,tr{break-inside:avoid}}
   </style>
 </head>
 <body>
+  <nav class="preview-toolbar"><a class="preview-back" href="${escapeHtml(returnUrl)}"><span aria-hidden="true">${dir === 'rtl' ? '→' : '←'}</span>${escapeHtml(backLabel)}</a></nav>
   <header class="store-header">
     ${logo}
     <div>
@@ -404,6 +423,14 @@ export function printCustomerStatement({
 </body>
 </html>`);
   win.document.close();
+  win.document.querySelector('.preview-back')?.addEventListener('click', (event) => {
+    if (win.opener && !win.opener.closed) {
+      event.preventDefault();
+      win.opener.focus();
+      win.close();
+      if (!win.closed) win.location.assign(returnUrl);
+    }
+  });
   win.focus();
   win.addEventListener('load', () => win.print(), { once: true });
   window.setTimeout(() => win.print(), 500);

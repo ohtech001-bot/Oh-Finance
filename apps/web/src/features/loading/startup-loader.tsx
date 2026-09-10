@@ -46,6 +46,12 @@ export function StartupLoader({ children }: { children: ReactNode }) {
 
   const ready = complete && !sessionLoading;
 
+  useEffect(() => {
+    if (ready) return;
+    document.documentElement.classList.add('startup-active');
+    return () => document.documentElement.classList.remove('startup-active');
+  }, [ready]);
+
   return (
     <>
       {children}

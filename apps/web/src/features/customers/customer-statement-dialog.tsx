@@ -53,6 +53,10 @@ export function CustomerStatementDialog({
     statement?.orders.map((order) => [order.orderId, order.paymentState]) ?? [],
   );
   const [printing, setPrinting] = useState(false);
+  const settledOrder = (entry: LedgerEntry) => {
+    const state = entry.refId ? orderPaymentStates.get(entry.refId) : undefined;
+    return entry.entryType === 'ORDER_DEBIT' && (state === 'PAID' || state === 'PAID_FROM_CREDIT');
+  };
 
   const handlePrint = async () => {
     if (!statement) return;
@@ -118,7 +122,14 @@ export function CustomerStatementDialog({
       align: 'end',
       render: (row) =>
         row.debit !== '0.00' ? (
-          <MoneyText value={row.debit} currency={currency} tone="debit" withSymbol={false} />
+          <span className={settledOrder(row) ? 'text-fg-muted line-through' : undefined}>
+            <MoneyText
+              value={row.debit}
+              currency={currency}
+              tone={settledOrder(row) ? 'neutral' : 'debit'}
+              withSymbol={false}
+            />
+          </span>
         ) : (
           <span className="text-fg-subtle">—</span>
         ),
@@ -205,6 +216,7 @@ export function CustomerStatementDialog({
                         value={row.debit}
                         currency={currency}
                         tone="debit"
+                        settled={settledOrder(row)}
                       />
                       <MovementAmount
                         label="المدفوع"
@@ -335,17 +347,26 @@ function MovementAmount({
   value,
   currency,
   tone,
+  settled = false,
 }: {
   label: string;
   value: string;
   currency: CurrencyCode;
   tone: 'debit' | 'credit';
+  settled?: boolean;
 }) {
   return (
     <div>
       <p className="text-fg-muted mb-1 text-xs">{label}</p>
       {value !== '0.00' ? (
-        <MoneyText value={value} currency={currency} tone={tone} withSymbol={false} />
+        <span className={settled ? 'text-fg-muted line-through' : undefined}>
+          <MoneyText
+            value={value}
+            currency={currency}
+            tone={settled ? 'neutral' : tone}
+            withSymbol={false}
+          />
+        </span>
       ) : (
         <span className="text-fg-subtle text-sm">—</span>
       )}

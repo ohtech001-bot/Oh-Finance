@@ -8,7 +8,14 @@ import {
   type Order,
   type Payment,
 } from '@oh/contracts';
-import { formatMoney, negate, toMoneyString, type CurrencyCode } from '@oh/money';
+import {
+  formatMoney,
+  greaterThan,
+  greaterThanOrEqual,
+  negate,
+  toMoneyString,
+  type CurrencyCode,
+} from '@oh/money';
 import {
   Button,
   Card,
@@ -116,6 +123,16 @@ export function CustomerDetailPage() {
 
   const customer = customerQuery.data;
   const summary = summaryQuery.data;
+  const debtLimitReached =
+    greaterThan(customer.creditLimit, '0') &&
+    greaterThanOrEqual(customer.balance, customer.creditLimit);
+  const reminderMessage = summary?.paymentDueReached
+    ? paymentDueMessage
+    : {
+        ar: 'وصل الدين إلى الحد المسموح أو تجاوزه',
+        he: 'החוב הגיע למסגרת המותרת או עבר אותה',
+        en: 'The debt has reached or exceeded the allowed limit',
+      }[locale];
 
   const ledgerColumns: Column<LedgerEntry>[] = [
     {
@@ -384,11 +401,11 @@ export function CustomerDetailPage() {
             </div>
           ) : null}
 
-          {summary?.paymentDueReached ? (
+          {summary?.paymentDueReached || debtLimitReached ? (
             <div className="rounded-card border-danger/30 bg-danger-soft mt-4 flex flex-wrap items-center justify-between gap-3 border px-4 py-3">
               <p className="text-danger text-sm font-semibold">
-                {paymentDueMessage} — {outstandingBalanceLabel}:{' '}
-                <MoneyText value={summary.paymentDueAmount} currency={currency} tone="debit" />
+                {reminderMessage} — {outstandingBalanceLabel}:{' '}
+                <MoneyText value={customer.balance} currency={currency} tone="debit" />
               </p>
               {whatsappPhone(customer.phone) ? (
                 <Button variant="outline" size="sm" asChild>
@@ -396,15 +413,22 @@ export function CustomerDetailPage() {
                     href={whatsappPaymentReminderUrl(
                       customer.phone!,
                       customer.name,
-                      summary.paymentDueAmount,
+                      customer.balance,
                       currency,
                       locale,
+                      summary?.paymentDueReached ? undefined : customer.creditLimit,
                     )}
                     target="_blank"
                     rel="noreferrer"
                   >
                     <MessageCircle className="text-success" aria-hidden />
-                    إرسال تذكير
+                    {
+                      {
+                        ar: 'إرسال تذكير بالسداد',
+                        he: 'שליחת תזכורת לתשלום',
+                        en: 'Send payment reminder',
+                      }[locale]
+                    }
                   </a>
                 </Button>
               ) : null}
@@ -606,12 +630,20 @@ function whatsappPaymentReminderUrl(
   balance: string,
   currency: CurrencyCode,
   locale: 'ar' | 'he' | 'en',
+  creditLimit?: string,
 ): string {
   const amount = formatMoney(balance, { currency });
-  const message = {
-    ar: `مرحبًا ${customerName}، نود تذكيرك بأن موعد سداد الحساب قد حل، والرصيد المستحق حاليًا هو ${amount}. نرجو لطفًا المبادرة إلى السداد. شكرًا لتعاونك.`,
-    he: `שלום ${customerName}, ברצוננו להזכיר שמועד תשלום החשבון הגיע, והיתרה לתשלום כעת היא ${amount}. נשמח להסדרת התשלום. תודה על שיתוף הפעולה.`,
-    en: `Hello ${customerName}, this is a kind reminder that your account payment is due. The current outstanding balance is ${amount}. Please arrange payment at your earliest convenience. Thank you.`,
-  }[locale];
+  const limit = creditLimit === undefined ? null : formatMoney(creditLimit, { currency });
+  const message = limit
+    ? {
+        ar: `مرحبًا ${customerName}، نود تذكيرك بأن الدين الحالي بلغ ${amount} وقد وصل أو تخطى الحد الأقصى المسموح به وهو ${limit}. نرجو لطفًا المبادرة إلى سداد الدين في أقرب وقت. شكرًا لتعاونك.`,
+        he: `שלום ${customerName}, החוב הנוכחי הוא ${amount} והגיע או עבר את המסגרת המותרת של ${limit}. נשמח להסדרת התשלום בהקדם. תודה.`,
+        en: `Hello ${customerName}, your current debt of ${amount} has reached or exceeded your limit of ${limit}. Please arrange payment. Thank you.`,
+      }[locale]
+    : {
+        ar: `مرحبًا ${customerName}، نود تذكيرك بأن موعد سداد الحساب قد حل، والرصيد المستحق حاليًا هو ${amount}. نرجو لطفًا المبادرة إلى السداد. شكرًا لتعاونك.`,
+        he: `שלום ${customerName}, ברצוננו להזכיר שמועד תשלום החשבון הגיע, והיתרה לתשלום כעת היא ${amount}. נשמח להסדרת התשלום. תודה על שיתוף הפעולה.`,
+        en: `Hello ${customerName}, this is a kind reminder that your account payment is due. The current outstanding balance is ${amount}. Please arrange payment at your earliest convenience. Thank you.`,
+      }[locale];
   return `https://wa.me/${whatsappPhone(phone) ?? ''}?text=${encodeURIComponent(message)}`;
 }

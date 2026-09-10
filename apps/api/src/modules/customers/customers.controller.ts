@@ -44,6 +44,16 @@ export class CustomersController {
     return this.customers.list(query);
   }
 
+  @Get('lookup')
+  @RequirePermissions(PERMISSIONS.CUSTOMERS_READ)
+  @ApiOperation({ summary: 'بحث سريع عن أول خمسة زبائن بالاسم أو الهاتف.' })
+  async lookup(
+    @Query(zodQuery(customerListQuerySchema.pick({ search: true })))
+    query: Pick<CustomerListQuery, 'search'>,
+  ) {
+    return this.customers.lookup(query.search);
+  }
+
   @Get('stats')
   @RequirePermissions(PERMISSIONS.CUSTOMERS_READ)
   @ApiOperation({ summary: 'إحصاءات: العدد، الديون الإجمالية، المتجاوزون لحد الائتمان.' })

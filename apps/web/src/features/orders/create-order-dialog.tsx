@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronDown, ChevronUp, Plus, Search, Trash2 } from 'lucide-react';
-import type { Customer, OrderDetail, OrderItemInput, PaginatedResult } from '@oh/contracts';
+import type { Customer, OrderDetail, OrderItemInput } from '@oh/contracts';
 import {
   add,
   greaterThan,
@@ -89,11 +89,13 @@ export function CreateOrderDialog({
 
   const customersQuery = useQuery({
     queryKey: ['customers', 'picker', debouncedCustomerSearch],
-    queryFn: () =>
-      api.get<PaginatedResult<Customer>>(
-        `/customers?pageSize=5&sortBy=name&sortOrder=asc&search=${encodeURIComponent(debouncedCustomerSearch)}`,
+    queryFn: ({ signal }) =>
+      api.get<Pick<Customer, 'id' | 'name' | 'phone'>[]>(
+        `/customers/lookup?search=${encodeURIComponent(debouncedCustomerSearch)}`,
+        { signal },
       ),
-    enabled: open && !fixedCustomerId && !order && debouncedCustomerSearch.length > 0,
+    enabled: open && !fixedCustomerId && !order,
+    retry: false,
   });
 
   useEffect(() => {
@@ -283,7 +285,7 @@ export function CreateOrderDialog({
     );
   };
 
-  const customers = customersQuery.data?.items ?? [];
+  const customers = customersQuery.data ?? [];
   const cellClass =
     'h-10 rounded-ctrl border border-border bg-card px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
@@ -315,10 +317,22 @@ export function CreateOrderDialog({
                     startIcon={<Search className="size-4" />}
                     autoComplete="off"
                   />
-                  {customerPickerOpen && debouncedCustomerSearch ? (
+                  {customerPickerOpen ? (
                     <div className="border-border bg-card shadow-pop rounded-card absolute inset-x-0 top-[calc(100%+6px)] z-50 max-h-64 overflow-y-auto border p-1.5">
-                      {customersQuery.isLoading ? (
+                      {customerSearch.trim() !== debouncedCustomerSearch ||
+                      customersQuery.isLoading ? (
                         <p className="text-fg-muted px-3 py-4 text-center text-sm">جارٍ البحث…</p>
+                      ) : customersQuery.isError ? (
+                        <div className="text-danger px-3 py-3 text-sm" role="alert">
+                          تعذر تحميل الزبائن. تحقق من الاتصال وحاول مجددًا.
+                          <button
+                            type="button"
+                            className="mt-2 block underline"
+                            onClick={() => void customersQuery.refetch()}
+                          >
+                            إعادة المحاولة
+                          </button>
+                        </div>
                       ) : customers.length === 0 ? (
                         <p className="text-fg-muted px-3 py-4 text-center text-sm">
                           لا يوجد زبون مطابق.

@@ -121,6 +121,35 @@ export class CustomersService {
     return created;
   }
 
+  async lookup(search = ''): Promise<Pick<Customer, 'id' | 'name' | 'phone'>[]> {
+    const { tenantId } = this.context();
+    const terms = search.trim().split(/\s+/).filter(Boolean);
+    return this.prisma.runInTenant(tenantId, (tx) =>
+      tx.customer.findMany({
+        where: {
+          tenantId,
+          archivedAt: null,
+          ...(terms.length
+            ? {
+                OR: [
+                  {
+                    AND: terms.map((term) => ({
+                      name: { contains: term, mode: 'insensitive' as const },
+                    })),
+                  },
+                  { phone: { contains: search.trim() } },
+                  { code: { contains: search.trim(), mode: 'insensitive' as const } },
+                ],
+              }
+            : {}),
+        },
+        select: { id: true, name: true, phone: true },
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        take: 5,
+      }),
+    );
+  }
+
   async list(query: CustomerListQuery): Promise<PaginatedResult<Customer>> {
     const { tenantId } = this.context();
 
