@@ -314,9 +314,9 @@ export function printOrder(
   </head>
   <body>
     <nav class="print-toolbar" aria-label="إجراءات الطباعة">
-      <button type="button" onclick="window.closePrintPreview()">رجوع ←</button>
-      <button class="primary" type="button" onclick="window.printReceipt()">طباعة</button>
-      <button type="button" data-share-pdf onclick="window.shareReceiptPdf()">مشاركة PDF</button>
+      <button type="button" data-back>رجوع ←</button>
+      <button class="primary" type="button" data-print>طباعة</button>
+      <button type="button" data-share-pdf>مشاركة PDF</button>
     </nav>
     <main class="receipt">
       <header class="store">
@@ -380,13 +380,16 @@ export function printOrder(
 
       <footer class="footer">${storeName}</footer>
     </main>
-    <script>
-      window.addEventListener('load', function () {
-        window.setTimeout(function () { window.print(); }, 250);
-      });
-    </script>
   </body>
   </html>`);
   win.document.close();
+  win.document
+    .querySelector('[data-back]')
+    ?.addEventListener('click', () => win.closePrintPreview?.());
+  win.document.querySelector('[data-print]')?.addEventListener('click', () => win.print());
+  win.document
+    .querySelector('[data-share-pdf]')
+    ?.addEventListener('click', () => void win.shareReceiptPdf?.());
+  win.addEventListener('load', () => win.setTimeout(() => win.print(), 250), { once: true });
   win.focus();
 }

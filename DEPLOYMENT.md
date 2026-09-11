@@ -1,5 +1,9 @@
 # Deployment (Vercel)
 
+Before public launch, review `PRODUCTION-READINESS.md` and complete the independent
+backup activation and restoration checks in `BACKUP.md`. Prepared tooling is not
+evidence of an active backup.
+
 The production web application and NestJS API are deployed from one Vercel
 Services project. This keeps browser requests, authentication cookies, and CSRF
 checks on the same origin while allowing Vercel to build each framework with its

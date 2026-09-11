@@ -29,7 +29,7 @@
     "helmet": "^8.0.0",
     "ioredis": "^5.8.2",
     "nestjs-pino": "^4.2.0",
-    "nodemailer": "^7.0.5",
+    "nodemailer": "^10.0.8",
     "pg": "^8.23.0",
     "pino": "^9.6.0",
     "pino-http": "^10.4.0",

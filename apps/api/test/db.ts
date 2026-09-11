@@ -14,6 +14,29 @@ import { PrismaClient } from '@prisma/client';
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? '';
 export const HAS_TEST_DB = TEST_DATABASE_URL.trim().length > 0;
 
+if (HAS_TEST_DB) {
+  if (process.env.ALLOW_TEST_DB_RESET !== 'true') {
+    throw new Error(
+      'Destructive integration tests require ALLOW_TEST_DB_RESET=true on an isolated test database.',
+    );
+  }
+  const test = new URL(TEST_DATABASE_URL);
+  for (const name of ['DATABASE_URL', 'DIRECT_DATABASE_URL']) {
+    const value = process.env[name];
+    if (!value) continue;
+    const production = new URL(value);
+    const sameDatabase = test.pathname === production.pathname;
+    const sameHost = test.hostname === production.hostname;
+    const project = (url: URL) =>
+      url.hostname.startsWith('db.')
+        ? url.hostname.split('.')[1]
+        : decodeURIComponent(url.username).split('.').slice(1).join('.');
+    if (sameDatabase && (sameHost || (project(test) && project(test) === project(production)))) {
+      throw new Error('Refusing integration tests against the application database.');
+    }
+  }
+}
+
 export const SKIP_REASON =
   'TEST_DATABASE_URL غير مضبوط — تُخطّى اختبارات التكامل. ' +
   'انسخ .env.test.example إلى .env.test وضع رابط قاعدة اختبار مستقلة.';
@@ -22,7 +45,9 @@ let client: PrismaClient | null = null;
 
 export function testDb(): PrismaClient {
   if (!HAS_TEST_DB) {
-    throw new Error('testDb() استُدعيت بلا TEST_DATABASE_URL. استخدم describe.skipIf(!HAS_TEST_DB).');
+    throw new Error(
+      'testDb() استُدعيت بلا TEST_DATABASE_URL. استخدم describe.skipIf(!HAS_TEST_DB).',
+    );
   }
 
   // حدّ اتصالات أوسع: اختبارات التزامن تُطلق ~20 معاملة تفاعلية معًا.
@@ -73,7 +98,12 @@ export async function resetDb(): Promise<void> {
  */
 export async function asTenant<T>(
   tenantId: string,
-  fn: (tx: Omit<PrismaClient, '$transaction' | '$connect' | '$disconnect' | '$on' | '$use' | '$extends'>) => Promise<T>,
+  fn: (
+    tx: Omit<
+      PrismaClient,
+      '$transaction' | '$connect' | '$disconnect' | '$on' | '$use' | '$extends'
+    >,
+  ) => Promise<T>,
 ): Promise<T> {
   const db = testDb();
   return db.$transaction(async (tx) => {
@@ -85,7 +115,12 @@ export async function asTenant<T>(
 
 /** ينفّذ استعلامًا بسياق المنصة. */
 export async function asPlatform<T>(
-  fn: (tx: Omit<PrismaClient, '$transaction' | '$connect' | '$disconnect' | '$on' | '$use' | '$extends'>) => Promise<T>,
+  fn: (
+    tx: Omit<
+      PrismaClient,
+      '$transaction' | '$connect' | '$disconnect' | '$on' | '$use' | '$extends'
+    >,
+  ) => Promise<T>,
 ): Promise<T> {
   const db = testDb();
   return db.$transaction(async (tx) => {
@@ -103,7 +138,12 @@ export async function asPlatform<T>(
  * صفرًا. هذا هو **الفشل الآمن** — خطأ برمجي يعطي «لا شيء» لا «كل شيء».
  */
 export async function asNobody<T>(
-  fn: (tx: Omit<PrismaClient, '$transaction' | '$connect' | '$disconnect' | '$on' | '$use' | '$extends'>) => Promise<T>,
+  fn: (
+    tx: Omit<
+      PrismaClient,
+      '$transaction' | '$connect' | '$disconnect' | '$on' | '$use' | '$extends'
+    >,
+  ) => Promise<T>,
 ): Promise<T> {
   const db = testDb();
   return db.$transaction(async (tx) => {
