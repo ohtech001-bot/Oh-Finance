@@ -568,7 +568,8 @@ export class CustomersService {
           SELECT DISTINCT ON (le.customer_id)
                  le.customer_id,
                  le.running_balance,
-                 c.credit_limit
+                 c.credit_limit,
+                 c.payment_due_date
           FROM ledger_entries le
           JOIN customers c ON c.id = le.customer_id
           WHERE le.tenant_id = ${tenantId}::uuid
