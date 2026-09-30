@@ -110,6 +110,8 @@ model Tenant {
   roles         Role[]
   subscriptions Subscription[]
   auditLogs     AuditLog[]
+  orderReturns OrderReturn[]
+  orderReturnItems OrderReturnItem[]
   sessions      Session[]
 
   // ── المرحلة 2 ──
@@ -356,6 +358,7 @@ model User {
   role        Role?            @relation(fields: [roleId], references: [id], onDelete: SetNull)
   permissions UserPermission[]
   sessions    Session[]
+  orderReturns OrderReturn[]
 
   @@index([tenantId, status])
   @@index([tenantId, roleId])
@@ -584,6 +587,8 @@ model Order {
   /// مشتق من مجموع التوزيعات. يُحدَّث داخل نفس معاملة الدفعة.
   paidAmount Decimal @default(0) @map("paid_amount") @db.Decimal(18, 4)
 
+  returnedAmount Decimal @default(0) @map("returned_amount") @db.Decimal(18, 4)
+
   /// الجزء المسدَّد من رصيد سابق للزبون، وليس من نقد مقبوض مع هذا الطلب.
   creditAppliedAmount Decimal @default(0) @map("credit_applied_amount") @db.Decimal(18, 4)
 
@@ -611,6 +616,7 @@ model Order {
   customer    Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
   items       OrderItem[]
   allocations PaymentAllocation[]
+  returns     OrderReturn[]
 
   @@unique([tenantId, number])
   @@index([tenantId, customerId, issuedAt])
@@ -666,9 +672,43 @@ model OrderItem {
   sortOrder Int @default(0) @map("sort_order")
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  returnItem OrderReturnItem?
 
   @@index([tenantId, orderId])
   @@map("order_items")
+}
+
+model OrderReturn {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  orderId String @map("order_id") @db.Uuid
+  requestId String @map("request_id") @db.Uuid
+  amount Decimal @db.Decimal(18, 4)
+  reason String? @db.VarChar(500)
+  createdBy String @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  creator User @relation(fields: [createdBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  items OrderReturnItem[]
+
+  @@unique([tenantId, requestId])
+  @@index([tenantId, orderId])
+  @@map("order_returns")
+}
+
+model OrderReturnItem {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  returnId String @map("return_id") @db.Uuid
+  orderItemId String @unique @map("order_item_id") @db.Uuid
+  amount Decimal @db.Decimal(18, 4)
+  return OrderReturn @relation(fields: [returnId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([tenantId, returnId])
+  @@map("order_return_items")
 }
 
 enum LedgerEntryType {

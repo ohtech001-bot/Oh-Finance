@@ -21,6 +21,8 @@ import {
   orderPreviewSchema,
   orderVersionSchema,
   updateOrderSchema,
+  returnOrderSchema,
+  type ReturnOrderRequest,
   type CancelOrderRequest,
   type ConfirmOrderRequest,
   type CreateOrderRequest,
@@ -131,6 +133,16 @@ export class OrdersController {
     @Body(zodBody(cancelOrderSchema)) dto: CancelOrderRequest,
   ) {
     return this.orders.cancel(id, dto);
+  }
+
+  @Post(':id/returns')
+  @RequirePermissions(PERMISSIONS.ORDERS_CANCEL)
+  @ApiOperation({ summary: 'إرجاع منتجات الطلب وخفض رصيد الدين.' })
+  returnItems(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(zodBody(returnOrderSchema)) dto: ReturnOrderRequest,
+  ) {
+    return this.orders.returnItems(id, dto);
   }
 
   @Post(':id/duplicate')

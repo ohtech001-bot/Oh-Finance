@@ -401,8 +401,8 @@ export class AuthService {
 
     const passwordHash = await this.passwords.hash(dto.password);
     await this.prisma.runUnscoped(async (tx) => {
-      await tx.user.update({
-        where: { id: user.id },
+      const changed = await tx.user.updateMany({
+        where: { id: user.id, passwordHash: user.passwordHash },
         data: {
           passwordHash,
           mustChangePassword: false,
@@ -411,6 +411,9 @@ export class AuthService {
           lockedUntil: null,
         },
       });
+      if (changed.count !== 1) {
+        throw AppError.validation('رابط تعيين كلمة السر غير صالح أو استُخدم سابقاً.');
+      }
       await tx.session.updateMany({
         where: { userId: user.id, revokedAt: null },
         data: { revokedAt: new Date(), revokedReason: 'INITIAL_PASSWORD_LINK_USED' },

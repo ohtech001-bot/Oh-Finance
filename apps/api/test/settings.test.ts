@@ -49,9 +49,7 @@ describe.skipIf(!HAS_TEST_DB)('الإعدادات — Increment 4.2', () => {
     await resetAll();
     t = await createTestTenant('set-a');
     b = await createTestTenant('set-b');
-    settings = new SettingsService(fakePrisma(), {
-      deleteUrlBestEffort: async () => undefined,
-    } as never);
+    settings = new SettingsService(fakePrisma());
   });
   afterAll(async () => {
     await closeTestDb();

@@ -43,6 +43,7 @@ interface OpenOrderRow {
   issuedAt: Date;
   dueAt: Date | null;
   total: Decimal;
+  returnedAmount: Decimal;
   paidAmount: Decimal;
 }
 
@@ -85,12 +86,14 @@ export class PaymentsService {
   async create(dto: CreatePaymentRequest, idempotencyKey: string): Promise<Payment> {
     const { tenantId, storeId, userId } = this.context();
 
-    const paymentId = await this.prisma.runInTenant(tenantId, async (tx) => {
+    return this.prisma.runInTenant(tenantId, async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ledger:${dto.customerId}`}, 0))`;
       const customer = await tx.customer.findFirst({
         where: { id: dto.customerId, archivedAt: null },
         select: { id: true, name: true, code: true },
       });
       if (!customer) throw AppError.notFound('الزبون');
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ledger:${customer.id}`}, 0))`;
 
       const amount = toMoney(dto.amount);
 
@@ -211,12 +214,15 @@ export class PaymentsService {
         },
       });
 
-      return payment.id;
+      const row = await tx.payment.findFirst({
+        where: { id: payment.id },
+        include: this.include(),
+      });
+      if (!row) throw AppError.internal('تعذّر قراءة الدفعة قبل حفظها.');
+      const result = this.toDto(row, entry);
+      await this.completeFinancialRequest(tx, tenantId, idempotencyKey, result);
+      return result;
     });
-
-    const created = await this.findOne(paymentId);
-    if (!created) throw AppError.internal('تعذّر قراءة الدفعة بعد إنشائها.');
-    return created;
   }
 
   /** الرصيد السابق القابل للاستخدام، بعد طرح ما استُخدم أو رُبط بطلبات. */
@@ -243,6 +249,12 @@ export class PaymentsService {
     const { tenantId, userId } = this.context();
 
     return this.prisma.runInTenant(tenantId, async (tx) => {
+      const identity = await tx.order.findFirst({
+        where: { id: dto.orderId },
+        select: { customerId: true },
+      });
+      if (!identity) throw AppError.notFound('الطلب');
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ledger:${identity.customerId}`}, 0))`;
       const order = await tx.order.findFirst({
         where: {
           id: dto.orderId,
@@ -256,6 +268,7 @@ export class PaymentsService {
           total: true,
           paidAmount: true,
           creditAppliedAmount: true,
+          returnedAmount: true,
           customer: { select: { name: true } },
         },
       });
@@ -267,7 +280,7 @@ export class PaymentsService {
       `;
 
       const amount = toMoney(dto.amount);
-      const total = toMoney(order.total.toString());
+      const total = subtract(order.total.toString(), order.returnedAmount.toString());
       const alreadyPaid = toMoney(order.paidAmount.toString());
       const remaining = subtract(total, alreadyPaid);
       const available = await this.availableCustomerCredit(tx, tenantId, order.customerId);
@@ -311,13 +324,32 @@ export class PaymentsService {
         actor: { id: userId, name: null },
       });
 
-      return {
+      const result: ApplyCustomerCreditResult = {
         orderId: order.id,
         appliedAmount: toMoneyString(amount, 2),
         paidAmount: toMoneyString(newPaid, 2),
         remainingAmount: toMoneyString(subtract(total, newPaid), 2),
         status,
       };
+      await this.completeFinancialRequest(tx, tenantId, idempotencyKey, result);
+      return result;
+    });
+  }
+
+  private async completeFinancialRequest(
+    tx: TxClient,
+    tenantId: string,
+    key: string,
+    result: Payment | ApplyCustomerCreditResult,
+  ): Promise<void> {
+    // Persist the replay response in the same transaction as the money movement.
+    await tx.idempotencyKey.updateMany({
+      where: { tenantId, key, status: 'IN_PROGRESS' },
+      data: {
+        status: 'COMPLETED',
+        responseStatus: 201,
+        responseBody: result as Prisma.InputJsonValue,
+      },
     });
   }
 
@@ -326,7 +358,7 @@ export class PaymentsService {
     tenantId: string,
     customerId: string,
   ): Promise<Decimal> {
-    const [payments, allocations, openingCredit, applied] = await Promise.all([
+    const [payments, allocations, openingCredit, applied, returnedCredit] = await Promise.all([
       tx.payment.aggregate({
         where: { tenantId, customerId, status: 'POSTED' },
         _sum: { amount: true },
@@ -343,6 +375,11 @@ export class PaymentsService {
         where: { tenantId, customerId, status: { not: 'CANCELLED' } },
         _sum: { creditAppliedAmount: true },
       }),
+      tx.$queryRaw<{ amount: string }[]>`
+        SELECT COALESCE(SUM(GREATEST(paid_amount - (total - returned_amount), 0)), 0)::text AS amount
+        FROM orders WHERE tenant_id = ${tenantId}::uuid AND customer_id = ${customerId}::uuid
+          AND status NOT IN ('CANCELLED', 'DRAFT', 'QUOTE')
+      `,
     ]);
 
     const received = add(
@@ -353,7 +390,7 @@ export class PaymentsService {
       allocations._sum.amount?.toString() ?? '0',
       applied._sum.creditAppliedAmount?.toString() ?? '0',
     );
-    const available = subtract(received, used);
+    const available = subtract(add(received, returnedCredit[0]?.amount ?? '0'), used);
     return isNegative(available) ? zero() : available;
   }
 
@@ -400,7 +437,7 @@ export class PaymentsService {
           throw AppError.validation(`الطلب المحدد غير موجود أو مسدَّد أو لا يخص هذا الزبون.`);
         }
 
-        const orderTotal = toMoney(order.total.toString());
+        const orderTotal = subtract(order.total.toString(), order.returnedAmount.toString());
         const alreadyPaid = toMoney(order.paidAmount.toString());
         const orderRemaining = subtract(orderTotal, alreadyPaid);
         const requested = toMoney(entry.amount);
@@ -438,7 +475,7 @@ export class PaymentsService {
     for (const order of openOrders) {
       if (!greaterThan(remaining, zero())) break;
 
-      const orderTotal = toMoney(order.total.toString());
+      const orderTotal = subtract(order.total.toString(), order.returnedAmount.toString());
       const alreadyPaid = toMoney(order.paidAmount.toString());
       const orderRemaining = subtract(orderTotal, alreadyPaid);
 
@@ -482,6 +519,7 @@ export class PaymentsService {
         dueAt: true,
         total: true,
         paidAmount: true,
+        returnedAmount: true,
       },
     });
   }
@@ -536,7 +574,7 @@ export class PaymentsService {
 
       return rows
         .map((row) => {
-          const total = toMoney(row.total.toString());
+          const total = subtract(row.total.toString(), row.returnedAmount.toString());
           const paid = toMoney(row.paidAmount.toString());
           const remaining = subtract(total, paid);
 
@@ -574,13 +612,24 @@ export class PaymentsService {
     const { tenantId, storeId, userId } = this.context();
 
     await this.prisma.runInTenant(tenantId, async (tx) => {
+      const identity = await tx.payment.findFirst({ where: { id }, select: { customerId: true } });
+      if (!identity) throw AppError.notFound('الدفعة');
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ledger:${identity.customerId}`}, 0))`;
       const payment = await tx.payment.findFirst({
         where: { id },
         include: {
           customer: { select: { name: true } },
           allocations: {
             include: {
-              order: { select: { id: true, number: true, total: true, paidAmount: true } },
+              order: {
+                select: {
+                  id: true,
+                  number: true,
+                  total: true,
+                  paidAmount: true,
+                  returnedAmount: true,
+                },
+              },
             },
           },
         },
@@ -589,6 +638,32 @@ export class PaymentsService {
 
       if (payment.status === 'REVERSED') {
         throw AppError.conflict('الدفعة معكوسة مسبقًا.');
+      }
+
+      // Reversal must not withdraw credit already spent on another order.
+      const allocatedAmount = sum(payment.allocations.map((item) => item.amount.toString()));
+      const releasedCredit = sum(
+        payment.allocations.map((item) => {
+          const netTotal = subtract(
+            item.order.total.toString(),
+            item.order.returnedAmount.toString(),
+          );
+          const excess = subtract(item.order.paidAmount.toString(), netTotal);
+          return isNegative(excess) ? zero() : min(excess, item.amount.toString());
+        }),
+      );
+      const requiredCredit = add(
+        subtract(payment.amount.toString(), allocatedAmount),
+        releasedCredit,
+      );
+      if (
+        greaterThan(requiredCredit, zero()) &&
+        greaterThan(
+          requiredCredit,
+          await this.availableCustomerCredit(tx, tenantId, payment.customerId),
+        )
+      ) {
+        throw AppError.conflict('لا يمكن عكس الدفعة: استُخدم رصيدها في طلبات أخرى.');
       }
 
       // القيد الدائن الأصلي.
@@ -618,15 +693,15 @@ export class PaymentsService {
         const order = allocation.order;
         const allocated = toMoney(allocation.amount.toString());
         const currentPaid = toMoney(order.paidAmount.toString());
-        const total = toMoney(order.total.toString());
+        const total = subtract(order.total.toString(), order.returnedAmount.toString());
 
         const newPaid = subtract(currentPaid, allocated);
 
         // الحالة الجديدة: مؤكد (لا دفع) أو مدفوع جزئيًا.
-        const newStatus = isZero(newPaid)
-          ? 'CONFIRMED'
-          : equals(newPaid, total)
-            ? 'PAID'
+        const newStatus = !greaterThan(total, newPaid)
+          ? 'PAID'
+          : isZero(newPaid)
+            ? 'CONFIRMED'
             : 'PARTIALLY_PAID';
 
         await tx.order.update({

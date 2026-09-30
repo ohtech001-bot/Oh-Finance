@@ -1,4 +1,5 @@
 import type { ReportsData } from '@oh/contracts';
+import { csvCell } from '@/lib/csv';
 
 /**
  * تصدير التقرير — بلا اعتماديات خارجية.
@@ -10,12 +11,6 @@ import type { ReportsData } from '@oh/contracts';
  *  ملاحظة صريحة: توليد XLSX/PDF على الخادم مؤجَّل (يتطلب مكتبات)؛ CSV+الطباعة
  *  يغطّيان الحاجة الآن بلا تضخيم الاعتماديات.
  */
-
-/** يقتبس حقل CSV بأمان (فواصل/علامات اقتباس/أسطر). */
-function csvCell(value: string | number): string {
-  const s = String(value);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
 
 function rowsToCsv(rows: (string | number)[][]): string {
   return rows.map((r) => r.map(csvCell).join(',')).join('\n');
@@ -32,7 +27,12 @@ export function downloadReportCsv(data: ReportsData): void {
     ['الإيراد', k.sales.value, k.sales.previous ?? '', k.sales.deltaPct ?? ''],
     ['المقبوضات', k.payments.value, k.payments.previous ?? '', k.payments.deltaPct ?? ''],
     ['الديون', k.outstanding.value, k.outstanding.previous ?? '', k.outstanding.deltaPct ?? ''],
-    ['عدد الطلبات', k.ordersCount.value, k.ordersCount.previous ?? '', k.ordersCount.deltaPct ?? ''],
+    [
+      'عدد الطلبات',
+      k.ordersCount.value,
+      k.ordersCount.previous ?? '',
+      k.ordersCount.deltaPct ?? '',
+    ],
     ['متوسط قيمة الطلب', k.averageOrderValue.value, k.averageOrderValue.previous ?? '', ''],
     ['الزبائن النشطون', k.activeCustomers.value, k.activeCustomers.previous ?? '', ''],
     ['الضرائب', k.taxes.value, k.taxes.previous ?? '', ''],

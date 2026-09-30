@@ -10,6 +10,7 @@ import {
   MessageCircle,
   Pencil,
   Plus,
+  RotateCcw,
   Trash2,
   Users,
   Wallet,
@@ -41,9 +42,11 @@ import {
 } from '@oh/ui';
 import { ApiRequestError } from '@/lib/api';
 import { currentLocale } from '@/lib/i18n';
+import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { useAuth } from '@/app/auth-context';
 import { useArchiveCustomer, useCustomerStats, useCustomers } from './api';
 import { CustomerFormDialog } from './customer-form-dialog';
+import { ReturnOrderDialog } from '@/features/orders/return-order-dialog';
 
 /**
  * شاشة الزبائن — مطابقة لـ`ui/other screens/الزبائن.jpeg`.
@@ -96,6 +99,7 @@ export function CustomersPage() {
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState(() => searchParams.get('search') ?? '');
   const [accountState, setAccountState] = useState('');
+  const debouncedSearch = useDebouncedValue(search.trim());
   const [sort, setSort] = useState<{ key: string; order: 'asc' | 'desc' }>({
     key: 'createdAt',
     order: 'desc',
@@ -104,6 +108,7 @@ export function CustomersPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | undefined>();
   const [archiveTarget, setArchiveTarget] = useState<Customer | null>(null);
+  const [returnTarget, setReturnTarget] = useState<Customer | null>(null);
 
   useEffect(() => {
     setSearch(searchParams.get('search') ?? '');
@@ -113,7 +118,7 @@ export function CustomersPage() {
   const query: Partial<CustomerListQuery> = {
     page,
     pageSize,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     accountState: (accountState || undefined) as CustomerListQuery['accountState'],
     sortBy: sort.key as CustomerListQuery['sortBy'],
     sortOrder: sort.order,
@@ -275,9 +280,20 @@ export function CustomersPage() {
         const reminderReason = dueToday ? 'DUE_TODAY' : 'OVER_LIMIT';
         return (
           <div
-            className="flex items-center justify-end gap-1"
+            className="flex flex-wrap items-center justify-end gap-1"
             onClick={(event) => event.stopPropagation()}
           >
+            {can('orders.cancel') && can('orders.read') ? (
+              <Button
+                variant="outline"
+                size="icon"
+                title={locale === 'he' ? 'החזרת הזמנה' : 'إرجاع طلبية'}
+                aria-label={`${locale === 'he' ? 'החזרת הזמנה' : 'إرجاع طلبية'}: ${row.name}`}
+                onClick={() => setReturnTarget(row)}
+              >
+                <RotateCcw aria-hidden />
+              </Button>
+            ) : null}
             {!dueToday && overLimit ? (
               whatsappPhone(row.phone) ? (
                 <Button variant="outline" size="icon" title={debtUsageLabels.messageTitle} asChild>
@@ -574,6 +590,16 @@ export function CustomersPage() {
       </div>
 
       <CustomerFormDialog open={formOpen} onOpenChange={setFormOpen} customer={editing} />
+      {returnTarget ? (
+        <ReturnOrderDialog
+          key={returnTarget.id}
+          customerId={returnTarget.id}
+          open
+          onOpenChange={(open) => {
+            if (!open) setReturnTarget(null);
+          }}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={archiveTarget !== null}

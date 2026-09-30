@@ -61,7 +61,7 @@ export function buildLoggerConfig(env: Env): Params {
         req: (req: { id: string; method: string; url: string; remoteAddress?: string }) => ({
           id: req.id,
           method: req.method,
-          url: req.url,
+          url: req.url?.split('?')[0],
           ip: req.remoteAddress,
         }),
         res: (res: { statusCode: number }) => ({ statusCode: res.statusCode }),
@@ -76,7 +76,8 @@ export function buildLoggerConfig(env: Env): Params {
 
       // فحوص الصحة تُغرق السجل بلا فائدة.
       autoLogging: {
-        ignore: (req: IncomingMessage) => req.url === '/api/health' || req.url === '/api/health/live',
+        ignore: (req: IncomingMessage) =>
+          req.url === '/api/health' || req.url === '/api/health/live',
       },
     },
   };

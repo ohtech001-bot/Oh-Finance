@@ -12,7 +12,6 @@ import { DEFAULT_STORE_SETTINGS } from '@oh/contracts';
 import { AppError } from '../../core/errors/app-error.js';
 import { PrismaService } from '../../core/prisma/prisma.service.js';
 import { TenantContext } from '../../core/tenancy/tenant-context.js';
-import { StoreLogoStorageService } from '../../core/storage/store-logo-storage.service.js';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -33,10 +32,7 @@ import { StoreLogoStorageService } from '../../core/storage/store-logo-storage.s
  */
 @Injectable()
 export class SettingsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly logos: StoreLogoStorageService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async getSettings(): Promise<StoreSettings> {
     const tenantId = TenantContext.requireTenantId();
@@ -68,7 +64,6 @@ export class SettingsService {
     if (!ctx?.storeId) throw AppError.forbidden('لا يوجد محل مرتبط بحسابك.');
     const storeId = ctx.storeId;
 
-    let replacedLogoUrl: string | null = null;
     const result = await this.prisma.runInTenant(tenantId, async (tx) => {
       const store = await tx.store.findFirst({
         where: { id: storeId },
@@ -90,7 +85,6 @@ export class SettingsService {
       switch (section) {
         case 'general': {
           const g = data as GeneralSettings;
-          if (store.logoUrl && g.logoUrl !== store.logoUrl) replacedLogoUrl = store.logoUrl;
           storeUpdate.name = g.name;
           storeUpdate.email = g.email || null;
           storeUpdate.address = g.address || null;
@@ -141,7 +135,8 @@ export class SettingsService {
       return this.merge(fresh!);
     });
 
-    if (replacedLogoUrl) await this.logos.deleteUrlBestEffort(replacedLogoUrl);
+    // A user-entered URL is not proof of ownership. Only the trusted upload flow
+    // may delete a previous Storage object after replacement.
     return result;
   }
 

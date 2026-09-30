@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   CalendarDays,
   CheckCircle2,
   ChevronLeft,
+  Eye,
   Pencil,
   Plus,
   ShoppingBag,
@@ -36,6 +38,7 @@ import {
   type Column,
 } from '@oh/ui';
 import { ApiRequestError, api } from '@/lib/api';
+import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { useAuth } from '@/app/auth-context';
 import { CreateOrderDialog } from './create-order-dialog';
 import { OrderDetailsDialog } from './order-details-dialog';
@@ -47,12 +50,14 @@ import { PrintOrderMenu } from './print-order-menu';
 
 export function OrdersPage() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const { user, can } = useAuth();
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
   const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search.trim());
   const [paymentState, setPaymentState] = useState('');
   const [classification, setClassification] = useState('');
   const [from, setFrom] = useState('');
@@ -76,7 +81,7 @@ export function OrdersPage() {
   const query: Partial<OrderListQuery> = {
     page,
     pageSize,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     status: paymentState === 'paid' ? 'PAID' : undefined,
     unpaidOnly: paymentState === 'unpaid' ? true : undefined,
     classification:
@@ -102,7 +107,11 @@ export function OrdersPage() {
     setSearchParams(next, { replace: true });
   };
 
-  const loadOrder = async (id: string) => api.get<OrderDetail>(`/orders/${id}`);
+  const loadOrder = (id: string) =>
+    queryClient.fetchQuery({
+      queryKey: ['orders', 'one', id],
+      queryFn: ({ signal }) => api.get<OrderDetail>(`/orders/${id}`, { signal }),
+    });
 
   const openEdit = async (row: Order) => {
     if (row.status !== 'DRAFT' && row.status !== 'QUOTE') return;
@@ -194,7 +203,7 @@ export function OrdersPage() {
         return (
           <div className="space-y-1">
             <MoneyText
-              value={row.total}
+              value={row.netTotal ?? row.total}
               currency={currency}
               tone={isDraft ? 'neutral' : isPaid ? 'credit' : 'debit'}
             />
@@ -207,7 +216,13 @@ export function OrdersPage() {
                     : 'text-danger text-xs font-medium'
               }
             >
-              {isDraft ? t('orders.draft') : isPaid ? t('orders.paid') : t('orders.unpaid')}
+              {row.returnedAmount && row.returnedAmount !== '0.00'
+                ? t('orders.returned')
+                : isDraft
+                  ? t('orders.draft')
+                  : isPaid
+                    ? t('orders.paid')
+                    : t('orders.unpaid')}
             </p>
           </div>
         );
@@ -246,11 +261,13 @@ export function OrdersPage() {
                 : 'debit'
           }
         >
-          {row.status === 'DRAFT' || row.status === 'QUOTE'
-            ? t('orders.draft')
-            : row.remainingAmount === '0.00'
-              ? t('orders.paid')
-              : t('orders.unpaid')}
+          {row.netTotal === '0.00' && row.returnedAmount !== '0.00'
+            ? t('orders.fullyReturned')
+            : row.status === 'DRAFT' || row.status === 'QUOTE'
+              ? t('orders.draft')
+              : row.remainingAmount === '0.00'
+                ? t('orders.paid')
+                : t('orders.unpaid')}
         </StatusBadge>
       ),
     },
@@ -262,9 +279,18 @@ export function OrdersPage() {
         const editable = row.status === 'DRAFT' || row.status === 'QUOTE';
         return (
           <div
-            className="flex items-center justify-end gap-2"
+            className="flex flex-wrap items-center justify-end gap-2"
             onClick={(event) => event.stopPropagation()}
           >
+            <Button
+              variant="outline"
+              size="sm"
+              aria-label={`${t('common.details')} ${displayOrderNumber(row.number)}`}
+              title={t('common.details')}
+              onClick={() => setDetailOrder(row.id)}
+            >
+              <Eye aria-hidden />
+            </Button>
             <Button
               variant="outline"
               size="sm"

@@ -1,5 +1,7 @@
 import { LEDGER_TYPE_LABELS, type LedgerEntry } from '@oh/contracts';
 import { displayOrderNumber } from '@/features/orders/order-number';
+import { ledgerBalanceDisplay } from './balance-display';
+import { csvCell } from '@/lib/csv';
 
 /**
  * تصدير وطباعة دفتر الحركات.
@@ -15,8 +17,10 @@ const HEADERS = [
   'الزبون',
   'رقم الزبون',
   'المرجع',
-  'المدين',
-  'الدائن',
+  'زيادة على الحساب',
+  'دفعة أو تخفيض من الحساب',
+  'الدين بعد الحركة',
+  'الرصيد المتاح بعد الحركة',
   'الرصيد بعد الحركة',
   'ملاحظات',
 ] as const;
@@ -35,15 +39,13 @@ function rowCells(e: LedgerEntry): string[] {
     e.refType === 'ORDER' && e.refNumber ? displayOrderNumber(e.refNumber) : (e.refNumber ?? ''),
     e.debit !== '0.00' ? e.debit : '',
     e.credit !== '0.00' ? e.credit : '',
-    e.runningBalance,
+    ledgerBalanceDisplay(e.runningBalance).debt === '0.00'
+      ? 'غير مديون'
+      : ledgerBalanceDisplay(e.runningBalance).debt,
+    ledgerBalanceDisplay(e.runningBalance).credit,
+    ledgerBalanceDisplay(e.runningBalance).signedBalance,
     e.refType === 'ORDER' ? (e.notes?.replace(/ORD-?/gi, '') ?? '') : (e.notes ?? ''),
   ];
-}
-
-/** يهرّب خلية CSV وفق RFC 4180. */
-function csvCell(value: string): string {
-  if (/[",\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
 }
 
 /** ينزّل الحركات كملف CSV. BOM في المقدمة كي يعرض Excel العربية سليمة. */

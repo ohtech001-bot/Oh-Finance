@@ -35,7 +35,9 @@ export class IdempotencyService {
 
   /** بصمة الحمولة — نفس المفتاح بحمولة مختلفة = خطأ عميل، لا إعادة محاولة. */
   hashPayload(payload: unknown): string {
-    return createHash('sha256').update(JSON.stringify(payload ?? null), 'utf8').digest('hex');
+    return createHash('sha256')
+      .update(JSON.stringify(payload ?? null), 'utf8')
+      .digest('hex');
   }
 
   /**
@@ -79,10 +81,7 @@ export class IdempotencyService {
       return { acquired: true, recordId: record.id };
     } catch (error) {
       // P2002 = انتهاك UNIQUE ⇒ المفتاح موجود ⇒ طلب مكرر.
-      if (
-        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-        error.code !== 'P2002'
-      ) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
         throw error;
       }
     }
@@ -92,6 +91,7 @@ export class IdempotencyService {
       tx.idempotencyKey.findUnique({
         where: { tenantId_key: { tenantId, key } },
         select: {
+          endpoint: true,
           requestHash: true,
           status: true,
           responseStatus: true,
@@ -107,7 +107,7 @@ export class IdempotencyService {
 
     // نفس المفتاح، حمولة مختلفة ⇒ خطأ في العميل، لا إعادة محاولة.
     // لو أعدنا الرد القديم هنا، لظن العميل أن دفعته الجديدة سُجِّلت — وهي لم تُسجَّل.
-    if (existing.requestHash !== requestHash) {
+    if (existing.endpoint !== endpoint || existing.requestHash !== requestHash) {
       throw new AppError(
         'IDEMPOTENCY_PAYLOAD_MISMATCH',
         'مفتاح منع التكرار مستخدم مع بيانات مختلفة. استخدم مفتاحًا جديدًا لكل عملية.',
@@ -132,12 +132,7 @@ export class IdempotencyService {
   }
 
   /** يخزّن الرد بعد نجاح العملية — فتعيده أي إعادة إرسال لاحقة. */
-  async complete(
-    tx: TxClient,
-    recordId: string,
-    status: number,
-    body: unknown,
-  ): Promise<void> {
+  async complete(tx: TxClient, recordId: string, status: number, body: unknown): Promise<void> {
     await tx.idempotencyKey.update({
       where: { id: recordId },
       data: {

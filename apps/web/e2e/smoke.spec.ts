@@ -31,7 +31,9 @@ test.describe('صفحة تسجيل الدخول', () => {
 
   test('تُعرض بلا انهيار', async ({ page }) => {
     await expect(page.getByRole('heading', { name: 'تسجيل الدخول' })).toBeVisible();
-    await expect(page.getByRole('textbox', { name: 'البريد الإلكتروني', exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('textbox', { name: 'البريد الإلكتروني', exact: true }),
+    ).toBeVisible();
     await expect(page.getByRole('textbox', { name: 'كلمة المرور', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'دخول' })).toBeVisible();
   });
@@ -42,7 +44,9 @@ test.describe('صفحة تسجيل الدخول', () => {
   });
 
   test('حقل البريد بـdir=ltr — البريد يُقرأ من اليسار حتى في واجهة عربية', async ({ page }) => {
-    await expect(page.getByRole('textbox', { name: 'البريد الإلكتروني', exact: true })).toHaveAttribute('dir', 'ltr');
+    await expect(
+      page.getByRole('textbox', { name: 'البريد الإلكتروني', exact: true }),
+    ).toHaveAttribute('dir', 'ltr');
   });
 
   test('التحقق من المدخلات يمنع الإرسال الفارغ', async ({ page }) => {
@@ -63,7 +67,9 @@ test.describe('صفحة تسجيل الدخول', () => {
     // نختبر **العلاقة** بين الحقول لا عددًا مطلقًا من ضغطات Tab: عدّ الضغطات
     // يجعل الاختبار هشًّا (إضافة زر واحد تكسره) ولا يقيس ما يهم فعلًا.
     await page.getByRole('textbox', { name: 'البريد الإلكتروني', exact: true }).focus();
-    await expect(page.getByRole('textbox', { name: 'البريد الإلكتروني', exact: true })).toBeFocused();
+    await expect(
+      page.getByRole('textbox', { name: 'البريد الإلكتروني', exact: true }),
+    ).toBeFocused();
 
     await page.keyboard.press('Tab');
     // زر «إظهار كلمة المرور» له tabIndex=-1 عمدًا — لا يعترض التسلسل.
@@ -103,15 +109,19 @@ test.describe('تبديل اللغة', () => {
     await expect(page.getByRole('heading', { name: 'התחברות' })).toBeVisible();
   });
 
-  test('الإنجليزية تقلب الاتجاه إلى LTR', async ({ page }) => {
+  test('القائمة تعرض العربية والعبرية فقط وتسمح بالعودة للعربية', async ({ page }) => {
     await page.goto('/login');
 
     await page.getByRole('button', { name: /العربية/ }).click();
-    await page.getByRole('menuitem', { name: 'English' }).click();
-
-    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
-    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    await expect(page.getByRole('menuitem')).toHaveCount(2);
+    await expect(page.getByRole('menuitem', { name: 'English' })).toHaveCount(0);
+    await page.getByRole('menuitem', { name: 'עברית' }).click();
+    await expect(page.getByRole('heading', { name: 'התחברות' })).toBeVisible();
+    await page.getByRole('button', { name: /עברית/ }).click();
+    await page.getByRole('menuitem', { name: 'العربية' }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    await expect(page.getByRole('heading', { name: 'تسجيل الدخول' })).toBeVisible();
   });
 });
 
@@ -173,13 +183,34 @@ test.describe('التجاوب على نقاط التوقف', () => {
     });
   }
 
-  test('لوحة العلامة تظهر على الديسكتوب وتختفي على الموبايل', async ({ page }) => {
+  test('صورة الدخول المناسبة تُحمّل للديسكتوب والموبايل', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/login');
-    await expect(page.getByText('عزل كامل لبيانات كل محل')).toBeVisible();
+    const image = page.locator('picture img');
+    await expect(image).toBeVisible();
+    await expect
+      .poll(() =>
+        image.evaluate(
+          (node: HTMLImageElement) =>
+            node.complete &&
+            node.naturalWidth > 0 &&
+            node.currentSrc.endsWith('/images/login-desktop.png'),
+        ),
+      )
+      .toBe(true);
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await expect(page.getByText('عزل كامل لبيانات كل محل')).not.toBeVisible();
+    await expect
+      .poll(() =>
+        image.evaluate(
+          (node: HTMLImageElement) =>
+            node.complete &&
+            node.naturalWidth > 0 &&
+            node.currentSrc.endsWith('/images/login-mobile.png'),
+        ),
+      )
+      .toBe(true);
+    await expect(page.getByRole('heading', { name: 'تسجيل الدخول' })).toBeVisible();
   });
 
   test('حقول النموذج قابلة للنقر عند 360px (أصغر شاشة مدعومة)', async ({ page }) => {

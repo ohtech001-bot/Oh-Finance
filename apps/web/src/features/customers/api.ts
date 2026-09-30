@@ -22,9 +22,10 @@ const KEY = 'customers';
 export function useCustomers(query: Partial<CustomerListQuery>) {
   return useQuery({
     queryKey: [KEY, 'list', query],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       api.get<PaginatedResult<Customer>>(
         `/customers${buildQuery(query as Record<string, string>)}`,
+        { signal },
       ),
   });
 }
@@ -39,7 +40,7 @@ export function useCustomerStats() {
 export function useCustomer(id: string | undefined) {
   return useQuery({
     queryKey: [KEY, 'one', id],
-    queryFn: () => api.get<Customer>(`/customers/${id}`),
+    queryFn: ({ signal }) => api.get<Customer>(`/customers/${id}`, { signal }),
     enabled: Boolean(id),
   });
 }

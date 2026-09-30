@@ -65,12 +65,14 @@ export class TokenService {
     return this.jwt.signAsync(payload, {
       secret: this.env.get('JWT_ACCESS_SECRET'),
       expiresIn: this.ttl(this.env.get('JWT_ACCESS_TTL')),
+      algorithm: 'HS256',
     });
   }
 
   async verifyAccessToken(token: string): Promise<AccessTokenPayload> {
     return this.jwt.verifyAsync<AccessTokenPayload>(token, {
       secret: this.env.get('JWT_ACCESS_SECRET'),
+      algorithms: ['HS256'],
     });
   }
 
@@ -84,6 +86,7 @@ export class TokenService {
       {
         secret: this.env.get('JWT_REFRESH_SECRET'),
         expiresIn: '30m',
+        algorithm: 'HS256',
       },
     );
   }
@@ -91,6 +94,7 @@ export class TokenService {
   async verifyPasswordResetToken(token: string): Promise<PasswordResetTokenPayload> {
     const payload = await this.jwt.verifyAsync<PasswordResetTokenPayload>(token, {
       secret: this.env.get('JWT_REFRESH_SECRET'),
+      algorithms: ['HS256'],
     });
     if (payload.purpose !== 'initial-password-reset') {
       throw new Error('Invalid password reset token purpose.');
@@ -181,6 +185,8 @@ export class TokenService {
   > {
     const tokenHash = this.passwords.hashToken(refreshToken);
 
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`refresh:${tokenHash}`}, 0))`;
+
     const session = await tx.session.findUnique({
       where: { refreshTokenHash: tokenHash },
       select: {
@@ -269,10 +275,21 @@ export class TokenService {
   async isSessionActive(tx: TxClient, sessionId: string): Promise<boolean> {
     const session = await tx.session.findUnique({
       where: { id: sessionId },
-      select: { revokedAt: true, expiresAt: true },
+      select: {
+        revokedAt: true,
+        expiresAt: true,
+        user: { select: { status: true, isSuperAdmin: true } },
+        tenant: { select: { status: true } },
+      },
     });
     if (!session) return false;
     if (session.revokedAt !== null) return false;
+    if (session.user.status !== 'ACTIVE') return false;
+    if (
+      !session.user.isSuperAdmin &&
+      (session.tenant?.status === 'SUSPENDED' || session.tenant?.status === 'CANCELLED')
+    )
+      return false;
     return session.expiresAt.getTime() > Date.now();
   }
 

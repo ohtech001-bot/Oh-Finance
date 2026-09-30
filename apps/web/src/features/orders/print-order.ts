@@ -173,11 +173,14 @@ export function printOrder(
   const settlementTime = settledAt ? escapeHtml(formatOrderTime(settledAt)) : null;
   const paid = order.remainingAmount === '0.00';
   const partiallyPaid = order.status === 'PARTIALLY_PAID';
-  const paymentState = paid
-    ? 'مدفوع / שולם'
-    : partiallyPaid
-      ? 'مدفوع جزئيًا / שולם חלקית'
-      : 'غير مدفوع / לא שולם';
+  const paymentState =
+    order.netTotal === '0.00' && order.returnedAmount !== '0.00'
+      ? 'مرتجع بالكامل / הוחזר במלואו'
+      : paid
+        ? 'مدفوع / שולם'
+        : partiallyPaid
+          ? 'مدفوع جزئيًا / שולם חלקית'
+          : 'غير مدفوع / לא שולם';
   const paymentColor = paid ? '#16733a' : partiallyPaid ? '#b65d00' : '#c42323';
   const cashPaid = subtract(order.paidAmount, order.creditAppliedAmount);
   const documentState = order.status === 'DRAFT' ? 'مسودة / טיוטה' : 'طلب مؤكد / הזמנה מאושרת';
@@ -186,7 +189,7 @@ export function printOrder(
   const a4 = paperSize === 'A4';
   const taxRate = options.store?.taxEnabled ? options.store.taxRate : 0;
   const tax = inclusiveTaxBreakdown(
-    order.total,
+    order.netTotal ?? order.total,
     options.store?.taxEnabled ?? false,
     taxRate,
     currency,
@@ -205,7 +208,7 @@ export function printOrder(
       return `
         <tr>
           <td class="product">
-            <span class="product-name">${escapeHtml(item.name)}</span>
+            <span class="product-name"${item.returned ? ' style="text-decoration:line-through"' : ''}>${escapeHtml(item.name)}</span>${item.returned ? '<span>مرتجع / הוחזר</span>' : ''}
             ${itemDiscount}
           </td>
           <td>${escapeHtml(item.quantity)}</td>
@@ -375,7 +378,8 @@ export function printOrder(
         <div class="total-row"><span>السعر قبل الضريبة</span><strong>${money(tax.beforeTax)}</strong></div>
         <div class="total-row"><span>قيمة الضريبة (${escapeHtml(String(taxRate))}% ضمن السعر)</span><strong>${money(tax.taxAmount)}</strong></div>
         ${discount}
-        <div class="total-row grand-total"><span>السعر النهائي شامل الضريبة</span><strong>${money(order.total)}</strong></div>
+        ${order.returnedAmount && order.returnedAmount !== '0.00' ? `<div class="total-row"><span>قيمة المرتجعات / החזרות</span><strong>${money(order.returnedAmount)}</strong></div>` : ''}
+        <div class="total-row grand-total"><span>السعر النهائي شامل الضريبة</span><strong>${money(order.netTotal ?? order.total)}</strong></div>
       </section>
 
       <footer class="footer">${storeName}</footer>

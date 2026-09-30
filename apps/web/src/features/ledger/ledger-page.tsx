@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowDownLeft, ArrowUpRight, Download, ListOrdered, Printer } from 'lucide-react';
 import { LEDGER_TYPE_LABELS, type LedgerEntry, type LedgerListQuery } from '@oh/contracts';
-import { negate, toMoneyString, type CurrencyCode } from '@oh/money';
+import { isZero, type CurrencyCode } from '@oh/money';
 import {
   Button,
   Card,
@@ -26,6 +26,7 @@ import { useAuth } from '@/app/auth-context';
 import { displayOrderNumber } from '@/features/orders/order-number';
 import { fetchAllLedger, useLedger } from './api';
 import { exportLedgerCsv, printLedger } from './export';
+import { ledgerBalanceDisplay } from './balance-display';
 
 /** لون شارة نوع الحركة. */
 const TYPE_TONE: Record<string, 'debit' | 'credit' | 'partial' | 'info' | 'neutral' | 'purple'> = {
@@ -38,16 +39,18 @@ const TYPE_TONE: Record<string, 'debit' | 'credit' | 'partial' | 'info' | 'neutr
   WRITE_OFF: 'debit',
 };
 
-/**
- * شاشة الحساب والحركات — مطابقة لـ`ui/other screens/الحساب والحركات.jpeg`.
- *
- * الجدول يعرض العمود الأهم: «الرصيد بعد الحركة» — وهو ما يجعل هذا دفتر أستاذ
- * حقيقيًا لا مجرد سجل. المدين والدائن في عمودين منفصلين، كما في المرجع.
- *
- * كل رقم هنا من دفتر الحركات على الخادم. لا رصيد محسوب في الواجهة.
- */
+/** Financial amounts come from the ledger; only their customer-facing sign is inverted. */
 export function LedgerPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const he = i18n.language.startsWith('he');
+  const labels = {
+    amount: he ? 'סכום התנועה' : 'مبلغ الحركة',
+    debt: he ? 'חוב לאחר התנועה' : 'الدين بعد الحركة',
+    balance: he ? 'יתרה לאחר התנועה' : 'الرصيد بعد الحركة',
+    noDebt: he ? 'ללא חוב' : 'غير مديون',
+    settled: he ? 'החשבון מאוזן' : 'الحساب مسدد',
+    available: he ? 'יתרה לזכות הלקוח' : 'رصيد متاح للزبون',
+  };
   const { user } = useAuth();
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
 
@@ -168,37 +171,80 @@ export function LedgerPage() {
       ),
     },
     {
-      header: 'الدين',
-      align: 'end',
-      render: (row) =>
-        row.debit !== '0.00' ? (
-          <MoneyText value={row.debit} currency={currency} tone="debit" withSymbol={false} />
-        ) : (
-          <span className="text-fg-subtle">—</span>
-        ),
-    },
-    {
-      header: 'المدفوع',
-      align: 'end',
-      render: (row) =>
-        row.credit !== '0.00' ? (
-          <MoneyText value={row.credit} currency={currency} tone="credit" withSymbol={false} />
-        ) : (
-          <span className="text-fg-subtle">—</span>
-        ),
-    },
-    {
-      header: 'الرصيد بعد الحركة',
+      header: labels.amount,
       align: 'end',
       render: (row) => (
-        <span className={row.isReversed ? 'line-through opacity-50' : ''}>
+        <div className="space-y-1">
           <MoneyText
-            value={row.runningBalance}
+            value={!isZero(row.debit) ? row.debit : row.credit}
+            currency={currency}
+            tone={!isZero(row.debit) ? 'debit' : 'credit'}
+            withSymbol={false}
+          />
+          <p className="text-fg-muted text-xs">
+            {!isZero(row.debit)
+              ? he
+                ? 'חיוב'
+                : 'زيادة على الحساب'
+              : row.entryType === 'PAYMENT_CREDIT'
+                ? he
+                  ? 'תשלום שהתקבל'
+                  : 'دفعة مقبوضة'
+                : he
+                  ? 'הפחתה מהחשבון'
+                  : 'تخفيض من الحساب'}
+          </p>
+          <div className="text-fg-muted flex flex-wrap justify-end gap-1 text-xs">
+            <span>{he ? 'לפני:' : 'قبل الحركة:'}</span>
+            <MoneyText
+              value={ledgerBalanceDisplay(row.openingBalance).signedBalance}
+              currency={currency}
+              tone="auto"
+              size="sm"
+              withSymbol={false}
+              signDisplay
+            />
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: labels.debt,
+      align: 'end',
+      render: (row) =>
+        !isZero(ledgerBalanceDisplay(row.runningBalance).debt) ? (
+          <MoneyText
+            value={ledgerBalanceDisplay(row.runningBalance).debt}
+            currency={currency}
+            tone="debit"
+            withSymbol={false}
+          />
+        ) : (
+          <span className="text-success text-xs font-medium">{labels.noDebt}</span>
+        ),
+    },
+    {
+      header: labels.balance,
+      align: 'end',
+      render: (row) => (
+        <div>
+          <MoneyText
+            value={ledgerBalanceDisplay(row.runningBalance).signedBalance}
             currency={currency}
             tone="auto"
             withSymbol={false}
+            signDisplay
           />
-        </span>
+          <p className="text-fg-muted mt-1 text-xs">
+            {!isZero(ledgerBalanceDisplay(row.runningBalance).credit)
+              ? labels.available
+              : isZero(row.runningBalance)
+                ? labels.settled
+                : he
+                  ? 'חוב לתשלום'
+                  : 'دين مطلوب سداده'}
+          </p>
+        </div>
       ),
     },
   ];
@@ -239,23 +285,17 @@ export function LedgerPage() {
 
       {customerId && totals && list.data && list.data.total > 0 ? (
         <Card>
-          <CardBody className="grid grid-cols-3 gap-3 py-5 text-center sm:gap-6">
+          <CardBody className="grid grid-cols-2 gap-3 py-5 text-center sm:gap-6">
             <Totals
-              label="إجمالي الدين"
-              value={totals.totalDebit}
+              label={he ? 'החוב הנוכחי' : 'الدين الحالي'}
+              value={ledgerBalanceDisplay(totals.currentBalance).debt}
               tone="debit"
               currency={currency}
             />
             <Totals
-              label="مدفوع حتى الآن"
-              value={totals.totalCredit}
+              label={labels.available}
+              value={ledgerBalanceDisplay(totals.currentBalance).credit}
               tone="credit"
-              currency={currency}
-            />
-            <Totals
-              label="الرصيد الحالي"
-              value={toMoneyString(negate(totals.currentBalance), 2)}
-              tone="auto"
               currency={currency}
             />
           </CardBody>
@@ -381,15 +421,31 @@ export function LedgerPage() {
                       tone={isDebit ? 'debit' : 'credit'}
                       size="lg"
                     />
-                    <p className="text-fg-muted mt-1 text-[11px]">الرصيد بعد الحركة</p>
+                    <p className="text-fg-muted mt-1 text-[11px]">{labels.balance}</p>
                     <MoneyText
-                      value={row.runningBalance}
+                      value={ledgerBalanceDisplay(row.runningBalance).signedBalance}
                       currency={currency}
                       tone="auto"
                       withSymbol={false}
                       size="sm"
+                      signDisplay
                     />
+                    {isZero(row.runningBalance) ? (
+                      <p className="text-fg-muted mt-1 text-xs">{labels.settled}</p>
+                    ) : null}
                   </div>
+                </div>
+                <div className="border-border mt-3 flex items-center justify-between gap-3 border-t pt-3 text-sm">
+                  <span className="text-fg-muted">{labels.debt}</span>
+                  {isZero(ledgerBalanceDisplay(row.runningBalance).debt) ? (
+                    <span className="text-success font-medium">{labels.noDebt}</span>
+                  ) : (
+                    <MoneyText
+                      value={ledgerBalanceDisplay(row.runningBalance).debt}
+                      currency={currency}
+                      tone="debit"
+                    />
+                  )}
                 </div>
               </article>
             );
@@ -419,21 +475,15 @@ export function LedgerPage() {
         <Card>
           <CardBody className="flex flex-wrap items-center justify-around gap-4 py-4">
             <Totals
-              label="إجمالي المدين"
+              label={he ? 'סך החיובים בתוצאות' : 'مجموع الزيادات ضمن النتائج'}
               value={totals.totalDebit}
               tone="debit"
               currency={currency}
             />
             <Totals
-              label="إجمالي الدائن"
+              label={he ? 'סך ההפחתות בתוצאות' : 'مجموع التخفيضات ضمن النتائج'}
               value={totals.totalCredit}
               tone="credit"
-              currency={currency}
-            />
-            <Totals
-              label="الرصيد الحالي"
-              value={totals.currentBalance}
-              tone="auto"
               currency={currency}
             />
           </CardBody>

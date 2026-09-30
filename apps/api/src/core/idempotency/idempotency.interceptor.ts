@@ -60,7 +60,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
     const headerValue = request.headers['idempotency-key'];
     const key = Array.isArray(headerValue) ? headerValue[0] : headerValue;
 
-    if (!key || key.trim().length < 8) {
+    if (!key || key.trim().length < 8 || key.length > 200) {
       throw new AppError(
         ERROR_CODES.IDEMPOTENCY_KEY_REQUIRED,
         'ترويسة Idempotency-Key مطلوبة لهذه العملية المالية. ' +
@@ -83,19 +83,22 @@ export class IdempotencyInterceptor implements NestInterceptor {
         const { recordId } = acquisition;
 
         return next.handle().pipe(
+          // Only handler failures release the reservation. A response-storage failure
+          // must retain it because the financial operation has already succeeded.
+          catchError((error: unknown) =>
+            from(this.idempotency.release(tenantId, recordId)).pipe(
+              switchMap(() => throwError(() => error)),
+            ),
+          ),
           // نجاح ⇒ خزّن الرد.
           switchMap((result) =>
             from(
               this.prisma.runInTenant(tenantId, (tx) =>
                 this.idempotency.complete(tx, recordId, 201, result),
               ),
-            ).pipe(tap({ next: () => undefined }), switchMap(() => of(result))),
-          ),
-
-          // فشل ⇒ حرّر المفتاح، ثم أعِد رمي الخطأ **الأصلي** بلا تغيير.
-          catchError((error: unknown) =>
-            from(this.idempotency.release(tenantId, recordId)).pipe(
-              switchMap(() => throwError(() => error)),
+            ).pipe(
+              tap({ next: () => undefined }),
+              switchMap(() => of(result)),
             ),
           ),
         );

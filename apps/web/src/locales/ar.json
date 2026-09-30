@@ -100,6 +100,7 @@
     "progress": "اكتمل {{progress}} بالمئة"
   },
   "common": {
+    "details": "تفاصيل الطلب",
     "search": "بحث",
     "searchPlaceholder": "ابحث عن زبون، طلب، فاتورة…",
     "filter": "تصفية",
@@ -165,6 +166,8 @@
     "archiveNamed": "أرشفة {{name}}"
   },
   "orders": {
+    "returned": "يتضمن مرتجعات",
+    "fullyReturned": "مرتجع بالكامل",
     "number": "رقم الطلب",
     "customer": "الزبون",
     "cost": "قيمة الطلب",

@@ -10,16 +10,33 @@ import type {
   OrderTotals,
   PaginatedResult,
   UpdateOrderRequest,
+  ReturnOrderRequest,
 } from '@oh/contracts';
 import { api, buildQuery } from '@/lib/api';
 
 const KEY = 'orders';
 
+export function useReturnOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: ReturnOrderRequest }) =>
+      api.post<OrderDetail>(`/orders/${id}/returns`, body),
+    onSuccess: (order) => {
+      qc.setQueryData([KEY, 'one', order.id], order);
+      invalidateOrderScope(qc);
+      void qc.invalidateQueries({ queryKey: ['payments'] });
+      void qc.invalidateQueries({ queryKey: ['reports'] });
+    },
+  });
+}
+
 export function useOrders(query: Partial<OrderListQuery>, enabled = true) {
   return useQuery({
     queryKey: [KEY, 'list', query],
-    queryFn: () =>
-      api.get<PaginatedResult<Order>>(`/orders${buildQuery(query as Record<string, string>)}`),
+    queryFn: ({ signal }) =>
+      api.get<PaginatedResult<Order>>(`/orders${buildQuery(query as Record<string, string>)}`, {
+        signal,
+      }),
     enabled,
   });
 }
@@ -35,7 +52,7 @@ export function useOrderStats(query: Partial<OrderListQuery>) {
 export function useOrder(id: string | undefined) {
   return useQuery({
     queryKey: [KEY, 'one', id],
-    queryFn: () => api.get<OrderDetail>(`/orders/${id}`),
+    queryFn: ({ signal }) => api.get<OrderDetail>(`/orders/${id}`, { signal }),
     enabled: Boolean(id),
   });
 }

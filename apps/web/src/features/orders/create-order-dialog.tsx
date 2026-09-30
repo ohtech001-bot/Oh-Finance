@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, ChevronDown, ChevronUp, Plus, Search, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import type { Customer, OrderDetail, OrderItemInput } from '@oh/contracts';
 import {
   add,
@@ -424,6 +424,8 @@ export function CreateOrderDialog({
                       }
                       className="border-border bg-card hover:bg-card-muted rounded-ctrl flex h-11 w-full items-center gap-2 border px-3 text-start transition-colors"
                       aria-expanded="false"
+                      aria-label={`تعديل المنتج ${item.name.trim() || i + 1}`}
+                      title="تعديل المنتج"
                     >
                       <ChevronDown className="text-fg-muted size-4 shrink-0" aria-hidden />
                       <span className="text-fg min-w-0 flex-1 truncate text-sm font-semibold">
@@ -432,6 +434,7 @@ export function CreateOrderDialog({
                       {lineTotal ? (
                         <MoneyText value={lineTotal} currency={currency} tone="plain" size="sm" />
                       ) : null}
+                      <Pencil className="text-accent size-4 shrink-0" aria-hidden />
                     </button>
                   );
                 }

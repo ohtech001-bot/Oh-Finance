@@ -166,7 +166,13 @@ export class LedgerQueryService {
       const statementOrders = orderIds.length
         ? await tx.order.findMany({
             where: { tenantId, customerId, id: { in: orderIds } },
-            select: { id: true, total: true, paidAmount: true, creditAppliedAmount: true },
+            select: {
+              id: true,
+              total: true,
+              paidAmount: true,
+              creditAppliedAmount: true,
+              returnedAmount: true,
+            },
           })
         : [];
 
@@ -196,9 +202,13 @@ export class LedgerQueryService {
         orders: statementOrders.map((order) => {
           const paidAmount = toMoney(order.paidAmount.toString());
           const creditApplied = toMoney(order.creditAppliedAmount.toString());
-          const remaining = subtract(order.total.toString(), paidAmount);
-          const paymentState: CustomerStatement['orders'][number]['paymentState'] = isZero(
+          const remaining = subtract(
+            subtract(order.total.toString(), order.returnedAmount.toString()),
+            paidAmount,
+          );
+          const paymentState: CustomerStatement['orders'][number]['paymentState'] = !greaterThan(
             remaining,
+            zero(),
           )
             ? greaterThan(creditApplied, zero()) && isZero(subtract(paidAmount, creditApplied))
               ? 'PAID_FROM_CREDIT'
@@ -239,6 +249,7 @@ export class LedgerQueryService {
     const { tenantId, storeId, userId } = this.context();
 
     const entryId = await this.prisma.runInTenant(tenantId, async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ledger:${dto.customerId}`}, 0))`;
       const customer = await tx.customer.findFirst({
         where: { id: dto.customerId, archivedAt: null },
         select: { id: true, name: true, code: true },

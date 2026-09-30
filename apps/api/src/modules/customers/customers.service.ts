@@ -30,6 +30,7 @@ import { PrismaService } from '../../core/prisma/prisma.service.js';
 import { TenantContext } from '../../core/tenancy/tenant-context.js';
 import { isoDateInTimeZone } from '../../core/time/iso-date-in-timezone.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { customerBalanceQuery } from './customer-balance-query.js';
 
 /** صف الزبون كما نقرأه من Prisma. */
 type CustomerRow = Prisma.CustomerGetPayload<Record<string, never>>;
@@ -179,16 +180,7 @@ export class CustomersService {
           : {}),
       };
 
-      /**
-       * ⚠️ الفرز والفلترة بالرصيد لا يمكنان في Prisma — الرصيد ليس عمودًا.
-       *
-       * الحل: نجلب المرشّحين، نحسب أرصدتهم دفعة واحدة (DISTINCT ON — لا N+1)،
-       * ثم نفلتر ونرتّب في الذاكرة، ثم نُرقّم.
-       *
-       * الثمن: عند الفرز/الفلترة بالرصيد نجلب أكثر من صفحة. مقبول لعشرات
-       * الآلاف من الزبائن (سقف الباقة 100 ألف). لو تجاوزناه، الحل هو
-       * MATERIALIZED VIEW على الأرصدة تُحدَّث بـtrigger — لا عمود قابل للكتابة.
-       */
+      // Balance filters execute in PostgreSQL; only the requested page is hydrated.
       const needsBalanceSort =
         query.sortBy === 'balance' ||
         query.accountState !== undefined ||
@@ -220,49 +212,23 @@ export class CustomersService {
         };
       }
 
-      // ── مسار الرصيد ───────────────────────────────────────────────────
-      const candidates = await tx.customer.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take: 20_000, // سقف صلب — يمنع استنزاف الذاكرة
-      });
-
-      const balances = await this.ledger.getBalances(
-        tx,
-        tenantId,
-        candidates.map((c) => c.id),
-      );
-
-      let enriched = candidates.map((row) => ({
-        row,
-        balance: balances.get(row.id) ?? zero(),
-      }));
-
-      if (query.accountState) {
-        enriched = enriched.filter((e) => this.accountState(e.balance) === query.accountState);
-      }
-
-      if (query.overCreditLimit) {
-        enriched = enriched.filter((e) => {
-          const limit = toMoney(e.row.creditLimit.toString());
-          return !isZero(limit) && e.balance.greaterThan(limit);
-        });
-      }
-
-      if (query.sortBy === 'balance') {
-        enriched.sort((a, b) =>
-          query.sortOrder === 'asc'
-            ? a.balance.comparedTo(b.balance)
-            : b.balance.comparedTo(a.balance),
-        );
-      }
-
-      const total = enriched.length;
-      const start = (query.page - 1) * query.pageSize;
-      const page = enriched.slice(start, start + query.pageSize);
+      const [result] = await tx.$queryRaw<
+        { total: number; items: { id: string; balance: string }[] }[]
+      >(customerBalanceQuery(tenantId, query, restorableAfter));
+      const total = result?.total ?? 0;
+      const page = result?.items ?? [];
+      const rows = page.length
+        ? await tx.customer.findMany({
+            where: { tenantId, id: { in: page.map((item) => item.id) } },
+          })
+        : [];
+      const byId = new Map(rows.map((row) => [row.id, row]));
 
       return {
-        items: page.map((e) => this.toDto(e.row, e.balance)),
+        items: page.flatMap((item) => {
+          const row = byId.get(item.id);
+          return row ? [this.toDto(row, toMoney(item.balance))] : [];
+        }),
         page: query.page,
         pageSize: query.pageSize,
         total,
@@ -319,7 +285,7 @@ export class CustomersService {
         tx.order.aggregate({
           where: { tenantId, customerId: id, status: { not: 'CANCELLED' } },
           _count: true,
-          _sum: { total: true },
+          _sum: { total: true, returnedAmount: true },
         }),
         tx.payment.aggregate({
           where: { tenantId, customerId: id, status: 'POSTED' },
@@ -343,7 +309,7 @@ export class CustomersService {
             status: { in: ['CONFIRMED', 'PARTIALLY_PAID'] },
             dueAt: { lt: now },
           },
-          select: { total: true, paidAmount: true },
+          select: { total: true, paidAmount: true, returnedAmount: true },
         }),
         // متوسط أيام السداد: من إصدار الطلب إلى استلام الدفعة، عبر التوزيعات.
         tx.$queryRaw<{ avg_days: number | null }[]>`
@@ -359,7 +325,13 @@ export class CustomersService {
         ? sum(
             overdue.map((o) =>
               toMoneyString(
-                subtract(toMoney(o.total.toString()), toMoney(o.paidAmount.toString())),
+                max(
+                  subtract(
+                    subtract(o.total.toString(), o.returnedAmount.toString()),
+                    o.paidAmount.toString(),
+                  ),
+                  zero(),
+                ),
               ),
             ),
           )
@@ -398,7 +370,13 @@ export class CustomersService {
       return {
         customer: this.toDto(row, balance),
         totalOrders: orderAgg._count,
-        totalOrdersAmount: toMoneyString(orderAgg._sum.total?.toString() ?? '0', 2),
+        totalOrdersAmount: toMoneyString(
+          subtract(
+            orderAgg._sum.total?.toString() ?? '0',
+            orderAgg._sum.returnedAmount?.toString() ?? '0',
+          ),
+          2,
+        ),
         totalPayments: paymentAgg._count,
         totalPaymentsAmount: toMoneyString(paymentAgg._sum.amount?.toString() ?? '0', 2),
         lastOrderAt: lastOrder?.issuedAt.toISOString() ?? null,
@@ -418,6 +396,7 @@ export class CustomersService {
     const { tenantId } = this.context();
 
     await this.prisma.runInTenant(tenantId, async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ledger:${id}`}, 0))`;
       const before = await tx.customer.findFirst({ where: { id } });
       if (!before) throw AppError.notFound('الزبون');
 
@@ -487,6 +466,7 @@ export class CustomersService {
     const { tenantId } = this.context();
 
     await this.prisma.runInTenant(tenantId, async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ledger:${id}`}, 0))`;
       const customer = await tx.customer.findFirst({ where: { id } });
       if (!customer) throw AppError.notFound('الزبون');
       if (customer.archivedAt) throw AppError.conflict('الزبون مؤرشف مسبقًا.');
@@ -531,6 +511,7 @@ export class CustomersService {
     const { tenantId } = this.context();
 
     return this.prisma.runInTenant(tenantId, async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ledger:${id}`}, 0))`;
       const customer = await tx.customer.findFirst({ where: { id } });
       if (!customer) throw AppError.notFound('الزبون');
       if (!customer.archivedAt) throw AppError.conflict('الزبون غير موجود في الأرشيف.');

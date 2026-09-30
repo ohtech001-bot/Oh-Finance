@@ -40,7 +40,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const logPayload = {
       requestId,
       method: request.method,
-      path: request.url,
+      path: request.url.split('?')[0],
       status,
       code: body.code,
       tenantId: TenantContext.get()?.tenantId ?? null,

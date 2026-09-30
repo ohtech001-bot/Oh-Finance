@@ -1,10 +1,3 @@
-/**
- * شاشة الحساب والحركات — مطابقة لـ`ui/other screens/الحساب والحركات.jpeg`.
- *
- * الجدول يعرض العمود الأهم: «الرصيد بعد الحركة» — وهو ما يجعل هذا دفتر أستاذ
- * حقيقيًا لا مجرد سجل. المدين والدائن في عمودين منفصلين، كما في المرجع.
- *
- * كل رقم هنا من دفتر الحركات على الخادم. لا رصيد محسوب في الواجهة.
- */
+/** Financial amounts come from the ledger; only their customer-facing sign is inverted. */
 export declare function LedgerPage(): import("react").JSX.Element;
 //# sourceMappingURL=ledger-page.d.ts.map

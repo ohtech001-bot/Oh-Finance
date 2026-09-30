@@ -230,6 +230,10 @@ export class LedgerService {
 
     if (!original) throw AppError.notFound('القيد');
 
+    if (original.entryType === 'ADJUSTMENT_CREDIT' && original.refType === 'ORDER') {
+      throw AppError.conflict('لا يمكن عكس قيد إرجاع طلبية بشكل مستقل عن سجل الإرجاع.');
+    }
+
     if (original.entryType === 'REVERSAL') {
       throw AppError.conflict('لا يُعكس قيد عكس. أنشئ قيد تسوية بدلًا منه.');
     }

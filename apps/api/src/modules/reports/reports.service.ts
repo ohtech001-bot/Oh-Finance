@@ -236,8 +236,8 @@ export class ReportsService {
       }[]
     >(
       `SELECT
-         COALESCE((SELECT SUM(total) FROM orders WHERE tenant_id=$1::uuid AND ${CONFIRMED_SALE} AND confirmed_at>=$2 AND confirmed_at<$3),0)::text rev_cur,
-         COALESCE((SELECT SUM(total) FROM orders WHERE tenant_id=$1::uuid AND ${CONFIRMED_SALE} AND confirmed_at>=$4 AND confirmed_at<$5),0)::text rev_prev,
+         COALESCE((SELECT SUM(total - returned_amount) FROM orders WHERE tenant_id=$1::uuid AND ${CONFIRMED_SALE} AND confirmed_at>=$2 AND confirmed_at<$3),0)::text rev_cur,
+         COALESCE((SELECT SUM(total - returned_amount) FROM orders WHERE tenant_id=$1::uuid AND ${CONFIRMED_SALE} AND confirmed_at>=$4 AND confirmed_at<$5),0)::text rev_prev,
          (SELECT COUNT(*) FROM orders WHERE tenant_id=$1::uuid AND ${CONFIRMED_SALE} AND issued_at>=$2 AND issued_at<$3) ord_cur,
          (SELECT COUNT(*) FROM orders WHERE tenant_id=$1::uuid AND ${CONFIRMED_SALE} AND issued_at>=$4 AND issued_at<$5) ord_prev,
          COALESCE((SELECT SUM(tax_amount) FROM orders WHERE tenant_id=$1::uuid AND ${CONFIRMED_SALE} AND confirmed_at>=$2 AND confirmed_at<$3),0)::text tax_cur,
@@ -295,7 +295,7 @@ export class ReportsService {
               ($3::timestamptz AT TIME ZONE $1) - interval '1 microsecond', interval '1 ${unit}') gs),
        b AS (SELECT b_local, (b_local AT TIME ZONE $1) b_start, (b_next_local AT TIME ZONE $1) b_end FROM bk)
        SELECT to_char(b.b_local,'YYYY-MM-DD') date,
-         COALESCE((SELECT SUM(total) FROM orders o WHERE o.tenant_id=$4::uuid AND o.status NOT IN ('DRAFT','QUOTE','CANCELLED') AND o.confirmed_at>=b.b_start AND o.confirmed_at<b.b_end),0)::text sales,
+         COALESCE((SELECT SUM(total - returned_amount) FROM orders o WHERE o.tenant_id=$4::uuid AND o.status NOT IN ('DRAFT','QUOTE','CANCELLED') AND o.confirmed_at>=b.b_start AND o.confirmed_at<b.b_end),0)::text sales,
          COALESCE((SELECT SUM(amount) FROM payments p WHERE p.tenant_id=$4::uuid AND p.status='POSTED' AND p.paid_at>=b.b_start AND p.paid_at<b.b_end),0)::text payments
        FROM b ORDER BY b.b_local`,
       tz,
@@ -330,7 +330,7 @@ export class ReportsService {
 
   private async ordersByStatus(tx: TxClient, tenantId: string, cs: Date, ce: Date) {
     const rows = await tx.$queryRawUnsafe<{ status: string; count: bigint; amount: string }[]>(
-      `SELECT status::text, COUNT(*) count, COALESCE(SUM(total),0)::text amount
+      `SELECT status::text, COUNT(*) count, COALESCE(SUM(total - returned_amount),0)::text amount
        FROM orders WHERE tenant_id=$1::uuid AND issued_at>=$2 AND issued_at<$3 GROUP BY status ORDER BY COUNT(*) DESC`,
       tenantId,
       cs,
@@ -364,11 +364,11 @@ export class ReportsService {
     const rows = await tx.$queryRawUnsafe<
       { id: string; code: string; name: string; purchases: string }[]
     >(
-      `SELECT c.id, c.code, c.name, COALESCE(SUM(o.total),0)::text purchases
+      `SELECT c.id, c.code, c.name, COALESCE(SUM(o.total - o.returned_amount),0)::text purchases
        FROM customers c JOIN orders o ON o.customer_id=c.id
        WHERE c.tenant_id=$1::uuid AND c.archived_at IS NULL AND o.status NOT IN ('DRAFT','QUOTE','CANCELLED')
          AND o.confirmed_at>=$2 AND o.confirmed_at<$3
-       GROUP BY c.id, c.code, c.name HAVING SUM(o.total)>0 ORDER BY SUM(o.total) DESC, c.id LIMIT 5`,
+       GROUP BY c.id, c.code, c.name HAVING SUM(o.total - o.returned_amount)>0 ORDER BY SUM(o.total - o.returned_amount) DESC, c.id LIMIT 5`,
       tenantId,
       cs,
       ce,
@@ -441,6 +441,7 @@ export class ReportsService {
       `SELECT oi.name, COALESCE(SUM(oi.quantity),0)::text quantity, COALESCE(SUM(oi.line_total),0)::text sales
        FROM order_items oi JOIN orders o ON o.id=oi.order_id
        WHERE oi.tenant_id=$1::uuid AND o.status NOT IN ('DRAFT','QUOTE','CANCELLED') AND o.confirmed_at>=$2 AND o.confirmed_at<$3
+         AND NOT EXISTS (SELECT 1 FROM order_return_items ri WHERE ri.order_item_id = oi.id)
        GROUP BY oi.name HAVING SUM(oi.line_total)>0 ORDER BY SUM(oi.line_total) DESC LIMIT 5`,
       tenantId,
       cs,
@@ -458,7 +459,7 @@ export class ReportsService {
       { user_id: string | null; orders: bigint; sales: string; payments: string }[]
     >(
       `WITH ord AS (
-         SELECT created_by, COUNT(*) orders, COALESCE(SUM(total),0) sales
+         SELECT created_by, COUNT(*) orders, COALESCE(SUM(total - returned_amount),0) sales
          FROM orders WHERE tenant_id=$1::uuid AND ${CONFIRMED_SALE} AND confirmed_at>=$2 AND confirmed_at<$3 GROUP BY created_by),
        pay AS (
          SELECT created_by, COALESCE(SUM(amount),0) payments

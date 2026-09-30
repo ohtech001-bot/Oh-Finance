@@ -236,7 +236,15 @@ export function OrderDetailsDialog({
                         <dt className="text-fg-muted">حالة الدفع</dt>
                         <dd>
                           <StatusBadge tone={paid ? 'credit' : partiallyPaid ? 'partial' : 'debit'}>
-                            {paid ? 'مدفوع' : partiallyPaid ? 'مدفوع جزئيًا' : 'غير مدفوع'}
+                            {order.netTotal === '0.00' && order.returnedAmount !== '0.00'
+                              ? locale === 'he'
+                                ? 'הוחזר במלואו'
+                                : 'مرتجع بالكامل'
+                              : paid
+                                ? 'مدفوع'
+                                : partiallyPaid
+                                  ? 'مدفوع جزئيًا'
+                                  : 'غير مدفوع'}
                           </StatusBadge>
                         </dd>
                       </div>
@@ -259,7 +267,18 @@ export function OrderDetailsDialog({
                       <tbody>
                         {order.items.map((item) => (
                           <tr key={item.id} className="border-border-subtle border-t">
-                            <td className="text-fg p-3 font-medium">{item.name}</td>
+                            <td className="text-fg p-3 font-medium">
+                              <span
+                                className={item.returned ? 'text-fg-muted line-through' : undefined}
+                              >
+                                {item.name}
+                              </span>
+                              {item.returned && (
+                                <span className="text-fg-muted block text-xs">
+                                  {locale === 'he' ? 'הוחזר' : 'مرتجع'}
+                                </span>
+                              )}
+                            </td>
                             <td className="p-3 text-center tabular-nums">{item.quantity}</td>
                             <td className="p-3 text-end">
                               <MoneyText
@@ -278,9 +297,40 @@ export function OrderDetailsDialog({
                   </div>
                 </section>
 
+                {(order.returns?.length ?? 0) > 0 && (
+                  <section className="border-border space-y-2 border-t pt-4">
+                    <h3 className="font-semibold">{locale === 'he' ? 'החזרות' : 'المرتجعات'}</h3>
+                    {order.returns?.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                      >
+                        <span dir="ltr">
+                          {formatOrderDate(entry.createdAt)} {formatOrderTime(entry.createdAt)}
+                        </span>
+                        <MoneyText value={entry.amount} currency={currency} tone="credit" />
+                      </div>
+                    ))}
+                  </section>
+                )}
                 <section className="border-border border-t pt-5">
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <Amount label="قيمة الطلب" value={order.total} currency={currency} />
+                    {order.returnedAmount && order.returnedAmount !== '0.00' ? (
+                      <>
+                        <Amount
+                          label={locale === 'he' ? 'החזרות' : 'قيمة المرتجعات'}
+                          value={order.returnedAmount}
+                          currency={currency}
+                          tone="credit"
+                        />
+                        <Amount
+                          label={locale === 'he' ? 'נטו לאחר החזרות' : 'الصافي بعد الإرجاع'}
+                          value={order.netTotal ?? order.total}
+                          currency={currency}
+                        />
+                      </>
+                    ) : null}
                     <Amount
                       label="المسحوب من رصيد الزبون"
                       value={order.creditAppliedAmount}

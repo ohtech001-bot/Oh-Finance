@@ -44,6 +44,7 @@ import {
   Pencil,
   Plus,
   ShoppingBag,
+  RotateCcw,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -56,6 +57,7 @@ import { usePayments } from '@/features/payments/api';
 import { RecordPaymentDialog } from '@/features/payments/record-payment-dialog';
 import { CreateOrderDialog } from '@/features/orders/create-order-dialog';
 import { OrderDetailsDialog } from '@/features/orders/order-details-dialog';
+import { ReturnOrderDialog } from '@/features/orders/return-order-dialog';
 import { displayOrderNumber } from '@/features/orders/order-number';
 import { useCustomer, useCustomerSummary } from './api';
 import { CustomerFormDialog } from './customer-form-dialog';
@@ -68,6 +70,7 @@ import { CustomerStatementDialog } from './customer-statement-dialog';
  * كل رقم من الخادم؛ الرصيد من دفتر الحركات.
  */
 export function CustomerDetailPage() {
+  const [returnOpen, setReturnOpen] = useState(false);
   const { id } = useParams<{ id: string }>();
   const { user, can } = useAuth();
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
@@ -209,14 +212,20 @@ export function CustomerDetailPage() {
       header: 'الحالة',
       render: (row) => (
         <StatusBadge tone={ORDER_STATUS_BADGE[row.status].tone}>
-          {ORDER_STATUS_LABELS[row.status]}
+          {row.netTotal === '0.00' && row.returnedAmount !== '0.00'
+            ? currentLocale() === 'he'
+              ? 'הוחזר במלואו'
+              : 'مرتجع بالكامل'
+            : ORDER_STATUS_LABELS[row.status]}
         </StatusBadge>
       ),
     },
     {
       header: 'الإجمالي',
       align: 'end',
-      render: (row) => <MoneyText value={row.total} currency={currency} withSymbol={false} />,
+      render: (row) => (
+        <MoneyText value={row.netTotal ?? row.total} currency={currency} withSymbol={false} />
+      ),
     },
     {
       header: 'المتبقي',
@@ -302,6 +311,12 @@ export function CustomerDetailPage() {
         linkAs={Link}
         actions={
           <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+            {can('orders.cancel') && can('orders.read') ? (
+              <Button variant="outline" onClick={() => setReturnOpen(true)}>
+                <RotateCcw aria-hidden />
+                {currentLocale() === 'he' ? 'החזרת הזמנה' : 'إرجاع طلبية'}
+              </Button>
+            ) : null}
             {can('orders.create') ? (
               <Button variant="brand" onClick={() => setOrderOpen(true)}>
                 <ShoppingBag aria-hidden />
@@ -557,6 +572,12 @@ export function CustomerDetailPage() {
       </Card>
 
       <CustomerFormDialog open={editOpen} onOpenChange={setEditOpen} customer={customer} />
+      <ReturnOrderDialog
+        key={customer.id}
+        open={returnOpen}
+        onOpenChange={setReturnOpen}
+        customerId={customer.id}
+      />
       <RecordPaymentDialog open={payOpen} onOpenChange={setPayOpen} fixedCustomerId={customer.id} />
       <CreateOrderDialog
         open={orderOpen}

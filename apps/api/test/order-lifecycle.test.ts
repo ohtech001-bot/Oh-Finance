@@ -122,6 +122,201 @@ describe.skipIf(!HAS_TEST_DB)('دورة حياة الطلب', () => {
     `);
   });
 
+  describe('order returns', () => {
+    async function returnFixture() {
+      const customerId = await createTestCustomer(t, 'Return customer');
+      const order = await asUser(t, () =>
+        orders.create(
+          orderPayload(customerId, {
+            status: 'CONFIRMED',
+            discountAmount: '30',
+            items: [100, 200].map((price) => ({
+              sourceType: 'MANUAL',
+              name: `Product ${price}`,
+              quantity: '1',
+              unitPrice: String(price),
+              discount: '0',
+              taxRate: '0',
+            })),
+          }),
+        ),
+      );
+      return { customerId, order };
+    }
+
+    it('returns selected products and only charges the net remainder on the next receipt', async () => {
+      const { customerId, order } = await returnFixture();
+      const returned = await asUser(t, () =>
+        orders.returnItems(order.id, {
+          version: order.version,
+          requestId: crypto.randomUUID(),
+          itemIds: [order.items[0]!.id],
+        }),
+      );
+      expect(returned?.total).toBe('270.00');
+      expect(returned?.returnedAmount).toBe('90.00');
+      expect(returned?.remainingAmount).toBe('180.00');
+      await asUser(t, () =>
+        payments.create(
+          {
+            customerId,
+            amount: '180',
+            method: 'CASH',
+            strategy: 'AUTO_OLDEST_FIRST',
+          } as CreatePaymentRequest,
+          crypto.randomUUID(),
+        ),
+      );
+      expect((await asUser(t, () => orders.findOne(order.id)))?.remainingAmount).toBe('0.00');
+      const balance = await inTenant(t.tenantId, (tx) =>
+        new LedgerService().getBalance(tx, t.tenantId, customerId),
+      );
+      expect(balance.toFixed(2)).toBe('0.00');
+    });
+
+    it('returns a partially paid order, exposes reusable credit, and preserves the original payment', async () => {
+      const { customerId, order } = await returnFixture();
+      await asUser(t, () =>
+        payments.create(
+          {
+            customerId,
+            amount: '100',
+            method: 'CASH',
+            strategy: 'AUTO_OLDEST_FIRST',
+          } as CreatePaymentRequest,
+          crypto.randomUUID(),
+        ),
+      );
+      const current = (await asUser(t, () => orders.findOne(order.id)))!;
+      const returned = await asUser(t, () =>
+        orders.returnItems(order.id, {
+          version: current.version,
+          requestId: crypto.randomUUID(),
+          itemIds: current.items.map((item) => item.id),
+        }),
+      );
+      expect(returned?.netTotal).toBe('0.00');
+      expect(returned?.paidAmount).toBe('100.00');
+      const balance = await inTenant(t.tenantId, (tx) =>
+        new LedgerService().getBalance(tx, t.tenantId, customerId),
+      );
+      expect(balance.toFixed(2)).toBe('-100.00');
+      const next = await asUser(t, () =>
+        orders.create(orderPayload(customerId, { status: 'CONFIRMED' })),
+      );
+      expect(next.creditAppliedAmount).toBe('100.00');
+      expect(next.remainingAmount).toBe('0.00');
+    });
+
+    it('replays a request without double credit and rejects returning the same product again', async () => {
+      const { customerId, order } = await returnFixture();
+      const body = {
+        version: order.version,
+        requestId: crypto.randomUUID(),
+        itemIds: [order.items[0]!.id],
+      };
+      await asUser(t, () => orders.returnItems(order.id, body));
+      const replay = await asUser(t, () => orders.returnItems(order.id, body));
+      expect(replay?.returns).toHaveLength(1);
+      await expect(
+        asUser(t, () =>
+          orders.returnItems(order.id, {
+            ...body,
+            requestId: crypto.randomUUID(),
+            version: replay!.version,
+          }),
+        ),
+      ).rejects.toThrow();
+      expect(
+        (
+          await inTenant(t.tenantId, (tx) =>
+            new LedgerService().getBalance(tx, t.tenantId, customerId),
+          )
+        ).toFixed(2),
+      ).toBe('180.00');
+      await expect(
+        asUser(t, () =>
+          orders.cancel(order.id, { version: replay!.version, reason: 'Duplicate reversal' }),
+        ),
+      ).rejects.toThrow();
+    });
+
+    it('serializes concurrent return requests and rejects cross-tenant access', async () => {
+      const { order } = await returnFixture();
+      const requests = await Promise.allSettled(
+        [1, 2].map(() =>
+          asUser(t, () =>
+            orders.returnItems(order.id, {
+              version: order.version,
+              requestId: crypto.randomUUID(),
+              itemIds: [order.items[0]!.id],
+            }),
+          ),
+        ),
+      );
+      expect(requests.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      const other = await createTestTenant(`return-isolation-${crypto.randomUUID().slice(0, 8)}`);
+      await expect(
+        asUser(other, () =>
+          orders.returnItems(order.id, {
+            version: order.version,
+            requestId: crypto.randomUUID(),
+            itemIds: [order.items[1]!.id],
+          }),
+        ),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('return database invariants', () => {
+    it('rejects orphan return amounts, missing ledger credits, and changes to committed returns', async () => {
+      const customerId = await createTestCustomer(t, 'Return constraints');
+      const order = await asUser(t, () =>
+        orders.create(orderPayload(customerId, { status: 'CONFIRMED' })),
+      );
+      await expect(
+        inTenant(t.tenantId, (tx) =>
+          tx.order.update({
+            where: { id: order.id },
+            data: { returnedAmount: '1' },
+          }),
+        ),
+      ).rejects.toThrow();
+      await expect(
+        inTenant(t.tenantId, (tx) =>
+          tx.orderReturn.create({
+            data: {
+              tenantId: t.tenantId,
+              orderId: order.id,
+              requestId: crypto.randomUUID(),
+              amount: '100',
+              createdBy: t.userId,
+              items: {
+                create: { tenantId: t.tenantId, orderItemId: order.items[0]!.id, amount: '100' },
+              },
+            },
+          }),
+        ),
+      ).rejects.toThrow();
+      const returned = await asUser(t, () =>
+        orders.returnItems(order.id, {
+          version: order.version,
+          requestId: crypto.randomUUID(),
+          itemIds: [order.items[0]!.id],
+        }),
+      );
+      await expect(
+        inTenant(t.tenantId, (tx) =>
+          tx.orderReturn.update({
+            where: { id: returned!.returns![0]!.id },
+            data: { amount: '1' },
+          }),
+        ),
+      ).rejects.toThrow();
+      expect((await asUser(t, () => orders.findOne(order.id)))?.returnedAmount).toBe('100.00');
+    });
+  });
+
   describe('السداد التلقائي من رصيد الزبون', () => {
     async function customerWithCredit(amount: string): Promise<string> {
       const customerId = await createTestCustomer(t, 'زبون له رصيد');

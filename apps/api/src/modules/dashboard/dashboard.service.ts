@@ -12,7 +12,7 @@ import type {
   TrendSeries,
 } from '@oh/contracts';
 import { DASHBOARD_KPI_META } from '@oh/contracts';
-import { divide, greaterThanOrEqual, toMoney, toMoneyString } from '@oh/money';
+import { divide, greaterThanOrEqual, subtract, toMoney, toMoneyString } from '@oh/money';
 import { AppError } from '../../core/errors/app-error.js';
 import { PrismaService, type TxClient } from '../../core/prisma/prisma.service.js';
 import { TenantContext } from '../../core/tenancy/tenant-context.js';
@@ -301,10 +301,10 @@ export class DashboardService {
       }[]
     >(
       `SELECT
-         COALESCE(SUM(total) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $2 AND confirmed_at < $3),0)::text AS rev_cur,
-         COALESCE(SUM(total) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $4 AND confirmed_at < $5),0)::text AS rev_prev,
-         COALESCE(SUM(LEAST(paid_amount, total)) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $2 AND confirmed_at < $3),0)::text AS collected_cur,
-         COALESCE(SUM(LEAST(paid_amount, total)) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $4 AND confirmed_at < $5),0)::text AS collected_prev,
+         COALESCE(SUM(total - returned_amount) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $2 AND confirmed_at < $3),0)::text AS rev_cur,
+         COALESCE(SUM(total - returned_amount) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $4 AND confirmed_at < $5),0)::text AS rev_prev,
+         COALESCE(SUM(LEAST(paid_amount, total - returned_amount)) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $2 AND confirmed_at < $3),0)::text AS collected_cur,
+         COALESCE(SUM(LEAST(paid_amount, total - returned_amount)) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $4 AND confirmed_at < $5),0)::text AS collected_prev,
          COUNT(*) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $2 AND confirmed_at < $3) AS conf_cur,
          COUNT(*) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $4 AND confirmed_at < $5) AS conf_prev,
          COUNT(*) FILTER (WHERE ${CONFIRMED_SALE} AND confirmed_at >= $2 AND confirmed_at < $3) AS ord_cur,
@@ -354,7 +354,7 @@ export class DashboardService {
          GROUP BY le.customer_id
        ),
        overdue AS (
-         SELECT customer_id, SUM(total - paid_amount) AS due
+         SELECT customer_id, SUM(GREATEST(total - returned_amount - paid_amount, 0)) AS due
          FROM orders
          WHERE tenant_id = $1::uuid AND status IN ('CONFIRMED','PARTIALLY_PAID') AND due_at < $4
          GROUP BY customer_id
@@ -462,7 +462,7 @@ export class DashboardService {
        )
        SELECT
          to_char(b.b_local, 'YYYY-MM-DD') AS bucket,
-         COALESCE((SELECT SUM(total) FROM orders o WHERE o.tenant_id = $4::uuid AND ${CONFIRMED_SALE}
+         COALESCE((SELECT SUM(total - returned_amount) FROM orders o WHERE o.tenant_id = $4::uuid AND ${CONFIRMED_SALE}
                     AND o.confirmed_at >= b.b_start AND o.confirmed_at < b.b_end),0)::text AS revenue,
           COALESCE((SELECT COUNT(*) FROM orders o WHERE o.tenant_id = $4::uuid AND ${sqlPrefixed(CONFIRMED_SALE, 'o')}
                     AND o.confirmed_at >= b.b_start AND o.confirmed_at < b.b_end),0)::text AS orders,
@@ -533,13 +533,13 @@ export class DashboardService {
               ? await tx.$queryRawUnsafe<
                   { id: string; code: string; name: string; amount: string }[]
                 >(
-                  `SELECT c.id, c.code, c.name, COALESCE(SUM(o.total),0)::text AS amount
+                  `SELECT c.id, c.code, c.name, COALESCE(SUM(o.total - o.returned_amount),0)::text AS amount
                    FROM customers c JOIN orders o ON o.customer_id = c.id
                    WHERE c.tenant_id = $1::uuid AND c.archived_at IS NULL AND ${sqlPrefixed(CONFIRMED_SALE, 'o')}
                      AND o.confirmed_at >= $2 AND o.confirmed_at < $3
                    GROUP BY c.id, c.code, c.name
-                   HAVING SUM(o.total) > 0
-                   ORDER BY SUM(o.total) DESC, c.id LIMIT 5`,
+                   HAVING SUM(o.total - o.returned_amount) > 0
+                   ORDER BY SUM(o.total - o.returned_amount) DESC, c.id LIMIT 5`,
                   tenantId,
                   new Date(range.from),
                   new Date(range.to),
@@ -671,7 +671,7 @@ export class DashboardService {
             customerId: o.customerId,
             customerName: o.customer.name,
             status: o.status,
-            total: toMoneyString(o.total.toString(), 2),
+            total: toMoneyString(subtract(o.total.toString(), o.returnedAmount.toString()), 2),
             issuedAt: o.issuedAt.toISOString(),
           }));
         })(),
@@ -737,7 +737,7 @@ export class DashboardService {
       const longOverdue = await tx.$queryRawUnsafe<
         { customer_id: string; name: string; due: string; oldest: Date }[]
       >(
-        `SELECT o.customer_id, c.name, SUM(o.total - o.paid_amount)::text AS due, MIN(o.due_at) AS oldest
+        `SELECT o.customer_id, c.name, SUM(GREATEST(o.total - o.returned_amount - o.paid_amount, 0))::text AS due, MIN(o.due_at) AS oldest
          FROM orders o JOIN customers c ON c.id = o.customer_id
          WHERE o.tenant_id = $1::uuid AND o.status IN ('CONFIRMED','PARTIALLY_PAID')
            AND o.due_at < $2

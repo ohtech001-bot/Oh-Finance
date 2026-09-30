@@ -13,6 +13,7 @@ import {
   type OrderTotals,
   type PaginatedResult,
   type UpdateOrderRequest,
+  type ReturnOrderRequest,
 } from '@oh/contracts';
 import {
   abs,
@@ -35,6 +36,7 @@ import { PrismaService, type TxClient } from '../../core/prisma/prisma.service.j
 import { TenantContext } from '../../core/tenancy/tenant-context.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { OrderCalculator } from './order-calculator.js';
+import { returnBalance, returnValues, selectedReturnAmount } from './return-calculator.js';
 
 type OrderRow = Prisma.OrderGetPayload<{
   include: {
@@ -69,6 +71,7 @@ export class OrdersService {
     const { tenantId, storeId, userId } = this.context();
 
     const orderId = await this.prisma.runInTenant(tenantId, async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ledger:${dto.customerId}`}, 0))`;
       const customer = await tx.customer.findFirst({
         where: { id: dto.customerId, archivedAt: null },
         select: {
@@ -187,6 +190,9 @@ export class OrdersService {
   async confirm(id: string, dto: ConfirmOrderRequest): Promise<OrderDetail> {
     const { tenantId, storeId, userId } = this.context();
     await this.prisma.runInTenant(tenantId, async (tx) => {
+      const identity = await tx.order.findFirst({ where: { id }, select: { customerId: true } });
+      if (!identity) throw AppError.notFound('الطلب');
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ledger:${identity.customerId}`}, 0))`;
       const order = await tx.order.findFirst({
         where: { id },
         include: {
@@ -198,11 +204,13 @@ export class OrdersService {
               paymentTermDays: true,
               paymentDueDate: true,
               status: true,
+              archivedAt: true,
             },
           },
         },
       });
       if (!order) throw AppError.notFound('الطلب');
+      if (order.customer.archivedAt) throw AppError.conflict('لا يمكن تأكيد طلب لزبون مؤرشف.');
 
       if (order.status === 'CANCELLED') {
         throw AppError.conflict('الطلب ملغي. لا يمكن تأكيده.');
@@ -278,6 +286,7 @@ export class OrdersService {
     }
 
     // ── رصد تجاوز حد الدين قبل القيد دون تعطيل البيع ───────────────────
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ledger:${params.customerId}`}, 0))`;
     const creditLimit = toMoney(params.customerCreditLimit);
 
     if (!isZero(creditLimit)) {
@@ -492,11 +501,19 @@ export class OrdersService {
     const { tenantId, storeId, userId } = this.context();
 
     await this.prisma.runInTenant(tenantId, async (tx) => {
+      const identity = await tx.order.findFirst({ where: { id }, select: { customerId: true } });
+      if (!identity) throw AppError.notFound('الطلب');
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ledger:${identity.customerId}`}, 0))`;
       const order = await tx.order.findFirst({
         where: { id },
         include: { customer: { select: { name: true } } },
       });
       if (!order) throw AppError.notFound('الطلب');
+      if (await tx.orderReturn.count({ where: { orderId: id } })) {
+        throw AppError.conflict(
+          'هذا الطلب يحتوي مرتجعات. استخدم إرجاع المنتجات المتبقية بدل الإلغاء.',
+        );
+      }
 
       if (order.status === 'CANCELLED') {
         throw AppError.conflict('الطلب ملغي مسبقًا.');
@@ -635,7 +652,10 @@ export class OrdersService {
 
       // البنود تُحذف تلقائيًا (onDelete Cascade). trigger القفل لا يعترض
       // لأن المسودة غير مقفلة.
-      await tx.order.delete({ where: { id } });
+      const deleted = await tx.order.deleteMany({
+        where: { id, version, status: { in: ['DRAFT', 'QUOTE'] } },
+      });
+      if (deleted.count !== 1) throw AppError.conflict('تغيّر الطلب أثناء الحذف. حدّث الصفحة.');
     });
   }
 
@@ -748,6 +768,125 @@ export class OrdersService {
     });
   }
 
+  async returnItems(id: string, dto: ReturnOrderRequest): Promise<OrderDetail | null> {
+    const { tenantId, storeId, userId } = this.context();
+    await this.prisma.runInTenant(tenantId, async (tx) => {
+      const identity = await tx.order.findFirst({
+        where: { id, tenantId, storeId },
+        select: { customerId: true },
+      });
+      if (!identity) throw AppError.notFound('الطلب');
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ledger:${identity.customerId}`}, 0))`;
+      const previous = await tx.orderReturn.findUnique({
+        where: { tenantId_requestId: { tenantId, requestId: dto.requestId } },
+        include: { items: true },
+      });
+      if (previous) {
+        if (
+          previous.orderId !== id ||
+          previous.reason !== (dto.reason || null) ||
+          previous.items.length !== dto.itemIds.length ||
+          previous.items.some((item) => !dto.itemIds.includes(item.orderItemId))
+        ) {
+          throw AppError.conflict('مفتاح الإرجاع مستخدم لعملية أخرى.');
+        }
+        return;
+      }
+      const order = await tx.order.findFirst({
+        where: { id, tenantId, storeId },
+        include: {
+          items: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }], include: { returnItem: true } },
+          store: { select: { currency: true } },
+        },
+      });
+      if (!order) throw AppError.notFound('الطلب');
+      if (order.version !== dto.version)
+        throw AppError.conflict('تغير الطلب. أعد فتحه قبل الإرجاع.');
+      if (!['CONFIRMED', 'PARTIALLY_PAID'].includes(order.status)) {
+        throw AppError.conflict('الإرجاع متاح للطلبات غير المسددة أو المسددة جزئيًا فقط.');
+      }
+      const values = returnValues(
+        order.total.toString(),
+        order.items,
+        order.store.currency as CurrencyCode,
+      );
+      if (
+        dto.itemIds.some(
+          (itemId) => !order.items.some((item) => item.id === itemId && !item.returnItem),
+        )
+      ) {
+        throw AppError.validation('المنتج لا يخص الطلب أو تم إرجاعه مسبقًا.');
+      }
+      const amount = selectedReturnAmount(values, dto.itemIds);
+      const returned = add(order.returnedAmount.toString(), amount);
+      if (greaterThan(returned, order.total.toString()))
+        throw AppError.conflict('المبلغ يتجاوز قيمة الطلب.');
+      const result = await tx.orderReturn.create({
+        data: {
+          tenantId,
+          orderId: id,
+          requestId: dto.requestId,
+          amount: toMoneyString(amount),
+          reason: dto.reason || null,
+          createdBy: userId,
+          items: {
+            create: dto.itemIds.map((orderItemId) => ({
+              tenantId,
+              orderItemId,
+              amount: values.get(orderItemId)!,
+            })),
+          },
+        },
+      });
+      if (!isZero(amount)) {
+        await this.ledger.append(tx, {
+          tenantId,
+          storeId,
+          customerId: order.customerId,
+          entryType: 'ADJUSTMENT_CREDIT',
+          direction: 'CREDIT',
+          amount: toMoneyString(amount),
+          refType: 'ORDER',
+          refId: id,
+          notes: `إرجاع منتجات من الطلب ${order.number}${dto.reason ? `: ${dto.reason}` : ''}`,
+          createdBy: userId,
+          idempotencyKey: `return:${result.id}`,
+        });
+      }
+      const { remaining } = returnBalance(
+        order.total.toString(),
+        returned.toString(),
+        order.paidAmount.toString(),
+      );
+      const updated = await tx.order.updateMany({
+        where: { id, version: dto.version },
+        data: {
+          returnedAmount: toMoneyString(returned),
+          status: isZero(remaining)
+            ? 'PAID'
+            : isZero(order.paidAmount.toString())
+              ? 'CONFIRMED'
+              : 'PARTIALLY_PAID',
+          version: { increment: 1 },
+        },
+      });
+      if (updated.count !== 1) throw AppError.conflict('تغير الطلب. أعد المحاولة.');
+      await this.audit.record(tx, {
+        action: 'order.returned',
+        summary: `إرجاع ${toMoneyString(amount, 2)} من الطلب ${order.number}`,
+        entityType: 'Order',
+        entityId: id,
+        after: {
+          returnId: result.id,
+          itemIds: dto.itemIds,
+          amount: toMoneyString(amount),
+          remaining: toMoneyString(remaining),
+        },
+      });
+    });
+    return this.findOne(id);
+  }
+
   async findOne(id: string): Promise<OrderDetail | null> {
     const { tenantId } = this.context();
 
@@ -757,8 +896,11 @@ export class OrdersService {
         include: {
           customer: { select: { name: true, code: true } },
           _count: { select: { items: true } },
-          items: { orderBy: { sortOrder: 'asc' } },
+          items: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }], include: { returnItem: true } },
+          store: { select: { currency: true } },
+          returns: { include: { items: true }, orderBy: { createdAt: 'asc' } },
           allocations: {
+            where: { payment: { status: 'POSTED' } },
             include: {
               payment: { select: { id: true, number: true, paidAt: true, method: true } },
             },
@@ -769,8 +911,21 @@ export class OrdersService {
 
       if (!row) return null;
 
+      const values = returnValues(
+        row.total.toString(),
+        row.items,
+        row.store.currency as CurrencyCode,
+      );
+
       return {
         ...this.toDto(row),
+        returns: row.returns.map((entry) => ({
+          id: entry.id,
+          amount: toMoneyString(entry.amount.toString(), 2),
+          reason: entry.reason,
+          createdAt: entry.createdAt.toISOString(),
+          itemIds: entry.items.map((item) => item.orderItemId),
+        })),
         items: row.items.map((item) => ({
           id: item.id,
           sourceType: item.sourceType,
@@ -783,6 +938,8 @@ export class OrdersService {
           taxRate: item.taxRate.toString(),
           lineTotal: toMoneyString(item.lineTotal.toString(), 2),
           sortOrder: item.sortOrder,
+          returned: Boolean(item.returnItem),
+          returnableAmount: item.returnItem ? '0.00' : toMoneyString(values.get(item.id) ?? '0', 2),
         })),
         allocations: row.allocations.map((a) => ({
           paymentId: a.payment.id,
@@ -823,7 +980,7 @@ export class OrdersService {
         tx.order.groupBy({ by: ['status'], where, _count: true }),
         tx.order.aggregate({
           where: { ...where, status: { notIn: ['CANCELLED', 'DRAFT', 'QUOTE'] } },
-          _sum: { total: true },
+          _sum: { total: true, returnedAmount: true },
         }),
         tx.$queryRaw<{ outstanding_amount: string }[]>`
           WITH latest_balances AS (
@@ -846,7 +1003,10 @@ export class OrdersService {
 
       const count = (status: string) => grouped.find((g) => g.status === status)?._count ?? 0;
 
-      const totalAmount = toMoney(agg._sum.total?.toString() ?? '0');
+      const totalAmount = subtract(
+        agg._sum.total?.toString() ?? '0',
+        agg._sum.returnedAmount?.toString() ?? '0',
+      );
       const outstandingAmount = debtRows[0]?.outstanding_amount ?? '0';
 
       return {
@@ -908,7 +1068,8 @@ export class OrdersService {
   private toDto(row: OrderRow): Order {
     const total = toMoney(row.total.toString());
     const paid = toMoney(row.paidAmount.toString());
-    const remaining = subtract(total, paid);
+    const returned = row.returnedAmount.toString();
+    const { net, remaining } = returnBalance(total.toString(), returned, paid.toString());
 
     const isOverdue =
       (row.status === 'CONFIRMED' || row.status === 'PARTIALLY_PAID') &&
@@ -933,6 +1094,8 @@ export class OrdersService {
       total: toMoneyString(total, 2),
 
       paidAmount: toMoneyString(paid, 2),
+      returnedAmount: toMoneyString(returned, 2),
+      netTotal: toMoneyString(net, 2),
       creditAppliedAmount: toMoneyString(row.creditAppliedAmount.toString(), 2),
       remainingAmount: toMoneyString(remaining, 2),
 

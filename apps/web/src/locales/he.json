@@ -100,6 +100,7 @@
     "progress": "{{progress}} אחוז הושלמו"
   },
   "common": {
+    "details": "פרטי ההזמנה",
     "search": "חיפוש",
     "searchPlaceholder": "חפש לקוח, הזמנה, חשבונית…",
     "filter": "סינון",
@@ -165,6 +166,8 @@
     "archiveNamed": "העברת {{name}} לארכיון"
   },
   "orders": {
+    "returned": "כולל החזרות",
+    "fullyReturned": "הוחזר במלואו",
     "number": "מספר הזמנה",
     "customer": "לקוח",
     "cost": "סכום ההזמנה",

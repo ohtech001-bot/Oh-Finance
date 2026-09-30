@@ -271,17 +271,19 @@ export function printCustomerStatement({
         isPositive(order.creditAppliedAmount) &&
         isZero(subtract(order.paidAmount, order.creditAppliedAmount));
       const paymentStatus =
-        order.remainingAmount === '0.00'
-          ? paidEntirelyFromCredit
-            ? text.statusPaidFromCredit
-            : text.statusPaid
-          : order.status === 'PARTIALLY_PAID'
-            ? text.statusPartiallyPaid
-            : text.statusUnpaid;
+        order.netTotal === '0.00' && order.returnedAmount !== '0.00'
+          ? 'مرتجع بالكامل / הוחזר במלואו'
+          : order.remainingAmount === '0.00'
+            ? paidEntirelyFromCredit
+              ? text.statusPaidFromCredit
+              : text.statusPaid
+            : order.status === 'PARTIALLY_PAID'
+              ? text.statusPartiallyPaid
+              : text.statusUnpaid;
       const products = order.items
         .map(
           (item) => `<tr>
-            <td>${escapeHtml(item.name)}</td>
+            <td>${item.returned ? `<s>${escapeHtml(item.name)}</s> (مرتجع / הוחזר)` : escapeHtml(item.name)}</td>
             <td>${escapeHtml(item.quantity)}</td>
             <td>${money(item.unitPrice)}</td>
             <td>${money(item.lineTotal)}</td>
@@ -299,6 +301,7 @@ export function printCustomerStatement({
           <span>${escapeHtml(text.creditApplied)}: <strong>${money(order.creditAppliedAmount)}</strong></span>
           <span>${escapeHtml(text.totalSettled)}: <strong>${money(order.paidAmount)}</strong></span>
           <span>${escapeHtml(text.remaining)}: <strong>${money(order.remainingAmount)}</strong></span>
+          ${order.returnedAmount && order.returnedAmount !== '0.00' ? `<span>مرتجعات / החזרות: <strong>${money(order.returnedAmount)}</strong></span><span>الصافي / נטו: <strong>${money(order.netTotal ?? order.total)}</strong></span>` : ''}
         </div>
         <h3>${escapeHtml(text.products)}</h3>
         <table class="products-table">

@@ -65,6 +65,8 @@ export const orderItemSchema = z.object({
   /** محسوب على الخادم. */
   lineTotal: nonNegativeMoneySchema,
   sortOrder: z.number().int(),
+  returned: z.boolean().optional(),
+  returnableAmount: nonNegativeMoneySchema.optional(),
 });
 export type OrderItem = z.infer<typeof orderItemSchema>;
 
@@ -125,6 +127,8 @@ export const orderSchema = z.object({
   total: nonNegativeMoneySchema,
 
   paidAmount: nonNegativeMoneySchema,
+  returnedAmount: nonNegativeMoneySchema.optional(),
+  netTotal: nonNegativeMoneySchema.optional(),
   /** جزء المدفوع الذي اختار المستخدم تسديده من رصيد الزبون السابق. */
   creditAppliedAmount: nonNegativeMoneySchema,
   /** = total − paidAmount. مشتق. */
@@ -151,6 +155,17 @@ export type Order = z.infer<typeof orderSchema>;
 
 export const orderDetailSchema = orderSchema.extend({
   items: z.array(orderItemSchema),
+  returns: z
+    .array(
+      z.object({
+        id: uuidSchema,
+        amount: nonNegativeMoneySchema,
+        reason: z.string().nullable(),
+        createdAt: isoDateTimeSchema,
+        itemIds: z.array(uuidSchema),
+      }),
+    )
+    .optional(),
   /** الدفعات التي وُزِّع جزء منها على هذا الطلب. */
   allocations: z.array(
     z.object({
@@ -228,6 +243,18 @@ export const cancelOrderSchema = z.object({
   reason: z.string().trim().min(3, 'سبب الإلغاء مطلوب ويُسجَّل في سجل التدقيق.').max(500),
 });
 export type CancelOrderRequest = z.infer<typeof cancelOrderSchema>;
+
+export const returnOrderSchema = z.object({
+  version: z.number().int().min(0),
+  requestId: uuidSchema,
+  itemIds: z
+    .array(uuidSchema)
+    .min(1)
+    .max(200)
+    .refine((ids) => new Set(ids).size === ids.length, 'لا يمكن تكرار المنتج.'),
+  reason: z.string().trim().max(500).optional(),
+});
+export type ReturnOrderRequest = z.infer<typeof returnOrderSchema>;
 
 /**
  * عمليات تحمل رقم النسخة فقط (قفل متفائل).
