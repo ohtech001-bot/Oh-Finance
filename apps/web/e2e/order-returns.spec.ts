@@ -106,7 +106,7 @@ for (const width of [390, 1280]) {
           email: 'preview@example.com',
           name: 'Preview owner',
           role: 'OWNER',
-          permissions: ['customers.read', 'orders.read', 'orders.cancel'],
+          permissions: ['customers.read', 'orders.read', 'orders.cancel', 'ledger.read'],
           locale: 'ar',
           isSuperAdmin: false,
           supportMode: false,
@@ -127,6 +127,25 @@ for (const width of [390, 1280]) {
         };
       else if (path === `/api/customers/${customerId}`) data = customer;
       else if (path === `/api/customers/${customerId}/summary`) data = null;
+      else if (path === `/api/ledger/statement/${customerId}`)
+        data = {
+          generatedAt: date,
+          totals: { currentBalance: current.remainingAmount },
+          orders: [{ orderId, paymentState: 'UNPAID' }],
+          entries: [
+            {
+              id: 'statement-order',
+              entryType: 'ORDER_DEBIT',
+              refType: 'ORDER',
+              refId: orderId,
+              refNumber: current.number,
+              occurredAt: date,
+              debit: '270.00',
+              credit: '0.00',
+              runningBalance: '270.00',
+            },
+          ],
+        };
       else if (path === '/api/notifications') data = { items: [], unreadCount: 0 };
       else if (path === `/api/orders/${orderId}/returns`) {
         submitted = route.request().postDataJSON();
@@ -180,6 +199,11 @@ for (const width of [390, 1280]) {
     await expect(dialog.getByText('شوال رمل', { exact: true })).toBeVisible();
     await expect(dialog.getByText('قيمة المرتجعات', { exact: true })).toBeVisible();
     await expect(dialog.getByText('الصافي بعد الإرجاع', { exact: true })).toBeVisible();
+    await page.goto(`/customers/${customerId}`);
+    await page.getByRole('button', { name: 'كشف الحساب', exact: true }).click();
+    await page.getByRole('dialog').getByRole('link', { name: '00001', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/orders\\?orderId=${orderId}`));
+    await expect(page.getByRole('dialog').getByText('شوال رمل', { exact: true })).toBeVisible();
     expect(errors).toEqual([]);
   });
 }

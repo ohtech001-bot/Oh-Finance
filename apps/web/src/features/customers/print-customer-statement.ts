@@ -222,6 +222,10 @@ export function printCustomerStatement({
     .href;
   const backLabel = { ar: 'العودة إلى الزبون', he: 'חזרה ללקוח', en: 'Back to customer' }[locale];
   const optional = (value: string | null | undefined) => (value ? escapeHtml(value) : text.noValue);
+  const orderLink = (id: string, number: string) => {
+    const url = new URL(`/orders/${encodeURIComponent(id)}`, window.location.origin).href;
+    return `<a class="order-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" dir="ltr">${escapeHtml(number.replace(/^ORD-?/i, ''))}</a>`;
+  };
   const formatDate = (value: string) =>
     escapeHtml(
       new Intl.DateTimeFormat(locale, {
@@ -292,7 +296,7 @@ export function printCustomerStatement({
         .join('');
       return `<article class="order-card">
         <div class="order-head">
-          <strong>${escapeHtml(text.orderNumber)}: <span dir="ltr">${escapeHtml(order.number.replace(/^ORD-/, ''))}</span></strong>
+          <strong>${escapeHtml(text.orderNumber)}: ${orderLink(order.id, order.number)}</strong>
           <span>${formatDate(order.issuedAt)} · ${formatTime(order.issuedAt)}</span>
           <strong>${escapeHtml(text.orderTotal)}: ${money(order.total)}</strong>
         </div>
@@ -333,7 +337,7 @@ export function printCustomerStatement({
         <td>${entry.debit !== '0.00' ? (settled ? `<s style="color:#667085">${money(entry.debit)}</s>` : money(entry.debit)) : text.noValue}</td>
         <td>${entry.credit !== '0.00' ? money(entry.credit) : text.noValue}</td>
         <td>${signedBalance(entry.runningBalance)}</td>
-        <td>${optional(entry.refType === 'ORDER' ? entry.refNumber?.replace(/^ORD-?/i, '') : entry.refNumber)}</td>
+        <td>${entry.refType === 'ORDER' && entry.refId && entry.refNumber ? orderLink(entry.refId, entry.refNumber) : optional(entry.refNumber)}</td>
       </tr>`;
     })
     .join('');
@@ -364,6 +368,7 @@ export function printCustomerStatement({
     .summary-item{border:1px solid #d0d5dd;border-radius:6px;padding:10px}
     .summary-value{font-size:15px;font-weight:800;margin-top:5px}
     .debt{color:#d92d20}.credit{color:#16803c}
+    .order-link{color:#175cd3;text-decoration:underline;text-underline-offset:3px;font-weight:700}
     .order-card{border:1px solid #98a2b3;border-radius:6px;padding:12px;margin-bottom:12px;break-inside:avoid}
     .order-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;margin-bottom:10px}
     .order-head strong:last-child{text-align:${dir === 'rtl' ? 'left' : 'right'}}
@@ -374,7 +379,7 @@ export function printCustomerStatement({
     th{background:#f2f4f7;font-weight:700}
     tbody tr:nth-child(even){background:#f9fafb}
     @page{size:A4;margin:12mm}
-    @media print{body{margin:0}.preview-toolbar{display:none}.section,.summary-item,.order-card,tr{break-inside:avoid}}
+    @media print{body{margin:0}.preview-toolbar{display:none}.order-link{color:inherit;text-decoration:none}.section,.summary-item,.order-card,tr{break-inside:avoid}}
   </style>
 </head>
 <body>

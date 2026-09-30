@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { CircleCheck, CircleDollarSign, Printer, WalletCards } from 'lucide-react';
 import {
   LEDGER_TYPE_LABELS,
@@ -57,6 +58,19 @@ export function CustomerStatementDialog({
     const state = entry.refId ? orderPaymentStates.get(entry.refId) : undefined;
     return entry.entryType === 'ORDER_DEBIT' && (state === 'PAID' || state === 'PAID_FROM_CREDIT');
   };
+  const orderReference = (entry: LedgerEntry) =>
+    entry.refType === 'ORDER' && entry.refId && entry.refNumber ? (
+      <Link
+        to={`/orders/${encodeURIComponent(entry.refId)}`}
+        onClick={() => onOpenChange(false)}
+        className="text-accent inline-flex min-h-9 items-center font-semibold underline underline-offset-4 hover:opacity-80"
+        dir="ltr"
+      >
+        {displayOrderNumber(entry.refNumber)}
+      </Link>
+    ) : entry.refNumber ? (
+      <span dir="ltr">{entry.refNumber}</span>
+    ) : null;
 
   const handlePrint = async () => {
     if (!statement) return;
@@ -106,11 +120,7 @@ export function CustomerStatementDialog({
       render: (row) => (
         <div>
           <p className="text-fg text-sm font-medium">{LEDGER_TYPE_LABELS[row.entryType]}</p>
-          {row.refNumber ? (
-            <p className="text-fg-muted text-xs">
-              {row.refType === 'ORDER' ? displayOrderNumber(row.refNumber) : row.refNumber}
-            </p>
-          ) : null}
+          {row.refNumber ? <p className="text-fg-muted text-xs">{orderReference(row)}</p> : null}
           {row.refType === 'ORDER' && row.refId && orderPaymentStates.has(row.refId) ? (
             <OrderPaymentBadge state={orderPaymentStates.get(row.refId)!} locale={locale} />
           ) : null}
@@ -199,6 +209,7 @@ export function CustomerStatementDialog({
                           {LEDGER_TYPE_LABELS[row.entryType]}
                         </p>
                         <StatementDate value={row.occurredAt} locale={locale} />
+                        {orderReference(row)}
                         {row.refType === 'ORDER' &&
                         row.refId &&
                         orderPaymentStates.has(row.refId) ? (
