@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   CreateCustomerRequest,
   Customer,
@@ -19,8 +19,8 @@ import { api, buildQuery } from '@/lib/api';
 
 const KEY = 'customers';
 
-export function useCustomers(query: Partial<CustomerListQuery>) {
-  return useQuery({
+export function customersQueryOptions(query: Partial<CustomerListQuery>) {
+  return queryOptions({
     queryKey: [KEY, 'list', query],
     queryFn: ({ signal }) =>
       api.get<PaginatedResult<Customer>>(
@@ -30,11 +30,19 @@ export function useCustomers(query: Partial<CustomerListQuery>) {
   });
 }
 
-export function useCustomerStats() {
-  return useQuery({
+export function useCustomers(query: Partial<CustomerListQuery>) {
+  return useQuery(customersQueryOptions(query));
+}
+
+export function customerStatsQueryOptions() {
+  return queryOptions({
     queryKey: [KEY, 'stats'],
-    queryFn: () => api.get<CustomerStats>('/customers/stats'),
+    queryFn: ({ signal }) => api.get<CustomerStats>('/customers/stats', { signal }),
   });
+}
+
+export function useCustomerStats() {
+  return useQuery(customerStatsQueryOptions());
 }
 
 export function useCustomer(id: string | undefined) {

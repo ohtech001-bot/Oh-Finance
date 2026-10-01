@@ -5,7 +5,7 @@ import { ChevronDown, Headphones, PanelRightClose, PanelRightOpen, Store } from 
 import { cn } from '@oh/ui';
 import { useAuth } from '@/app/auth-context';
 import type { NavItem } from './nav-items';
-import { prefetchRoute } from '@/app/route-prefetch';
+import { useNavigationPrefetch } from '@/app/navigation-prefetch';
 
 export interface SidebarProps {
   items: NavItem[];
@@ -45,6 +45,7 @@ export function Sidebar({
   const { t } = useTranslation();
   const { can, user } = useAuth();
   const location = useLocation();
+  const prefetchRoute = useNavigationPrefetch();
 
   const visible = items.filter((item) => !item.permission || can(item.permission));
   const initialGroup =
@@ -167,6 +168,7 @@ export function Sidebar({
                             onClick={onNavigate}
                             onPointerEnter={() => prefetchRoute(child.to)}
                             onFocus={() => prefetchRoute(child.to)}
+                            onPointerDown={() => prefetchRoute(child.to)}
                             className={({ isActive }) =>
                               cn(
                                 'sidebar-branch__item rounded-ctrl relative flex items-center gap-2.5 px-3 py-2.5 text-sm transition-all duration-200',
@@ -194,6 +196,7 @@ export function Sidebar({
                   onClick={onNavigate}
                   onPointerEnter={() => prefetchRoute(item.to)}
                   onFocus={() => prefetchRoute(item.to)}
+                  onPointerDown={() => prefetchRoute(item.to)}
                   className={({ isActive }) =>
                     cn(
                       'rounded-ctrl flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-all duration-200',

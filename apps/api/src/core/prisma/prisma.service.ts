@@ -70,9 +70,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   /**
    * ينفّذ العمل داخل معاملة مقيّدة بمستأجر واحد.
    *
-   * سطران يفعّلان العزل، والترتيب بينهما لا يهم لكن كلاهما إلزامي:
+   * إعدادان يفعّلان العزل في استعلام واحد، وكلاهما إلزامي:
    *
-   *   1. `SET LOCAL ROLE oh_app`
+   *   1. `set_config('role', 'oh_app', true)`، المكافئ لـ`SET LOCAL ROLE oh_app`
    *      ⚠️ **هذا السطر هو ما يجعل RLS تعمل أصلًا.**
    *      نتصل بقاعدة البيانات كـ`postgres` (مستخدم فائق)، والمستخدمون
    *      الفائقون **يتجاوزون RLS كليًا** — فبدون هذا السطر تكون كل سياسات
@@ -91,8 +91,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   ): Promise<T> {
     return this.client.$transaction(
       async (tx) => {
-        await tx.$executeRawUnsafe('SET LOCAL ROLE oh_app');
-        await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}::text, true)`;
+        // Set both transaction-local RLS settings in one database round trip.
+        await tx.$executeRaw`SELECT set_config('role', 'oh_app', true),
+          set_config('app.tenant_id', ${tenantId}::text, true)`;
         return fn(tx);
       },
       {
@@ -125,8 +126,8 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
         // نفس المنطق: SET LOCAL ROLE oh_app كي تُطبَّق RLS، ثم فتح سياق المنصة.
         // سياسة `platform_access` على كل جدول تسمح لـoh_app بالمرور عندما
         // يكون app.is_platform='on' — فيرى المدير العام كل المستأجرين.
-        await tx.$executeRawUnsafe('SET LOCAL ROLE oh_app');
-        await tx.$executeRaw`SELECT set_config('app.is_platform', 'on', true)`;
+        await tx.$executeRaw`SELECT set_config('role', 'oh_app', true),
+          set_config('app.is_platform', 'on', true)`;
         return fn(tx);
       },
       {

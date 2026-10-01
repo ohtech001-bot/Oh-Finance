@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   CancelOrderRequest,
   ConfirmOrderRequest,
@@ -30,23 +30,32 @@ export function useReturnOrder() {
   });
 }
 
-export function useOrders(query: Partial<OrderListQuery>, enabled = true) {
-  return useQuery({
+export function ordersQueryOptions(query: Partial<OrderListQuery>) {
+  return queryOptions({
     queryKey: [KEY, 'list', query],
     queryFn: ({ signal }) =>
       api.get<PaginatedResult<Order>>(`/orders${buildQuery(query as Record<string, string>)}`, {
         signal,
       }),
-    enabled,
+  });
+}
+
+export function useOrders(query: Partial<OrderListQuery>, enabled = true) {
+  return useQuery({ ...ordersQueryOptions(query), enabled });
+}
+
+export function orderStatsQueryOptions(query: Partial<OrderListQuery>) {
+  return queryOptions({
+    queryKey: [KEY, 'stats', query],
+    queryFn: ({ signal }) =>
+      api.get<OrderStats>(`/orders/stats${buildQuery(query as Record<string, string>)}`, {
+        signal,
+      }),
   });
 }
 
 export function useOrderStats(query: Partial<OrderListQuery>) {
-  return useQuery({
-    queryKey: [KEY, 'stats', query],
-    queryFn: () =>
-      api.get<OrderStats>(`/orders/stats${buildQuery(query as Record<string, string>)}`),
-  });
+  return useQuery(orderStatsQueryOptions(query));
 }
 
 export function useOrder(id: string | undefined) {

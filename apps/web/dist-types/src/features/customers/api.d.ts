@@ -1,4 +1,147 @@
 import type { CustomerListQuery, PaginatedResult } from '@oh/contracts';
+export declare function customersQueryOptions(query: Partial<CustomerListQuery>): import("@tanstack/query-core").OmitKeyof<import("@tanstack/react-query").UseQueryOptions<PaginatedResult<{
+    id: string;
+    code: string;
+    status: "ACTIVE" | "INACTIVE" | "BLOCKED";
+    notes: string | null;
+    createdAt: string;
+    balance: string;
+    email: string | null;
+    name: string;
+    phone: string | null;
+    company: string | null;
+    phoneAlt: string | null;
+    address: string | null;
+    city: string | null;
+    taxNumber: string | null;
+    tags: string[];
+    creditLimit: string;
+    paymentTermDays: number;
+    paymentDueDay: number;
+    paymentDueDate: string | null;
+    accountState: "DEBIT" | "CREDIT" | "SETTLED";
+    availableCredit: string;
+    updatedAt: string;
+    archivedAt: string | null;
+}>, Error, PaginatedResult<{
+    id: string;
+    code: string;
+    status: "ACTIVE" | "INACTIVE" | "BLOCKED";
+    notes: string | null;
+    createdAt: string;
+    balance: string;
+    email: string | null;
+    name: string;
+    phone: string | null;
+    company: string | null;
+    phoneAlt: string | null;
+    address: string | null;
+    city: string | null;
+    taxNumber: string | null;
+    tags: string[];
+    creditLimit: string;
+    paymentTermDays: number;
+    paymentDueDay: number;
+    paymentDueDate: string | null;
+    accountState: "DEBIT" | "CREDIT" | "SETTLED";
+    availableCredit: string;
+    updatedAt: string;
+    archivedAt: string | null;
+}>, (string | Partial<{
+    page: number;
+    pageSize: number;
+    includeArchived: boolean;
+    archivedOnly: boolean;
+    sortBy: "code" | "createdAt" | "balance" | "name" | "lastOrderAt";
+    sortOrder: "asc" | "desc";
+    status?: "ACTIVE" | "INACTIVE" | "BLOCKED" | undefined;
+    search?: string | undefined;
+    city?: string | undefined;
+    accountState?: "DEBIT" | "CREDIT" | "SETTLED" | undefined;
+    tag?: string | undefined;
+    overCreditLimit?: boolean | undefined;
+}>)[]>, "queryFn"> & {
+    queryFn?: import("@tanstack/query-core").QueryFunction<PaginatedResult<{
+        id: string;
+        code: string;
+        status: "ACTIVE" | "INACTIVE" | "BLOCKED";
+        notes: string | null;
+        createdAt: string;
+        balance: string;
+        email: string | null;
+        name: string;
+        phone: string | null;
+        company: string | null;
+        phoneAlt: string | null;
+        address: string | null;
+        city: string | null;
+        taxNumber: string | null;
+        tags: string[];
+        creditLimit: string;
+        paymentTermDays: number;
+        paymentDueDay: number;
+        paymentDueDate: string | null;
+        accountState: "DEBIT" | "CREDIT" | "SETTLED";
+        availableCredit: string;
+        updatedAt: string;
+        archivedAt: string | null;
+    }>, (string | Partial<{
+        page: number;
+        pageSize: number;
+        includeArchived: boolean;
+        archivedOnly: boolean;
+        sortBy: "code" | "createdAt" | "balance" | "name" | "lastOrderAt";
+        sortOrder: "asc" | "desc";
+        status?: "ACTIVE" | "INACTIVE" | "BLOCKED" | undefined;
+        search?: string | undefined;
+        city?: string | undefined;
+        accountState?: "DEBIT" | "CREDIT" | "SETTLED" | undefined;
+        tag?: string | undefined;
+        overCreditLimit?: boolean | undefined;
+    }>)[], never> | undefined;
+} & {
+    queryKey: (string | Partial<{
+        page: number;
+        pageSize: number;
+        includeArchived: boolean;
+        archivedOnly: boolean;
+        sortBy: "code" | "createdAt" | "balance" | "name" | "lastOrderAt";
+        sortOrder: "asc" | "desc";
+        status?: "ACTIVE" | "INACTIVE" | "BLOCKED" | undefined;
+        search?: string | undefined;
+        city?: string | undefined;
+        accountState?: "DEBIT" | "CREDIT" | "SETTLED" | undefined;
+        tag?: string | undefined;
+        overCreditLimit?: boolean | undefined;
+    }>)[] & {
+        [dataTagSymbol]: PaginatedResult<{
+            id: string;
+            code: string;
+            status: "ACTIVE" | "INACTIVE" | "BLOCKED";
+            notes: string | null;
+            createdAt: string;
+            balance: string;
+            email: string | null;
+            name: string;
+            phone: string | null;
+            company: string | null;
+            phoneAlt: string | null;
+            address: string | null;
+            city: string | null;
+            taxNumber: string | null;
+            tags: string[];
+            creditLimit: string;
+            paymentTermDays: number;
+            paymentDueDay: number;
+            paymentDueDate: string | null;
+            accountState: "DEBIT" | "CREDIT" | "SETTLED";
+            availableCredit: string;
+            updatedAt: string;
+            archivedAt: string | null;
+        }>;
+        [dataTagErrorSymbol]: Error;
+    };
+};
 export declare function useCustomers(query: Partial<CustomerListQuery>): import("@tanstack/react-query").UseQueryResult<NoInfer<PaginatedResult<{
     id: string;
     code: string;
@@ -24,6 +167,42 @@ export declare function useCustomers(query: Partial<CustomerListQuery>): import(
     updatedAt: string;
     archivedAt: string | null;
 }>>, Error>;
+export declare function customerStatsQueryOptions(): import("@tanstack/query-core").OmitKeyof<import("@tanstack/react-query").UseQueryOptions<{
+    total: number;
+    overCreditLimit: number;
+    active: number;
+    withDebt: number;
+    totalDebt: string;
+    overduePaymentCustomers: number;
+}, Error, {
+    total: number;
+    overCreditLimit: number;
+    active: number;
+    withDebt: number;
+    totalDebt: string;
+    overduePaymentCustomers: number;
+}, string[]>, "queryFn"> & {
+    queryFn?: import("@tanstack/query-core").QueryFunction<{
+        total: number;
+        overCreditLimit: number;
+        active: number;
+        withDebt: number;
+        totalDebt: string;
+        overduePaymentCustomers: number;
+    }, string[], never> | undefined;
+} & {
+    queryKey: string[] & {
+        [dataTagSymbol]: {
+            total: number;
+            overCreditLimit: number;
+            active: number;
+            withDebt: number;
+            totalDebt: string;
+            overduePaymentCustomers: number;
+        };
+        [dataTagErrorSymbol]: Error;
+    };
+};
 export declare function useCustomerStats(): import("@tanstack/react-query").UseQueryResult<NoInfer<{
     total: number;
     overCreditLimit: number;

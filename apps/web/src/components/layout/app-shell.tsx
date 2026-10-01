@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Drawer, DrawerContent } from '@oh/ui';
+import { Drawer, DrawerContent, Skeleton } from '@oh/ui';
 import { useAuth } from '@/app/auth-context';
 import { PLATFORM_NAV, TENANT_NAV } from './nav-items';
 import { MobileTabBar } from './mobile-tabbar';
@@ -44,8 +44,7 @@ export function AppShell() {
   const newOrderLabel = t('nav.addOrder');
 
   useEffect(() => {
-    const timer = window.setTimeout(() => prefetchPrimaryRoutes(isPlatform), 350);
-    return () => window.clearTimeout(timer);
+    return prefetchPrimaryRoutes(isPlatform);
   }, [isPlatform]);
 
   const toggleSidebar = () => {
@@ -91,7 +90,21 @@ export function AppShell() {
           tabIndex={-1}
         >
           <div key={location.pathname} className="page-enter min-h-full">
-            <Outlet />
+            <Suspense
+              fallback={
+                <div className="space-y-6" aria-busy="true">
+                  <Skeleton className="h-10 w-48" />
+                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    {Array.from({ length: 4 }, (_, index) => (
+                      <Skeleton key={index} className="h-28 w-full" />
+                    ))}
+                  </div>
+                  <Skeleton className="h-80 w-full" />
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
           </div>
         </main>
       </div>

@@ -41,6 +41,7 @@
       "buildCommand": "cd ../.. && npm run build:api",
       "functions": {
         "src/main.mts": {
+          "regions": ["dub1"],
           "maxDuration": 30,
           "includeFiles": "package.json"
         }

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from 
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/app/auth-context';
 
-const MIN_VISIBLE_MS = 650;
 const EXIT_DELAY_MS = 140;
 const WAITING_PROGRESS_CEILING = 90;
 
@@ -11,7 +10,7 @@ export function StartupLoader({ children }: { children: ReactNode }) {
   const { isLoading: sessionLoading } = useAuth();
   const startedAt = useRef(Date.now());
   const [progress, setProgress] = useState(4);
-  const [complete, setComplete] = useState(false);
+  const [complete, setComplete] = useState(!sessionLoading);
 
   useEffect(() => {
     if (!sessionLoading) return;
@@ -29,20 +28,15 @@ export function StartupLoader({ children }: { children: ReactNode }) {
   }, [sessionLoading]);
 
   useEffect(() => {
-    if (sessionLoading) return;
-
-    const remainingMinimum = Math.max(0, MIN_VISIBLE_MS - (Date.now() - startedAt.current));
-    let exitTimer: number | undefined;
-    const finishTimer = window.setTimeout(() => {
-      setProgress(100);
-      exitTimer = window.setTimeout(() => setComplete(true), EXIT_DELAY_MS);
-    }, remainingMinimum);
-
-    return () => {
-      window.clearTimeout(finishTimer);
-      if (exitTimer) window.clearTimeout(exitTimer);
-    };
-  }, [sessionLoading]);
+    if (sessionLoading) {
+      setComplete(false);
+      return;
+    }
+    if (complete) return;
+    setProgress(100);
+    const exitTimer = window.setTimeout(() => setComplete(true), EXIT_DELAY_MS);
+    return () => window.clearTimeout(exitTimer);
+  }, [sessionLoading, complete]);
 
   const ready = complete && !sessionLoading;
 

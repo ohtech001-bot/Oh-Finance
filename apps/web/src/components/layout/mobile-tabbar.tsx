@@ -4,7 +4,7 @@ import { MoreHorizontal, Plus } from 'lucide-react';
 import { cn } from '@oh/ui';
 import { useAuth } from '@/app/auth-context';
 import { mobileNavItems, type NavItem } from './nav-items';
-import { prefetchRoute } from '@/app/route-prefetch';
+import { useNavigationPrefetch } from '@/app/navigation-prefetch';
 
 export interface MobileTabBarProps {
   items: NavItem[];
@@ -89,12 +89,14 @@ export function MobileTabBar({ items, onOpenMore, fab }: MobileTabBarProps) {
 }
 
 function TabItem({ item, label }: { item: NavItem; label: string }) {
+  const prefetchRoute = useNavigationPrefetch();
   return (
     <NavLink
       to={item.to}
       end={item.to === '/' || item.to === '/platform'}
       onPointerEnter={() => prefetchRoute(item.to)}
       onFocus={() => prefetchRoute(item.to)}
+      onPointerDown={() => prefetchRoute(item.to)}
       className={({ isActive }) =>
         cn(
           'flex h-full flex-1 flex-col items-center justify-center gap-1',
