@@ -1,3 +1,5 @@
+import { copy, useCopy } from '@/lib/copy';
+import { currentLocale } from '@/lib/i18n';
 import { Link } from 'react-router-dom';
 import { BookOpen, CreditCard, Bell, ShoppingBag, User } from 'lucide-react';
 import { type ActivityCategory, type ActivityItem } from '@oh/contracts';
@@ -36,7 +38,7 @@ function entityHref(item: ActivityItem): string | null {
 
 /** وقت نسبي بالعربية (منذ ٣ ساعات). Math.floor مسموح — لا تقريب مالي. */
 function relativeTime(iso: string): string {
-  const rtf = new Intl.RelativeTimeFormat('ar', { numeric: 'auto' });
+  const rtf = new Intl.RelativeTimeFormat(currentLocale(), { numeric: 'auto' });
   const past = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   const units: [Intl.RelativeTimeFormatUnit, number][] = [
     ['year', 31_536_000],
@@ -58,7 +60,14 @@ export interface ActivityFeedProps {
   className?: string;
 }
 
-export function ActivityFeed({ items, loading, emptyText = 'لا يوجد نشاط بعد.', className }: ActivityFeedProps) {
+export function ActivityFeed({
+  items,
+  loading,
+  emptyText = copy('لا يوجد نشاط بعد.'),
+  className,
+}: ActivityFeedProps) {
+  useCopy();
+
   if (loading && items.length === 0) {
     return (
       <div className="space-y-3 p-2" aria-busy="true">
@@ -76,7 +85,7 @@ export function ActivityFeed({ items, loading, emptyText = 'لا يوجد نشا
   }
 
   if (items.length === 0) {
-    return <p className="py-8 text-center text-[13px] text-fg-subtle">{emptyText}</p>;
+    return <p className="text-fg-subtle py-8 text-center text-[13px]">{emptyText}</p>;
   }
 
   return (
@@ -86,14 +95,16 @@ export function ActivityFeed({ items, loading, emptyText = 'لا يوجد نشا
         const href = entityHref(item);
 
         const body = (
-          <div className="flex items-start gap-3 rounded-ctrl px-2 py-2.5 hover:bg-card-muted">
-            <span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full ${CATEGORY_STYLE[item.category]}`}>
+          <div className="rounded-ctrl hover:bg-card-muted flex items-start gap-3 px-2 py-2.5">
+            <span
+              className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full ${CATEGORY_STYLE[item.category]}`}
+            >
               <Icon className="size-4" aria-hidden />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] leading-snug text-fg">{item.title}</p>
-              <p className="mt-0.5 text-xs text-fg-muted">
-                {item.actorName ? <span>{item.actorName}</span> : <span>النظام</span>}
+              <p className="text-fg text-[13px] leading-snug">{copy(item.title)}</p>
+              <p className="text-fg-muted mt-0.5 text-xs">
+                {item.actorName ? <span>{item.actorName}</span> : <span>{copy('النظام')}</span>}
                 {' · '}
                 <time dateTime={item.occurredAt}>{relativeTime(item.occurredAt)}</time>
               </p>

@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -44,12 +45,12 @@ export function LedgerPage() {
   const { t, i18n } = useTranslation();
   const he = i18n.language.startsWith('he');
   const labels = {
-    amount: he ? 'סכום התנועה' : 'مبلغ الحركة',
-    debt: he ? 'חוב לאחר התנועה' : 'الدين بعد الحركة',
-    balance: he ? 'יתרה לאחר התנועה' : 'الرصيد بعد الحركة',
-    noDebt: he ? 'ללא חוב' : 'غير مديون',
-    settled: he ? 'החשבון מאוזן' : 'الحساب مسدد',
-    available: he ? 'יתרה לזכות הלקוח' : 'رصيد متاح للزبون',
+    amount: he ? 'סכום התנועה' : copy('مبلغ الحركة'),
+    debt: he ? 'חוב לאחר התנועה' : copy('الدين بعد الحركة'),
+    balance: he ? 'יתרה לאחר התנועה' : copy('الرصيد بعد الحركة'),
+    noDebt: he ? 'ללא חוב' : copy('غير مديون'),
+    settled: he ? 'החשבון מאוזן' : copy('الحساب مسدد'),
+    available: he ? 'יתרה לזכות הלקוח' : copy('رصيد متاح للزبون'),
   };
   const { user } = useAuth();
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
@@ -86,15 +87,15 @@ export function LedgerPage() {
     try {
       const rows = await fetchAllLedger(query);
       if (rows.length === 0) {
-        toast.error('لا توجد حركات للتصدير.');
+        toast.error(copy('لا توجد حركات للتصدير.'));
         return;
       }
       const stamp = new Date().toISOString().slice(0, 10);
       if (kind === 'csv') exportLedgerCsv(rows, `ledger-${stamp}.csv`);
-      else printLedger(rows, 'دفتر الحركات المالية');
+      else printLedger(rows, copy('دفتر الحركات المالية'));
     } catch (e) {
       if (e instanceof ApiRequestError) toast.apiError(e.message, e.requestId);
-      else toast.error('تعذّر التصدير.');
+      else toast.error(copy('تعذّر التصدير.'));
     } finally {
       setBusy(null);
     }
@@ -111,7 +112,7 @@ export function LedgerPage() {
 
   const allColumns: Column<LedgerEntry>[] = [
     {
-      header: 'التاريخ والوقت',
+      header: copy('التاريخ والوقت'),
       render: (row) => {
         const d = new Date(row.occurredAt);
         return (
@@ -132,14 +133,14 @@ export function LedgerPage() {
       },
     },
     {
-      header: 'نوع الحركة',
+      header: copy('نوع الحركة'),
       render: (row) => (
         <StatusBadge tone={TYPE_TONE[row.entryType] ?? 'neutral'}>{movementLabel(row)}</StatusBadge>
       ),
     },
     {
       key: 'customer',
-      header: 'الزبون',
+      header: copy('الزبون'),
       hideBelow: 'lg',
       render: (row) => (
         <div className="min-w-0">
@@ -148,7 +149,7 @@ export function LedgerPage() {
       ),
     },
     {
-      header: 'المرجع',
+      header: copy('المرجع'),
       hideBelow: 'md',
       render: (row) =>
         row.refNumber ? (
@@ -160,7 +161,7 @@ export function LedgerPage() {
         ),
     },
     {
-      header: 'التفاصيل',
+      header: copy('التفاصيل'),
       hideBelow: 'xl',
       render: (row) => (
         <span className="text-fg-muted line-clamp-1 text-[13px]">
@@ -185,17 +186,17 @@ export function LedgerPage() {
             {!isZero(row.debit)
               ? he
                 ? 'חיוב'
-                : 'زيادة على الحساب'
+                : copy('زيادة على الحساب')
               : row.entryType === 'PAYMENT_CREDIT'
                 ? he
                   ? 'תשלום שהתקבל'
-                  : 'دفعة مقبوضة'
+                  : copy('دفعة مقبوضة')
                 : he
                   ? 'הפחתה מהחשבון'
-                  : 'تخفيض من الحساب'}
+                  : copy('تخفيض من الحساب')}
           </p>
           <div className="text-fg-muted flex flex-wrap justify-end gap-1 text-xs">
-            <span>{he ? 'לפני:' : 'قبل الحركة:'}</span>
+            <span>{he ? 'לפני:' : copy('قبل الحركة:')}</span>
             <MoneyText
               value={ledgerBalanceDisplay(row.openingBalance).signedBalance}
               currency={currency}
@@ -242,7 +243,7 @@ export function LedgerPage() {
                 ? labels.settled
                 : he
                   ? 'חוב לתשלום'
-                  : 'دين مطلوب سداده'}
+                  : copy('دين مطلوب سداده')}
           </p>
         </div>
       ),
@@ -255,7 +256,11 @@ export function LedgerPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title={customerId && customerName ? `كشف حساب ${customerName}` : t('nav.ledger')}
+        title={
+          customerId && customerName
+            ? copy('كشف حساب {{value0}}', { value0: customerName })
+            : t('nav.ledger')
+        }
         icon={ListOrdered}
         breadcrumbs={[{ label: t('nav.dashboard'), href: '/' }, { label: t('nav.ledger') }]}
         linkAs={Link}
@@ -268,7 +273,7 @@ export function LedgerPage() {
               disabled={busy !== null}
             >
               <Download aria-hidden />
-              تصدير CSV
+              {copy('تصدير CSV')}
             </Button>
             <Button
               variant="outline"
@@ -277,7 +282,7 @@ export function LedgerPage() {
               disabled={busy !== null}
             >
               <Printer aria-hidden />
-              طباعة
+              {copy('طباعة')}
             </Button>
           </div>
         }
@@ -287,7 +292,7 @@ export function LedgerPage() {
         <Card>
           <CardBody className="grid grid-cols-2 gap-3 py-5 text-center sm:gap-6">
             <Totals
-              label={he ? 'החוב הנוכחי' : 'الدين الحالي'}
+              label={he ? 'החוב הנוכחי' : copy('الدين الحالي')}
               value={ledgerBalanceDisplay(totals.currentBalance).debt}
               tone="debit"
               currency={currency}
@@ -309,7 +314,7 @@ export function LedgerPage() {
             setSearch(v);
             setPage(1);
           }}
-          placeholder="ابحث في الحركات أو الزبائن…"
+          placeholder={copy('ابحث في الحركات أو الزبائن…')}
         />
         <SelectFilter
           value={entryType}
@@ -317,8 +322,8 @@ export function LedgerPage() {
             setEntryType(v);
             setPage(1);
           }}
-          allLabel="كل أنواع الحركات"
-          label="نوع الحركة"
+          allLabel={copy('كل أنواع الحركات')}
+          label={copy('نوع الحركة')}
           options={Object.entries(LEDGER_TYPE_LABELS).map(([value, label]) => ({ value, label }))}
         />
         <DateRangeFilter
@@ -337,10 +342,16 @@ export function LedgerPage() {
 
       <div>
         {customerId ? (
-          <h2 className="text-fg mb-3 text-center text-lg font-semibold">طلبات وحركات الزبون</h2>
+          <h2 className="text-fg mb-3 text-center text-lg font-semibold">
+            {copy('طلبات وحركات الزبون')}
+          </h2>
         ) : null}
         <DataTable
-          caption={customerId ? `طلبات وحركات ${customerName ?? 'الزبون'}` : 'جميع الحركات المالية'}
+          caption={
+            customerId
+              ? copy('طلبات وحركات {{value0}}', { value0: customerName ?? 'الزبون' })
+              : copy('جميع الحركات المالية')
+          }
           columns={columns}
           rows={list.data?.items ?? []}
           rowKey={(r) => r.id}
@@ -351,7 +362,7 @@ export function LedgerPage() {
                   message:
                     list.error instanceof ApiRequestError
                       ? list.error.message
-                      : 'تعذّر تحميل الحركات.',
+                      : copy('تعذّر تحميل الحركات.'),
                   requestId:
                     list.error instanceof ApiRequestError ? list.error.requestId : undefined,
                 }
@@ -361,8 +372,8 @@ export function LedgerPage() {
           isFiltered={isFiltered}
           onResetFilters={resetFilters}
           empty={{
-            title: 'لا توجد حركات مالية بعد',
-            description: 'تظهر الحركات هنا عند تأكيد الطلبات وتسجيل الدفعات.',
+            title: copy('لا توجد حركات مالية بعد'),
+            description: copy('تظهر الحركات هنا عند تأكيد الطلبات وتسجيل الدفعات.'),
           }}
           mobileRender={(row) => {
             const isDebit = row.debit !== '0.00';
@@ -385,7 +396,7 @@ export function LedgerPage() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="text-fg truncate text-sm font-bold">
-                      {row.customerName || LEDGER_TYPE_LABELS[row.entryType]}
+                      {row.customerName || copy(LEDGER_TYPE_LABELS[row.entryType])}
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <StatusBadge tone={TYPE_TONE[row.entryType] ?? 'neutral'}>
@@ -464,7 +475,7 @@ export function LedgerPage() {
                 setPageSize(s);
                 setPage(1);
               }}
-              itemLabel="حركة"
+              itemLabel={copy('حركة')}
             />
           </div>
         ) : null}
@@ -475,13 +486,13 @@ export function LedgerPage() {
         <Card>
           <CardBody className="flex flex-wrap items-center justify-around gap-4 py-4">
             <Totals
-              label={he ? 'סך החיובים בתוצאות' : 'مجموع الزيادات ضمن النتائج'}
+              label={he ? 'סך החיובים בתוצאות' : copy('مجموع الزيادات ضمن النتائج')}
               value={totals.totalDebit}
               tone="debit"
               currency={currency}
             />
             <Totals
-              label={he ? 'סך ההפחתות בתוצאות' : 'مجموع التخفيضات ضمن النتائج'}
+              label={he ? 'סך ההפחתות בתוצאות' : copy('مجموع التخفيضات ضمن النتائج')}
               value={totals.totalCredit}
               tone="credit"
               currency={currency}
@@ -504,6 +515,8 @@ function Totals({
   tone: 'debit' | 'credit' | 'auto';
   currency: CurrencyCode;
 }) {
+  useCopy();
+
   return (
     <div className="text-center">
       <p className="text-fg-muted text-[13px]">{label}</p>
@@ -518,11 +531,11 @@ function Totals({
 }
 
 function movementLabel(entry: LedgerEntry): string {
-  if (entry.entryType !== 'PAYMENT_CREDIT') return LEDGER_TYPE_LABELS[entry.entryType];
-  if (entry.relatedOrderNumbers.length === 0) return 'دفعة';
+  if (entry.entryType !== 'PAYMENT_CREDIT') return copy(LEDGER_TYPE_LABELS[entry.entryType]);
+  if (entry.relatedOrderNumbers.length === 0) return copy('دفعة');
 
   const orderNumbers = entry.relatedOrderNumbers.map(displayOrderNumber);
   return orderNumbers.length === 1
-    ? `دفعة للطلب ${orderNumbers[0]}`
-    : `دفعة للطلبات ${orderNumbers.join('، ')}`;
+    ? copy('دفعة للطلب {{value0}}', { value0: orderNumbers[0] })
+    : copy('دفعة للطلبات {{value0}}', { value0: orderNumbers.join('، ') });
 }

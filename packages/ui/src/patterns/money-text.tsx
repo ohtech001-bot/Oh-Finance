@@ -1,3 +1,4 @@
+import { useUiTranslation } from '../localization.js';
 import { formatMoney, isMoneyString, type CurrencyCode, type MoneyString } from '@oh/money';
 import { cn } from '../lib/cn.js';
 
@@ -48,11 +49,13 @@ export function MoneyText({
   signDisplay = false,
   className,
 }: MoneyTextProps) {
+  const copy = useUiTranslation();
+
   // حارس وقت التشغيل: قيمة تالفة تُعرض كشرطة، لا تُسقط الصفحة.
   // عرض "NaN" أو انهيار الشاشة في جدول مالي أسوأ من عرض «غير متاح».
   if (!isMoneyString(value)) {
     return (
-      <span className={cn('text-fg-subtle', className)} title="قيمة غير صالحة">
+      <span className={cn('text-fg-subtle', className)} title={copy('قيمة غير صالحة')}>
         —
       </span>
     );
@@ -99,10 +102,7 @@ export function MoneyText({
   const formatted = formatMoney(value, { currency, withSymbol, signDisplay });
 
   return (
-    <span
-      dir="ltr"
-      className={cn('inline-block tabular-nums', toneClass, sizeClass, className)}
-    >
+    <span dir="ltr" className={cn('inline-block tabular-nums', toneClass, sizeClass, className)}>
       {formatted}
     </span>
   );

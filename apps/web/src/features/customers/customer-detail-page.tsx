@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
@@ -70,6 +71,8 @@ import { CustomerStatementDialog } from './customer-statement-dialog';
  * كل رقم من الخادم؛ الرصيد من دفتر الحركات.
  */
 export function CustomerDetailPage() {
+  useCopy();
+
   const [returnOpen, setReturnOpen] = useState(false);
   const { id } = useParams<{ id: string }>();
   const { user, can } = useAuth();
@@ -116,7 +119,7 @@ export function CustomerDetailPage() {
           message={
             customerQuery.error instanceof ApiRequestError
               ? customerQuery.error.message
-              : 'تعذّر تحميل الزبون.'
+              : copy('تعذّر تحميل الزبون.')
           }
           onRetry={() => void customerQuery.refetch()}
         />
@@ -139,7 +142,7 @@ export function CustomerDetailPage() {
 
   const ledgerColumns: Column<LedgerEntry>[] = [
     {
-      header: 'التاريخ',
+      header: copy('التاريخ'),
       render: (row) => (
         <span className="text-fg text-[13px] tabular-nums" dir="ltr">
           {row.occurredAt.slice(0, 10)}
@@ -147,7 +150,7 @@ export function CustomerDetailPage() {
       ),
     },
     {
-      header: 'الساعة',
+      header: copy('الساعة'),
       render: (row) => (
         <span className="text-fg text-[13px] tabular-nums" dir="ltr">
           {new Date(row.occurredAt).toLocaleTimeString(locale, {
@@ -158,13 +161,13 @@ export function CustomerDetailPage() {
       ),
     },
     {
-      header: 'نوع الحركة',
+      header: copy('نوع الحركة'),
       render: (row) => (
-        <span className="text-fg text-[13px]">{LEDGER_TYPE_LABELS[row.entryType]}</span>
+        <span className="text-fg text-[13px]">{copy(LEDGER_TYPE_LABELS[row.entryType])}</span>
       ),
     },
     {
-      header: 'الدين',
+      header: copy('الدين'),
       align: 'end',
       render: (row) =>
         row.debit !== '0.00' ? (
@@ -174,7 +177,7 @@ export function CustomerDetailPage() {
         ),
     },
     {
-      header: 'المدفوع',
+      header: copy('المدفوع'),
       align: 'end',
       render: (row) =>
         row.credit !== '0.00' ? (
@@ -184,7 +187,7 @@ export function CustomerDetailPage() {
         ),
     },
     {
-      header: 'الرصيد بعد',
+      header: copy('الرصيد بعد'),
       align: 'end',
       render: (row) => (
         <MoneyText value={row.runningBalance} currency={currency} tone="auto" withSymbol={false} />
@@ -194,13 +197,13 @@ export function CustomerDetailPage() {
 
   const orderColumns: Column<Order>[] = [
     {
-      header: 'رقم الطلب',
+      header: copy('رقم الطلب'),
       render: (row) => (
         <span className="text-accent font-medium">{displayOrderNumber(row.number)}</span>
       ),
     },
     {
-      header: 'التاريخ',
+      header: copy('التاريخ'),
       hideBelow: 'md',
       render: (row) => (
         <span className="text-fg text-[13px] tabular-nums" dir="ltr">
@@ -209,26 +212,26 @@ export function CustomerDetailPage() {
       ),
     },
     {
-      header: 'الحالة',
+      header: copy('الحالة'),
       render: (row) => (
         <StatusBadge tone={ORDER_STATUS_BADGE[row.status].tone}>
           {row.netTotal === '0.00' && row.returnedAmount !== '0.00'
             ? currentLocale() === 'he'
               ? 'הוחזר במלואו'
-              : 'مرتجع بالكامل'
+              : copy('مرتجع بالكامل')
             : ORDER_STATUS_LABELS[row.status]}
         </StatusBadge>
       ),
     },
     {
-      header: 'الإجمالي',
+      header: copy('الإجمالي'),
       align: 'end',
       render: (row) => (
         <MoneyText value={row.netTotal ?? row.total} currency={currency} withSymbol={false} />
       ),
     },
     {
-      header: 'المتبقي',
+      header: copy('المتبقي'),
       align: 'end',
       hideBelow: 'sm',
       render: (row) =>
@@ -240,18 +243,18 @@ export function CustomerDetailPage() {
             withSymbol={false}
           />
         ) : (
-          <span className="text-success">مسدَّد</span>
+          <span className="text-success">{copy('مسدَّد')}</span>
         ),
     },
   ];
 
   const paymentColumns: Column<Payment>[] = [
     {
-      header: 'رقم الدفعة',
+      header: copy('رقم الدفعة'),
       render: (row) => <span className="text-accent font-medium">{row.number}</span>,
     },
     {
-      header: 'التاريخ',
+      header: copy('التاريخ'),
       render: (row) => (
         <span className="text-fg text-[13px] tabular-nums" dir="ltr">
           {row.paidAt.slice(0, 10)}
@@ -259,7 +262,7 @@ export function CustomerDetailPage() {
       ),
     },
     {
-      header: 'الساعة',
+      header: copy('الساعة'),
       render: (row) => (
         <span className="text-fg text-[13px] tabular-nums" dir="ltr">
           {new Date(row.paidAt).toLocaleTimeString(locale, {
@@ -270,35 +273,35 @@ export function CustomerDetailPage() {
       ),
     },
     {
-      header: 'الطريقة',
+      header: copy('الطريقة'),
       hideBelow: 'sm',
       render: (row) => (
-        <span className="text-fg text-[13px]">{PAYMENT_METHOD_LABELS[row.method]}</span>
+        <span className="text-fg text-[13px]">{copy(PAYMENT_METHOD_LABELS[row.method])}</span>
       ),
     },
     {
-      header: 'المبلغ',
+      header: copy('المبلغ'),
       align: 'end',
       render: (row) => (
         <MoneyText value={row.amount} currency={currency} tone="credit" withSymbol={false} />
       ),
     },
     {
-      header: 'الحالة',
+      header: copy('الحالة'),
       align: 'end',
       render: (row) =>
         row.status === 'REVERSED' ? (
-          <StatusBadge tone="debit">معكوسة</StatusBadge>
+          <StatusBadge tone="debit">{copy('معكوسة')}</StatusBadge>
         ) : (
-          <StatusBadge tone="credit">مقبوضة</StatusBadge>
+          <StatusBadge tone="credit">{copy('مقبوضة')}</StatusBadge>
         ),
     },
   ];
 
   return (
     <div className="space-y-5">
-      <Button variant="outline" size="icon" asChild title="العودة إلى الزبائن">
-        <Link to="/customers" aria-label="العودة إلى صفحة الزبائن">
+      <Button variant="outline" size="icon" asChild title={copy('العودة إلى الزبائن')}>
+        <Link to="/customers" aria-label={copy('العودة إلى صفحة الزبائن')}>
           <ArrowLeft className="rtl:rotate-180" aria-hidden />
         </Link>
       </Button>
@@ -307,38 +310,38 @@ export function CustomerDetailPage() {
         title={customer.name}
         icon={Users}
         className="flex-col sm:flex-row"
-        breadcrumbs={[{ label: 'الزبائن', href: '/customers' }, { label: customer.name }]}
+        breadcrumbs={[{ label: copy('الزبائن'), href: '/customers' }, { label: customer.name }]}
         linkAs={Link}
         actions={
           <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
             {can('orders.cancel') && can('orders.read') ? (
               <Button variant="outline" onClick={() => setReturnOpen(true)}>
                 <RotateCcw aria-hidden />
-                {currentLocale() === 'he' ? 'החזרת הזמנה' : 'إرجاع طلبية'}
+                {currentLocale() === 'he' ? 'החזרת הזמנה' : copy('إرجاع طلبية')}
               </Button>
             ) : null}
             {can('orders.create') ? (
               <Button variant="brand" onClick={() => setOrderOpen(true)}>
                 <ShoppingBag aria-hidden />
-                طلب جديد
+                {copy('طلب جديد')}
               </Button>
             ) : null}
             {can('payments.create') ? (
               <Button variant="accent" onClick={() => setPayOpen(true)}>
                 <Plus aria-hidden />
-                تسجيل دفعة
+                {copy('تسجيل دفعة')}
               </Button>
             ) : null}
             {can('ledger.read') ? (
               <Button variant="outline" onClick={() => setStatementOpen(true)}>
                 <FileText aria-hidden />
-                كشف الحساب
+                {copy('كشف الحساب')}
               </Button>
             ) : null}
             {can('customers.write') ? (
               <Button variant="outline" onClick={() => setEditOpen(true)}>
                 <Pencil aria-hidden />
-                تعديل
+                {copy('تعديل')}
               </Button>
             ) : null}
           </div>
@@ -356,15 +359,15 @@ export function CustomerDetailPage() {
             </div>
 
             <dl className="border-border space-y-2.5 border-t pt-4 text-[13px]">
-              {customer.company ? <Info label="الشركة" value={customer.company} /> : null}
-              {customer.phone ? <Info label="الهاتف" value={customer.phone} ltr /> : null}
-              {customer.email ? <Info label="البريد" value={customer.email} ltr /> : null}
-              {customer.city ? <Info label="المدينة" value={customer.city} /> : null}
+              {customer.company ? <Info label={copy('الشركة')} value={customer.company} /> : null}
+              {customer.phone ? <Info label={copy('الهاتف')} value={customer.phone} ltr /> : null}
+              {customer.email ? <Info label={copy('البريد')} value={customer.email} ltr /> : null}
+              {customer.city ? <Info label={copy('المدينة')} value={customer.city} /> : null}
               {customer.taxNumber ? (
-                <Info label="الرقم الضريبي" value={customer.taxNumber} ltr />
+                <Info label={copy('الرقم الضريبي')} value={customer.taxNumber} ltr />
               ) : null}
               <Info
-                label="يوم السداد الشهري"
+                label={copy('يوم السداد الشهري')}
                 value={formatDueDay(customer.paymentDueDay, locale)}
               />
             </dl>
@@ -378,7 +381,7 @@ export function CustomerDetailPage() {
           ) : summary ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
               <StatCard
-                label="الرصيد الحالي"
+                label={copy('الرصيد الحالي')}
                 money={toMoneyString(negate(customer.balance), 2)}
                 currency={currency}
                 moneyTone="auto"
@@ -404,10 +407,10 @@ export function CustomerDetailPage() {
                 currency={currency}
                 icon={CreditCard}
                 tone="accent"
-                sublabel={`المتاح: ${customer.availableCredit}`}
+                sublabel={copy('المتاح: {{value0}}', { value0: customer.availableCredit })}
               />
               <StatCard
-                label="مجموع الطلبات"
+                label={copy('مجموع الطلبات')}
                 value={summary.totalOrders}
                 icon={ShoppingBag}
                 tone="purple"
@@ -455,9 +458,9 @@ export function CustomerDetailPage() {
       {/* ── معلومات الحساب المختصرة ───────────────────────────────────── */}
       {summary ? (
         <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-          <InsightCard label="استخدام الائتمان">
+          <InsightCard label={copy('استخدام الائتمان')}>
             {summary.creditUsagePct === null ? (
-              <span className="text-fg-subtle text-sm">بلا حد</span>
+              <span className="text-fg-subtle text-sm">{copy('بلا حد')}</span>
             ) : (
               <div className="space-y-1">
                 <span className="text-fg text-sm font-semibold tabular-nums">
@@ -478,13 +481,13 @@ export function CustomerDetailPage() {
               </div>
             )}
           </InsightCard>
-          <InsightCard label="آخر طلب">
+          <InsightCard label={copy('آخر طلب')}>
             <DateOrDash value={summary.lastOrderAt} />
           </InsightCard>
-          <InsightCard label="آخر دفعة">
+          <InsightCard label={copy('آخر دفعة')}>
             <DateOrDash value={summary.lastPaymentAt} />
           </InsightCard>
-          <InsightCard label="زبون منذ">
+          <InsightCard label={copy('زبون منذ')}>
             <DateOrDash value={customer.createdAt} />
           </InsightCard>
         </div>
@@ -495,23 +498,25 @@ export function CustomerDetailPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="overflow-x-auto px-5 pt-2">
             <TabsList>
-              <TabsTrigger value="orders">الطلبات</TabsTrigger>
-              {can('ledger.read') ? <TabsTrigger value="ledger">دفتر الحركات</TabsTrigger> : null}
-              <TabsTrigger value="payments">الدفعات</TabsTrigger>
-              <TabsTrigger value="notes">الملاحظات</TabsTrigger>
+              <TabsTrigger value="orders">{copy('الطلبات')}</TabsTrigger>
+              {can('ledger.read') ? (
+                <TabsTrigger value="ledger">{copy('دفتر الحركات')}</TabsTrigger>
+              ) : null}
+              <TabsTrigger value="payments">{copy('الدفعات')}</TabsTrigger>
+              <TabsTrigger value="notes">{copy('الملاحظات')}</TabsTrigger>
             </TabsList>
           </div>
 
           {/* الطلبات */}
           <TabsContent value="orders">
             <DataTable
-              caption={`طلبات ${customer.name}`}
+              caption={copy('طلبات {{value0}}', { value0: customer.name })}
               columns={orderColumns}
               rows={ordersQuery.data?.items ?? []}
               rowKey={(r) => r.id}
               loading={ordersQuery.isLoading}
               onRowClick={(r) => setSelectedOrderId(r.id)}
-              empty={{ title: 'لا توجد طلبات لهذا الزبون' }}
+              empty={{ title: copy('لا توجد طلبات لهذا الزبون') }}
               className="border-0 shadow-none"
             />
           </TabsContent>
@@ -520,26 +525,26 @@ export function CustomerDetailPage() {
           {can('ledger.read') ? (
             <TabsContent value="ledger">
               <CardHeader
-                title="الحركات المالية"
+                title={copy('الحركات المالية')}
                 action={
                   <button
                     type="button"
                     onClick={() => setStatementOpen(true)}
                     className="text-accent text-[13px] font-medium hover:underline"
                   >
-                    كشف الحساب الكامل
+                    {copy('كشف الحساب الكامل')}
                   </button>
                 }
               />
               <DataTable
-                caption={`حركات حساب ${customer.name}`}
+                caption={copy('حركات حساب {{value0}}', { value0: customer.name })}
                 columns={ledgerColumns}
                 rows={ledgerQuery.data?.items ?? []}
                 rowKey={(r) => r.id}
                 loading={ledgerQuery.isLoading}
                 empty={{
-                  title: 'لا توجد حركات بعد',
-                  description: 'تظهر الحركات عند تأكيد طلب أو تسجيل دفعة.',
+                  title: copy('لا توجد حركات بعد'),
+                  description: copy('تظهر الحركات عند تأكيد طلب أو تسجيل دفعة.'),
                 }}
                 className="border-0 shadow-none"
               />
@@ -549,12 +554,12 @@ export function CustomerDetailPage() {
           {/* الدفعات */}
           <TabsContent value="payments">
             <DataTable
-              caption={`دفعات ${customer.name}`}
+              caption={copy('دفعات {{value0}}', { value0: customer.name })}
               columns={paymentColumns}
               rows={paymentsQuery.data?.items ?? []}
               rowKey={(r) => r.id}
               loading={paymentsQuery.isLoading}
-              empty={{ title: 'لا توجد دفعات لهذا الزبون' }}
+              empty={{ title: copy('لا توجد دفعات لهذا الزبون') }}
               className="border-0 shadow-none"
             />
           </TabsContent>
@@ -564,7 +569,9 @@ export function CustomerDetailPage() {
             <CardBody>
               <div className="flex items-start gap-3">
                 <FileText className="text-fg-subtle mt-0.5 size-5" aria-hidden />
-                <p className="text-fg-muted text-sm">{customer.notes || 'لا توجد ملاحظات.'}</p>
+                <p className="text-fg-muted text-sm">
+                  {customer.notes || copy('لا توجد ملاحظات.')}
+                </p>
               </div>
             </CardBody>
           </TabsContent>
@@ -602,6 +609,8 @@ export function CustomerDetailPage() {
 }
 
 function InsightCard({ label, children }: { label: string; children: ReactNode }) {
+  useCopy();
+
   return (
     <Card>
       <CardBody className="min-h-28 p-5">
@@ -613,6 +622,8 @@ function InsightCard({ label, children }: { label: string; children: ReactNode }
 }
 
 function DateOrDash({ value }: { value: string | null }) {
+  useCopy();
+
   if (!value) return <span className="text-fg-subtle text-sm">—</span>;
   return (
     <span className="text-fg text-sm tabular-nums" dir="ltr">
@@ -622,6 +633,8 @@ function DateOrDash({ value }: { value: string | null }) {
 }
 
 function Info({ label, value, ltr }: { label: string; value: string; ltr?: boolean }) {
+  useCopy();
+
   return (
     <div className="flex items-center justify-between gap-3">
       <dt className="text-fg-muted shrink-0">{label}</dt>
@@ -633,7 +646,7 @@ function Info({ label, value, ltr }: { label: string; value: string; ltr?: boole
 }
 
 function formatDueDay(day: number, locale: 'ar' | 'he' | 'en'): string {
-  if (locale === 'ar') return `يوم ${day} من كل شهر`;
+  if (locale === 'ar') return copy('يوم {{value0}} من كل شهر', { value0: day });
   if (locale === 'he') return `בכל ${day} בחודש`;
   return `Day ${day} of every month`;
 }

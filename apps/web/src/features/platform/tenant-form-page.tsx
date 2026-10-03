@@ -1,3 +1,5 @@
+import { copy } from '@/lib/copy';
+import { currentLocale } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -213,7 +215,7 @@ export function TenantFormPage() {
         if (error.fields) {
           for (const [field, messages] of Object.entries(error.fields)) {
             setError(field as keyof CreateTenantRequest, {
-              message: messages.join('، '),
+              message: messages.join(copy('، ')),
             });
           }
           return;
@@ -256,7 +258,7 @@ export function TenantFormPage() {
             <DialogTitle>{t('platform.editTenant')}</DialogTitle>
           </DialogHeader>
           <ErrorState
-            message="تعذّر تحميل بيانات المحل."
+            message={copy('تعذّر تحميل بيانات المحل.')}
             onRetry={() => void tenantQuery.refetch()}
           />
         </DialogContent>
@@ -283,24 +285,26 @@ export function TenantFormPage() {
           <form onSubmit={onSubmit} className="space-y-4 px-3 py-4 sm:space-y-5 sm:p-6" noValidate>
             {/* ── بيانات المحل ────────────────────────────────────────────── */}
             <Card>
-              <CardHeader title="بيانات المحل" />
+              <CardHeader title={copy('بيانات المحل')} />
               <CardBody className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <Field label={t('platform.tenantName')} error={errors.name?.message} required>
                   {(props) => (
                     <Input
                       {...props}
                       {...register('name')}
-                      placeholder="محل النجاح"
+                      placeholder={copy('محل النجاح')}
                       error={Boolean(errors.name)}
                     />
                   )}
                 </Field>
 
-                <Field label="المدينة" error={errors.storeCity?.message}>
-                  {(props) => <Input {...props} {...register('storeCity')} placeholder="الرياض" />}
+                <Field label={copy('المدينة')} error={errors.storeCity?.message}>
+                  {(props) => (
+                    <Input {...props} {...register('storeCity')} placeholder={copy('الرياض')} />
+                  )}
                 </Field>
 
-                <Field label="هاتف المحل" error={errors.storePhone?.message}>
+                <Field label={copy('هاتف المحل')} error={errors.storePhone?.message}>
                   {(props) => (
                     <Input
                       {...props}
@@ -311,7 +315,7 @@ export function TenantFormPage() {
                   )}
                 </Field>
 
-                <Field label="بريد المحل" error={errors.storeEmail?.message}>
+                <Field label={copy('بريد المحل')} error={errors.storeEmail?.message}>
                   {(props) => (
                     <Input
                       {...props}
@@ -323,17 +327,17 @@ export function TenantFormPage() {
                   )}
                 </Field>
 
-                <Field label="العنوان" error={errors.storeAddress?.message}>
+                <Field label={copy('العنوان')} error={errors.storeAddress?.message}>
                   {(props) => (
                     <Input
                       {...props}
                       {...register('storeAddress')}
-                      placeholder="شارع النجاح، حي النور"
+                      placeholder={copy('شارع النجاح، حي النور')}
                     />
                   )}
                 </Field>
 
-                <Field label="رابط موقع المحل" error={errors.websiteUrl?.message}>
+                <Field label={copy('رابط موقع المحل')} error={errors.websiteUrl?.message}>
                   {(props) => (
                     <Input
                       {...props}
@@ -345,13 +349,13 @@ export function TenantFormPage() {
                   )}
                 </Field>
 
-                <Field label="شعار المحل" error={errors.logoDataUrl?.message}>
+                <Field label={copy('شعار المحل')} error={errors.logoDataUrl?.message}>
                   {() => (
                     <div className="flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
                       {watch('logoDataUrl') || tenantQuery.data?.stores[0]?.logoUrl ? (
                         <img
                           src={watch('logoDataUrl') || tenantQuery.data?.stores[0]?.logoUrl || ''}
-                          alt="شعار المحل"
+                          alt={copy('شعار المحل')}
                           className="rounded-ctrl border-border size-16 border object-contain"
                         />
                       ) : (
@@ -368,14 +372,14 @@ export function TenantFormPage() {
                           if (!file) return;
                           if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
                             setError('logoDataUrl', {
-                              message: 'صيغة الشعار يجب أن تكون PNG أو JPEG أو WebP.',
+                              message: copy('صيغة الشعار يجب أن تكون PNG أو JPEG أو WebP.'),
                             });
                             event.target.value = '';
                             return;
                           }
                           if (file.size > 5 * 1024 * 1024) {
                             setError('logoDataUrl', {
-                              message: 'حجم الشعار يجب ألا يتجاوز 5 ميجابايت.',
+                              message: copy('حجم الشعار يجب ألا يتجاوز 5 ميجابايت.'),
                             });
                             event.target.value = '';
                             return;
@@ -397,9 +401,9 @@ export function TenantFormPage() {
 
             {/* ── التوطين والعملة ─────────────────────────────────────────── */}
             <Card>
-              <CardHeader title="اللغة والعملة" />
+              <CardHeader title={copy('اللغة والعملة')} />
               <CardBody className="grid grid-cols-1 gap-5 md:grid-cols-3">
-                <Field label="اللغة الافتراضية" required>
+                <Field label={copy('اللغة الافتراضية')} required>
                   {(props) => (
                     <select
                       {...props}
@@ -415,7 +419,11 @@ export function TenantFormPage() {
                   )}
                 </Field>
 
-                <Field label="العملة" hint="تُستخدم في كل المبالغ والفواتير." required>
+                <Field
+                  label={copy('العملة')}
+                  hint={copy('تُستخدم في كل المبالغ والفواتير.')}
+                  required
+                >
                   {(props) => (
                     <select
                       {...props}
@@ -424,15 +432,19 @@ export function TenantFormPage() {
                     >
                       {CURRENCY_CODES.map((code) => (
                         <option key={code} value={code}>
-                          {CURRENCIES[code as CurrencyCode].nameAr} (
-                          {CURRENCIES[code as CurrencyCode].symbol})
+                          {
+                            CURRENCIES[code as CurrencyCode][
+                              currentLocale() === 'he' ? 'nameHe' : 'nameAr'
+                            ]
+                          }{' '}
+                          ({CURRENCIES[code as CurrencyCode].symbol})
                         </option>
                       ))}
                     </select>
                   )}
                 </Field>
 
-                <Field label="المنطقة الزمنية" required>
+                <Field label={copy('المنطقة الزمنية')} required>
                   {(props) => (
                     <select
                       {...props}
@@ -454,7 +466,7 @@ export function TenantFormPage() {
             {!isEdit ? (
               <>
                 <Card>
-                  <CardHeader title="صاحب المحل" />
+                  <CardHeader title={copy('صاحب المحل')} />
                   <CardBody className="grid grid-cols-1 gap-5 md:grid-cols-2">
                     <Field
                       label={t('platform.ownerName')}
@@ -465,7 +477,7 @@ export function TenantFormPage() {
                         <Input
                           {...props}
                           {...register('ownerName')}
-                          placeholder="أحمد محمود"
+                          placeholder={copy('أحمد محمود')}
                           startIcon={<User className="size-4" />}
                           error={Boolean(errors.ownerName)}
                         />
@@ -474,7 +486,7 @@ export function TenantFormPage() {
 
                     <Field
                       label={t('platform.ownerEmail')}
-                      hint="سيستخدمه لتسجيل الدخول. يجب أن يكون فريدًا في المنصة."
+                      hint={copy('سيستخدمه لتسجيل الدخول. يجب أن يكون فريدًا في المنصة.')}
                       error={errors.ownerEmail?.message}
                       required
                     >
@@ -492,7 +504,7 @@ export function TenantFormPage() {
 
                     <Field
                       label={t('platform.ownerPassword')}
-                      hint="7 أحرف على الأقل. أبلغه بها عبر قناة آمنة واطلب تغييرها."
+                      hint={copy('7 أحرف على الأقل. أبلغه بها عبر قناة آمنة واطلب تغييرها.')}
                       error={errors.ownerPassword?.message}
                       required
                     >
@@ -507,7 +519,7 @@ export function TenantFormPage() {
                       )}
                     </Field>
 
-                    <Field label="هاتف صاحب المحل" error={errors.ownerPhone?.message}>
+                    <Field label={copy('هاتف صاحب المحل')} error={errors.ownerPhone?.message}>
                       {(props) => (
                         <Input
                           {...props}
@@ -521,7 +533,7 @@ export function TenantFormPage() {
                 </Card>
 
                 <Card>
-                  <CardHeader title="الاشتراك" />
+                  <CardHeader title={copy('الاشتراك')} />
                   <CardBody className="grid grid-cols-1 gap-5 md:grid-cols-2">
                     <Field label={t('platform.plan')} error={errors.planId?.message} required>
                       {(props) => (
@@ -532,7 +544,8 @@ export function TenantFormPage() {
                         >
                           {plans.map((plan) => (
                             <option key={plan.id} value={plan.id}>
-                              {plan.nameAr} — {plan.priceMonthly} {plan.currency} / شهريًا
+                              {currentLocale() === 'he' ? plan.nameHe : plan.nameAr} —{' '}
+                              {plan.priceMonthly} {plan.currency} {copy('/ شهريًا')}
                             </option>
                           ))}
                         </select>
@@ -645,7 +658,7 @@ export function TenantFormPage() {
 
               {isDirty ? (
                 <span className="text-warning col-span-2 text-xs sm:col-span-1">
-                  لديك تغييرات غير محفوظة.
+                  {copy('لديك تغييرات غير محفوظة.')}
                 </span>
               ) : null}
             </div>

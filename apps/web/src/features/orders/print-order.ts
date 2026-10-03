@@ -9,6 +9,8 @@ import {
   type CurrencyCode,
 } from '@oh/money';
 import { displayOrderNumber } from './order-number';
+import { copy } from '@/lib/copy';
+import { currentLocale } from '@/lib/i18n';
 
 interface PrintOrderOptions {
   store?: {
@@ -159,6 +161,8 @@ export function printOrder(
   currency: CurrencyCode,
   options: PrintOrderOptions = {},
 ) {
+  const locale = currentLocale();
+  const tr = (message: string) => escapeHtml(copy(message, {}, locale));
   const win = (options.targetWindow ??
     window.open('', '_blank', 'width=420,height=720')) as OrderPrintWindow | null;
   if (!win) return;
@@ -175,15 +179,15 @@ export function printOrder(
   const partiallyPaid = order.status === 'PARTIALLY_PAID';
   const paymentState =
     order.netTotal === '0.00' && order.returnedAmount !== '0.00'
-      ? 'مرتجع بالكامل / הוחזר במלואו'
+      ? tr('مرتجع بالكامل / הוחזר במלואו')
       : paid
-        ? 'مدفوع / שולם'
+        ? tr('مدفوع / שולם')
         : partiallyPaid
-          ? 'مدفوع جزئيًا / שולם חלקית'
-          : 'غير مدفوع / לא שולם';
+          ? tr('مدفوع جزئيًا / שולם חלקית')
+          : tr('غير مدفوع / לא שולם');
   const paymentColor = paid ? '#16733a' : partiallyPaid ? '#b65d00' : '#c42323';
   const cashPaid = subtract(order.paidAmount, order.creditAppliedAmount);
-  const documentState = order.status === 'DRAFT' ? 'مسودة / טיוטה' : 'طلب مؤكد / הזמנה מאושרת';
+  const documentState = tr(order.status === 'DRAFT' ? 'مسودة / טיוטה' : 'طلب مؤكد / הזמנה מאושרת');
   const storeName = escapeHtml(options.store?.name ?? 'OH Finance');
   const paperSize = options.paperSize ?? '80mm';
   const a4 = paperSize === 'A4';
@@ -202,13 +206,13 @@ export function printOrder(
     .map((item) => {
       const itemDiscount =
         Number(item.discount) > 0
-          ? `<span class="product-discount">خصم المنتج: - ${money(item.discount)}</span>`
+          ? `<span class="product-discount">${tr('خصم المنتج')}: - ${money(item.discount)}</span>`
           : '';
 
       return `
         <tr>
           <td class="product">
-            <span class="product-name"${item.returned ? ' style="text-decoration:line-through"' : ''}>${escapeHtml(item.name)}</span>${item.returned ? '<span>مرتجع / הוחזר</span>' : ''}
+            <span class="product-name"${item.returned ? ' style="text-decoration:line-through"' : ''}>${escapeHtml(item.name)}</span>${item.returned ? `<span>${tr('مرتجع')}</span>` : ''}
             ${itemDiscount}
           </td>
           <td>${escapeHtml(item.quantity)}</td>
@@ -220,7 +224,7 @@ export function printOrder(
 
   const discount =
     Number(order.discountAmount) > 0
-      ? `<div class="total-row"><span>الخصم</span><strong>- ${money(order.discountAmount)}</strong></div>`
+      ? `<div class="total-row"><span>${tr('الخصم')}</span><strong>- ${money(order.discountAmount)}</strong></div>`
       : '';
 
   const filename = `order-${displayOrderNumber(order.number)}.pdf`;
@@ -236,7 +240,7 @@ export function printOrder(
     const originalText = shareButton?.textContent ?? '';
     if (shareButton) {
       shareButton.disabled = true;
-      shareButton.textContent = 'جارٍ تجهيز PDF...';
+      shareButton.textContent = copy('جارٍ تجهيز PDF...', {}, locale);
     }
 
     try {
@@ -244,8 +248,12 @@ export function printOrder(
       const file = new File([blob], filename, { type: 'application/pdf' });
       const shareData: ShareData = {
         files: [file],
-        title: `طلب ${displayOrderNumber(order.number)}`,
-        text: `طلب ${displayOrderNumber(order.number)} - ${order.customerName}`,
+        title: copy('طلب {{value0}}', { value0: displayOrderNumber(order.number) }, locale),
+        text: copy(
+          'طلب {{value0}} - {{value1}}',
+          { value0: displayOrderNumber(order.number), value1: order.customerName },
+          locale,
+        ),
       };
 
       if (win.navigator.share && (!win.navigator.canShare || win.navigator.canShare(shareData))) {
@@ -262,15 +270,15 @@ export function printOrder(
 
       if (customerWhatsapp) {
         win.open(
-          `https://wa.me/${customerWhatsapp}?text=${encodeURIComponent(`طلب ${displayOrderNumber(order.number)} جاهز بصيغة PDF. أرفق الملف الذي تم تنزيله.`)}`,
+          `https://wa.me/${customerWhatsapp}?text=${encodeURIComponent(copy('طلب {{value0}} جاهز بصيغة PDF. أرفق الملف الذي تم تنزيله.', { value0: displayOrderNumber(order.number) }, locale))}`,
           '_blank',
           'noopener,noreferrer',
         );
       }
-      win.alert('تم تنزيل ملف PDF. أرفقه في محادثة واتساب للزبون.');
+      win.alert(copy('تم تنزيل ملف PDF. أرفقه في محادثة واتساب للزبون.', {}, locale));
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
-      win.alert('تعذر إنشاء ملف PDF. حاول مرة أخرى.');
+      win.alert(copy('تعذر إنشاء ملف PDF. حاول مرة أخرى.', {}, locale));
     } finally {
       if (shareButton) {
         shareButton.disabled = false;
@@ -280,7 +288,7 @@ export function printOrder(
   };
 
   win.document.write(`<!doctype html>
-  <html lang="ar" dir="rtl">
+  <html lang="${locale}" dir="rtl">
   <head>
     <meta charset="utf-8">
     <title>${orderNumber}</title>
@@ -316,10 +324,10 @@ export function printOrder(
     </style>
   </head>
   <body>
-    <nav class="print-toolbar" aria-label="إجراءات الطباعة">
-      <button type="button" data-back>رجوع ←</button>
-      <button class="primary" type="button" data-print>طباعة</button>
-      <button type="button" data-share-pdf>مشاركة PDF</button>
+    <nav class="print-toolbar" aria-label="${tr('إجراءات الطباعة')}">
+      <button type="button" data-back>← ${tr('رجوع')}</button>
+      <button class="primary" type="button" data-print>${tr('طباعة')}</button>
+      <button type="button" data-share-pdf>${tr('مشاركة PDF')}</button>
     </nav>
     <main class="receipt">
       <header class="store">
@@ -332,54 +340,54 @@ export function printOrder(
       </header>
 
       <section class="section">
-        <div class="section-title">تفاصيل صاحب الطلب</div>
-        <div class="info-row"><span>الاسم</span><strong>${escapeHtml(order.customerName)}</strong></div>
-        ${options.customer?.phone ? `<div class="info-row"><span>الهاتف</span><strong>${escapeHtml(options.customer.phone)}</strong></div>` : ''}
-        ${options.customer?.email ? `<div class="info-row"><span>البريد الإلكتروني</span><strong>${escapeHtml(options.customer.email)}</strong></div>` : ''}
-        ${options.customer?.city ? `<div class="info-row"><span>المدينة</span><strong>${escapeHtml(options.customer.city)}</strong></div>` : ''}
-        ${options.customer?.address ? `<div class="info-row"><span>العنوان</span><strong>${escapeHtml(options.customer.address)}</strong></div>` : ''}
+        <div class="section-title">${tr('تفاصيل صاحب الطلب')}</div>
+        <div class="info-row"><span>${tr('الاسم')}</span><strong>${escapeHtml(order.customerName)}</strong></div>
+        ${options.customer?.phone ? `<div class="info-row"><span>${tr('الهاتف')}</span><strong>${escapeHtml(options.customer.phone)}</strong></div>` : ''}
+        ${options.customer?.email ? `<div class="info-row"><span>${tr('البريد الإلكتروني')}</span><strong>${escapeHtml(options.customer.email)}</strong></div>` : ''}
+        ${options.customer?.city ? `<div class="info-row"><span>${tr('المدينة')}</span><strong>${escapeHtml(options.customer.city)}</strong></div>` : ''}
+        ${options.customer?.address ? `<div class="info-row"><span>${tr('العنوان')}</span><strong>${escapeHtml(options.customer.address)}</strong></div>` : ''}
       </section>
 
       <section class="section">
-        <div class="section-title">تفاصيل الطلب</div>
-        <div class="info-row"><span>رقم الطلب</span><strong>${orderNumber}</strong></div>
-        <div class="info-row"><span>تاريخ استلام الطلب</span><strong>${orderDate}</strong></div>
-        <div class="info-row"><span>ساعة الاستلام</span><strong>${orderTime}</strong></div>
-        ${settlementDate ? `<div class="info-row"><span>تاريخ السداد</span><strong>${settlementDate}</strong></div>` : ''}
-        ${settlementTime ? `<div class="info-row"><span>ساعة السداد</span><strong>${settlementTime}</strong></div>` : ''}
-        <div class="info-row"><span>حالة الدفع</span><span class="payment">${paymentState}</span></div>
-        <div class="info-row"><span>قيمة الطلب</span><strong>${money(order.total)}</strong></div>
-        <div class="info-row"><span>المسحوب من رصيد الزبون</span><strong>${money(order.creditAppliedAmount)}</strong></div>
-        ${greaterThan(cashPaid, '0') ? `<div class="info-row"><span>المدفوع نقدًا</span><strong>${money(cashPaid.toString())}</strong></div>` : ''}
-        <div class="info-row"><span>إجمالي المسدد</span><strong>${money(order.paidAmount)}</strong></div>
-        <div class="info-row"><span>المتبقي للسداد</span><strong>${money(order.remainingAmount)}</strong></div>
-        ${options.customer?.balance !== undefined ? `<div class="info-row"><span>رصيد الحساب الحالي</span><strong>${money(options.customer.balance)}</strong></div>` : ''}
+        <div class="section-title">${tr('تفاصيل الطلب')}</div>
+        <div class="info-row"><span>${tr('رقم الطلب')}</span><strong>${orderNumber}</strong></div>
+        <div class="info-row"><span>${tr('تاريخ استلام الطلب')}</span><strong>${orderDate}</strong></div>
+        <div class="info-row"><span>${tr('ساعة الاستلام')}</span><strong>${orderTime}</strong></div>
+        ${settlementDate ? `<div class="info-row"><span>${tr('تاريخ السداد')}</span><strong>${settlementDate}</strong></div>` : ''}
+        ${settlementTime ? `<div class="info-row"><span>${tr('ساعة السداد')}</span><strong>${settlementTime}</strong></div>` : ''}
+        <div class="info-row"><span>${tr('حالة الدفع')}</span><span class="payment">${paymentState}</span></div>
+        <div class="info-row"><span>${tr('قيمة الطلب')}</span><strong>${money(order.total)}</strong></div>
+        <div class="info-row"><span>${tr('المسحوب من رصيد الزبون')}</span><strong>${money(order.creditAppliedAmount)}</strong></div>
+        ${greaterThan(cashPaid, '0') ? `<div class="info-row"><span>${tr('المدفوع نقدًا')}</span><strong>${money(cashPaid.toString())}</strong></div>` : ''}
+        <div class="info-row"><span>${tr('إجمالي المسدد')}</span><strong>${money(order.paidAmount)}</strong></div>
+        <div class="info-row"><span>${tr('المتبقي للسداد')}</span><strong>${money(order.remainingAmount)}</strong></div>
+        ${options.customer?.balance !== undefined ? `<div class="info-row"><span>${tr('رصيد الحساب الحالي')}</span><strong>${money(options.customer.balance)}</strong></div>` : ''}
         ${
           options.payment
-            ? `<div class="info-row"><span>قيمة الدفعة</span><strong>${money(options.payment.amount)}</strong></div>
-        <div class="info-row"><span>الرصيد قبل الدفع</span><strong>${money(options.payment.balanceBefore)}</strong></div>
-        <div class="info-row"><span>الرصيد بعد الدفع</span><strong>${money(options.payment.balanceAfter)}</strong></div>`
+            ? `<div class="info-row"><span>${tr('قيمة الدفعة')}</span><strong>${money(options.payment.amount)}</strong></div>
+        <div class="info-row"><span>${tr('الرصيد قبل الدفع')}</span><strong>${money(options.payment.balanceBefore)}</strong></div>
+        <div class="info-row"><span>${tr('الرصيد بعد الدفع')}</span><strong>${money(options.payment.balanceAfter)}</strong></div>`
             : ''
         }
       </section>
 
       <section class="section">
-        <div class="section-title">المنتجات</div>
+        <div class="section-title">${tr('المنتجات')}</div>
         <table>
           <thead>
-            <tr><th class="product">المنتج</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr>
+            <tr><th class="product">${tr('المنتج')}</th><th>${tr('الكمية')}</th><th>${tr('سعر الوحدة')}</th><th>${tr('الإجمالي')}</th></tr>
           </thead>
           <tbody>${items}</tbody>
         </table>
-        <div class="tax-note">الأسعار المعروضة تشمل الضريبة.</div>
+        <div class="tax-note">${tr('الأسعار المعروضة تشمل الضريبة.')}</div>
       </section>
 
       <section class="section">
-        <div class="total-row"><span>السعر قبل الضريبة</span><strong>${money(tax.beforeTax)}</strong></div>
-        <div class="total-row"><span>قيمة الضريبة (${escapeHtml(String(taxRate))}% ضمن السعر)</span><strong>${money(tax.taxAmount)}</strong></div>
+        <div class="total-row"><span>${tr('السعر قبل الضريبة')}</span><strong>${money(tax.beforeTax)}</strong></div>
+        <div class="total-row"><span>${escapeHtml(copy('قيمة الضريبة ({{rate}}% ضمن السعر)', { rate: taxRate }, locale))}</span><strong>${money(tax.taxAmount)}</strong></div>
         ${discount}
-        ${order.returnedAmount && order.returnedAmount !== '0.00' ? `<div class="total-row"><span>قيمة المرتجعات / החזרות</span><strong>${money(order.returnedAmount)}</strong></div>` : ''}
-        <div class="total-row grand-total"><span>السعر النهائي شامل الضريبة</span><strong>${money(order.netTotal ?? order.total)}</strong></div>
+        ${order.returnedAmount && order.returnedAmount !== '0.00' ? `<div class="total-row"><span>${tr('قيمة المرتجعات')}</span><strong>${money(order.returnedAmount)}</strong></div>` : ''}
+        <div class="total-row grand-total"><span>${tr('السعر النهائي شامل الضريبة')}</span><strong>${money(order.netTotal ?? order.total)}</strong></div>
       </section>
 
       <footer class="footer">${storeName}</footer>

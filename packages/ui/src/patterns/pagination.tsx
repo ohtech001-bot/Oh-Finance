@@ -1,3 +1,4 @@
+import { useUiTranslation } from '../localization.js';
 import { cn } from '../lib/cn.js';
 import { Button } from '../primitives/button.js';
 
@@ -33,6 +34,8 @@ export function Pagination({
   itemLabel = 'عنصر',
   className,
 }: PaginationProps) {
+  const copy = useUiTranslation();
+
   if (total === 0) return null;
 
   const from = (page - 1) * pageSize + 1;
@@ -40,26 +43,26 @@ export function Pagination({
 
   return (
     <nav
-      aria-label="ترقيم الصفحات"
+      aria-label={copy('ترقيم الصفحات')}
       className={cn(
-        'flex flex-col gap-3 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between',
+        'border-border flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between',
         className,
       )}
     >
       {/* العدّاد + حجم الصفحة */}
-      <div className="flex flex-wrap items-center gap-3 text-[13px] text-fg-muted sm:gap-4">
+      <div className="text-fg-muted flex flex-wrap items-center gap-3 text-[13px] sm:gap-4">
         {onPageSizeChange ? (
           <div className="flex items-center gap-2">
             <label htmlFor="page-size" className="whitespace-nowrap">
-              لكل صفحة
+              {copy('لكل صفحة')}
             </label>
             <select
               id="page-size"
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
               className={cn(
-                'h-9 rounded-ctrl border border-border bg-card px-2 text-[13px] text-fg',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                'rounded-ctrl border-border bg-card text-fg h-9 border px-2 text-[13px]',
+                'focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2',
               )}
             >
               {pageSizes.map((size) => (
@@ -71,10 +74,13 @@ export function Pagination({
           </div>
         ) : null}
 
-        <p aria-live="polite">
-          عرض <span className="tabular-nums font-medium text-fg">{from}</span> إلى{' '}
-          <span className="tabular-nums font-medium text-fg">{to}</span> من{' '}
-          <span className="tabular-nums font-medium text-fg">{total}</span> {itemLabel}
+        <p aria-live="polite" className="tabular-nums">
+          {copy('عرض {{from}} إلى {{to}} من {{total}} {{item}}', {
+            from,
+            to,
+            total,
+            item: copy(itemLabel),
+          })}
         </p>
       </div>
 
@@ -86,16 +92,12 @@ export function Pagination({
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
         >
-          السابق
+          {copy('السابق')}
         </Button>
 
         {buildPageList(page, totalPages).map((item, i) =>
           item === 'ellipsis' ? (
-            <span
-              key={`gap-${i}`}
-              className="hidden px-2 text-fg-subtle sm:inline"
-              aria-hidden
-            >
+            <span key={`gap-${i}`} className="text-fg-subtle hidden px-2 sm:inline" aria-hidden>
               …
             </span>
           ) : (
@@ -106,7 +108,7 @@ export function Pagination({
               className={cn('min-w-9 tabular-nums', item !== page && 'max-sm:hidden')}
               onClick={() => onPageChange(item)}
               aria-current={item === page ? 'page' : undefined}
-              aria-label={`صفحة ${item}`}
+              aria-label={copy('صفحة {{value0}}', { value0: item })}
             >
               {item}
             </Button>
@@ -119,7 +121,7 @@ export function Pagination({
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
         >
-          التالي
+          {copy('التالي')}
         </Button>
       </div>
     </nav>

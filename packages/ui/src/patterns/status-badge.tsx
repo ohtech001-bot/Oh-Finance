@@ -1,5 +1,6 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../lib/cn.js';
+import { useUiTranslation } from '../localization.js';
 
 /**
  * شارات الحالة — الألوان والأشكال مقيسة من المرجع البصري.
@@ -10,15 +11,15 @@ import { cn } from '../lib/cn.js';
  *    وزبون دائن في جدول الزبائن.
  */
 const badgeVariants = cva(
-  'inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-badge whitespace-nowrap',
+  'rounded-pill text-badge inline-flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1',
   {
     variants: {
       tone: {
-        credit: 'bg-success-soft text-success',   // مدفوع · دائن · نشط
-        debit: 'bg-danger-soft text-danger',      // مدين · ملغي · غير نشط
-        partial: 'bg-warning-soft text-warning',  // مدفوع جزئيًا
-        info: 'bg-info-soft text-info',           // عرض سعر
-        neutral: 'bg-neutral-soft text-neutral',  // مسودة
+        credit: 'bg-success-soft text-success', // مدفوع · دائن · نشط
+        debit: 'bg-danger-soft text-danger', // مدين · ملغي · غير نشط
+        partial: 'bg-warning-soft text-warning', // مدفوع جزئيًا
+        info: 'bg-info-soft text-info', // عرض سعر
+        neutral: 'bg-neutral-soft text-neutral', // مسودة
         purple: 'bg-purple-soft text-purple',
         orange: 'bg-orange-soft text-orange',
       },
@@ -35,12 +36,11 @@ export interface StatusBadgeProps extends VariantProps<typeof badgeVariants> {
 }
 
 export function StatusBadge({ tone, withDot, children, className }: StatusBadgeProps) {
+  const copy = useUiTranslation();
   return (
     <span className={cn(badgeVariants({ tone }), className)}>
-      {withDot ? (
-        <span className="size-1.5 rounded-full bg-current" aria-hidden />
-      ) : null}
-      {children}
+      {withDot ? <span className="size-1.5 rounded-full bg-current" aria-hidden /> : null}
+      {typeof children === 'string' ? copy(children) : children}
     </span>
   );
 }

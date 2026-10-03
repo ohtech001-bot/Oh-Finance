@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { useState } from 'react';
 import { ArrowRight, RotateCcw } from 'lucide-react';
 import { sum, type CurrencyCode } from '@oh/money';
@@ -28,6 +29,8 @@ export function ReturnOrderDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  useCopy();
+
   const he = currentLocale() === 'he';
   const text = he
     ? {
@@ -47,20 +50,20 @@ export function ReturnOrderDialog({
         prev: 'הקודם',
       }
     : {
-        title: 'إرجاع طلبية',
-        back: 'رجوع',
-        empty: 'لا توجد طلبيات غير مسددة.',
-        loading: 'جارٍ التحميل...',
-        error: 'تعذر تحميل الطلبات.',
-        retry: 'إعادة المحاولة',
-        all: 'إرجاع جميع المنتجات المتبقية',
-        amount: 'قيمة الإرجاع',
-        confirm: 'هل تريد إرجاع الطلبية أو المنتجات المحددة منها؟',
-        hint: 'تُخصم القيمة من الدين، ويصبح الفرق الزائد عن الدين رصيدًا للزبون.',
-        done: 'تم الإرجاع وتحديث حساب الزبون.',
-        cancel: 'إلغاء',
-        next: 'التالي',
-        prev: 'السابق',
+        title: copy('إرجاع طلبية'),
+        back: copy('رجوع'),
+        empty: copy('لا توجد طلبيات غير مسددة.'),
+        loading: copy('جارٍ التحميل...'),
+        error: copy('تعذر تحميل الطلبات.'),
+        retry: copy('إعادة المحاولة'),
+        all: copy('إرجاع جميع المنتجات المتبقية'),
+        amount: copy('قيمة الإرجاع'),
+        confirm: copy('هل تريد إرجاع الطلبية أو المنتجات المحددة منها؟'),
+        hint: copy('تُخصم القيمة من الدين، ويصبح الفرق الزائد عن الدين رصيدًا للزبون.'),
+        done: copy('تم الإرجاع وتحديث حساب الزبون.'),
+        cancel: copy('إلغاء'),
+        next: copy('التالي'),
+        prev: copy('السابق'),
       };
   const { user } = useAuth();
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
@@ -118,7 +121,7 @@ export function ReturnOrderDialog({
       <Dialog open={open} onOpenChange={close}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{text.title}</DialogTitle>
+            <DialogTitle>{copy(text.title)}</DialogTitle>
           </DialogHeader>
           <DialogBody>
             {selectedId && (
@@ -237,7 +240,7 @@ export function ReturnOrderDialog({
                 onClick={() => setConfirmation(true)}
               >
                 <RotateCcw aria-hidden />
-                {text.title}
+                {copy(text.title)}
               </Button>
             )}
           </DialogFooter>
@@ -248,7 +251,7 @@ export function ReturnOrderDialog({
         onOpenChange={setConfirmation}
         title={text.confirm}
         description={text.hint}
-        confirmLabel={text.title}
+        confirmLabel={copy(text.title)}
         loading={mutation.isPending}
         variant="brand"
         onConfirm={submit}

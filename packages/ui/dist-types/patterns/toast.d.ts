@@ -22,18 +22,17 @@ export declare const toast: {
      */
     apiError: (message: string, requestId?: string) => string | number;
     promise: <ToastData>(promise: Promise<ToastData> | (() => Promise<ToastData>), data?: {
-        icon?: import("react").ReactNode;
         className?: string | undefined;
         id?: number | string | undefined;
         style?: React.CSSProperties | undefined;
         onDismiss?: ((toast: import("sonner").ToastT) => void) | undefined;
+        icon?: import("react").ReactNode;
         action?: import("react").ReactNode | import("sonner").Action;
-        position?: ("top-left" | "top-right" | "bottom-left" | "bottom-right" | "top-center" | "bottom-center") | undefined;
-        duration?: number | undefined;
-        closeButton?: boolean | undefined;
         richColors?: boolean | undefined;
         invert?: boolean | undefined;
+        closeButton?: boolean | undefined;
         dismissible?: boolean | undefined;
+        duration?: number | undefined;
         cancel?: import("react").ReactNode | import("sonner").Action;
         onAutoClose?: ((toast: import("sonner").ToastT) => void) | undefined;
         cancelButtonStyle?: React.CSSProperties | undefined;
@@ -41,6 +40,7 @@ export declare const toast: {
         unstyled?: boolean | undefined;
         classNames?: import("sonner").ToastClassnames | undefined;
         descriptionClassName?: string | undefined;
+        position?: ("top-left" | "top-right" | "bottom-left" | "bottom-right" | "top-center" | "bottom-center") | undefined;
     } & {
         loading?: string | React.ReactNode;
         success?: import("react").ReactNode | ((data: ToastData) => React.ReactNode | string | Promise<React.ReactNode | string>);

@@ -1,6 +1,7 @@
 import { lazy } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import { CreditCard } from 'lucide-react';
+import { PublicRoot } from './public-root';
 import {
   RedirectIfAuthenticated,
   RequireAuth,
@@ -103,14 +104,40 @@ const PlatformSubscriptionsPage = lazy(() =>
  * ═══════════════════════════════════════════════════════════════════════════
  *
  *  ثلاث مناطق:
- *    عام            → /login, /forgot-password
- *    المحل          → /  (يتطلب مستأجرًا؛ المدير العام يُوجَّه بعيدًا)
+ *    عام            → / للزائر، /login, /forgot-password
+ *    المحل          → / للمستخدم المسجّل (يتطلب مستأجرًا؛ المدير العام يُوجَّه بعيدًا)
  *    المنصة         → /platform/*  (المدير العام حصرًا)
  *
  *  الحراس هنا **تجربة مستخدم**. البيانات كلها من الـAPI، وهو من يفرض الحماية.
  *  حذف هذا الملف بالكامل لا يفتح أي بيانات — يجعل التنقّل قبيحًا فقط.
  */
 export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <PublicRoot />,
+    errorElement: <RouteErrorPage />,
+    children: [
+      {
+        element: <RequireAuth />,
+        children: [
+          {
+            element: <RequireTenant />,
+            children: [
+              {
+                element: <ShortcutsLayout />,
+                children: [
+                  {
+                    element: <AppShell />,
+                    children: [{ index: true, element: <DashboardPage /> }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
   { path: '/privacy', element: <LegalPage kind="privacy" />, errorElement: <RouteErrorPage /> },
   { path: '/reset-password', element: <ResetPasswordPage />, errorElement: <RouteErrorPage /> },
   {
@@ -145,7 +172,6 @@ export const router = createBrowserRouter([
               {
                 element: <AppShell />,
                 children: [
-                  { index: true, element: <DashboardPage /> },
                   {
                     path: 'support',
                     element: <RequireNotGeneralManager />,

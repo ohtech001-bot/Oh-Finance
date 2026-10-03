@@ -1,15 +1,11 @@
 // ── الأدوات ──────────────────────────────────────────────────────────────────
 export { cn } from './lib/cn.js';
+export { UiLocalizationProvider, useUiTranslation, useUiLocale } from './localization.js';
 
 // ── البدائيات ────────────────────────────────────────────────────────────────
 export { Button, buttonVariants, type ButtonProps } from './primitives/button.js';
 export { Input, Field, type InputProps, type FieldProps } from './primitives/input.js';
-export {
-  Skeleton,
-  TableSkeleton,
-  StatCardsSkeleton,
-  CardSkeleton,
-} from './primitives/skeleton.js';
+export { Skeleton, TableSkeleton, StatCardsSkeleton, CardSkeleton } from './primitives/skeleton.js';
 export {
   Dialog,
   DialogTrigger,

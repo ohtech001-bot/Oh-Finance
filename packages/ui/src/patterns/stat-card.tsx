@@ -1,10 +1,12 @@
+import { useUiTranslation } from '../localization.js';
 import { ArrowDownRight, ArrowUpRight, type LucideIcon } from 'lucide-react';
 import type { CurrencyCode, MoneyString } from '@oh/money';
 import { cn } from '../lib/cn.js';
 import { MoneyText, type MoneyTone } from './money-text.js';
 import { Skeleton } from '../primitives/skeleton.js';
 
-export type StatTone = 'brand' | 'accent' | 'debit' | 'credit' | 'partial' | 'purple' | 'orange' | 'info' | 'neutral';
+export type StatTone =
+  'brand' | 'accent' | 'debit' | 'credit' | 'partial' | 'purple' | 'orange' | 'info' | 'neutral';
 
 const ICON_TONE: Record<StatTone, string> = {
   brand: 'bg-brand-soft text-brand',
@@ -80,23 +82,25 @@ export function StatCard({
   pending,
   className,
 }: StatCardProps) {
+  const copy = useUiTranslation();
+
   return (
     <div
       className={cn(
-        'rounded-card border border-border bg-card p-3 shadow-card sm:p-5',
-        'transition-shadow hover:shadow-card-hover',
+        'rounded-card border-border bg-card shadow-card border p-3 sm:p-5',
+        'hover:shadow-card-hover transition-shadow',
         className,
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-medium text-fg-muted">{label}</p>
+          <p className="text-fg-muted text-[13px] font-medium">{label}</p>
 
           <div className="mt-2">
             {loading ? (
               <Skeleton className="h-8 w-28" />
             ) : pending ? (
-              <p className="text-sm font-medium text-fg-subtle">—</p>
+              <p className="text-fg-subtle text-sm font-medium">—</p>
             ) : money !== undefined ? (
               <MoneyText value={money} currency={currency} tone={moneyTone} size="kpi" />
             ) : (
@@ -108,7 +112,7 @@ export function StatCard({
             {loading ? (
               <Skeleton className="h-3.5 w-20" />
             ) : pending ? (
-              <span className="inline-flex items-center rounded-pill bg-neutral-soft px-2 py-0.5 text-[11px] font-medium text-neutral">
+              <span className="rounded-pill bg-neutral-soft text-neutral inline-flex items-center px-2 py-0.5 text-[11px] font-medium">
                 {pending}
               </span>
             ) : delta ? (
@@ -128,18 +132,18 @@ export function StatCard({
                   {delta.value}%
                 </span>
                 {delta.label ? (
-                  <span className="font-normal text-fg-muted">{delta.label}</span>
+                  <span className="text-fg-muted font-normal">{copy(delta.label)}</span>
                 ) : null}
               </span>
             ) : sublabel ? (
-              <p className="text-xs text-fg-muted">{sublabel}</p>
+              <p className="text-fg-muted text-xs">{sublabel}</p>
             ) : null}
           </div>
         </div>
 
         <div
           className={cn(
-            'flex size-10 shrink-0 items-center justify-center rounded-icon sm:size-12',
+            'rounded-icon flex size-10 shrink-0 items-center justify-center sm:size-12',
             ICON_TONE[tone],
           )}
           aria-hidden

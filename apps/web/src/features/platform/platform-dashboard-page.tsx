@@ -1,3 +1,4 @@
+import { copy } from '@/lib/copy';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -57,7 +58,7 @@ export function PlatformDashboardPage() {
         <div className="rounded-card border-border bg-card border">
           <ErrorState
             message={
-              error instanceof ApiRequestError ? error.message : 'تعذّر تحميل إحصاءات المنصة.'
+              error instanceof ApiRequestError ? error.message : copy('تعذّر تحميل إحصاءات المنصة.')
             }
             requestId={error instanceof ApiRequestError ? error.requestId : undefined}
             onRetry={() => void refetch()}
@@ -65,7 +66,7 @@ export function PlatformDashboardPage() {
         </div>
       ) : data ? (
         <>
-          <section aria-label="إحصاءات المنصة">
+          <section aria-label={copy('إحصاءات المنصة')}>
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <StatCard
                 label={t('platform.totalTenants')}
@@ -79,14 +80,14 @@ export function PlatformDashboardPage() {
                 value={data.activeTenants}
                 icon={CheckCircle2}
                 tone="credit"
-                sublabel={`${data.trialTenants} تجريبي`}
+                sublabel={copy('{{value0}} تجريبي', { value0: data.trialTenants })}
               />
               <StatCard
                 label={t('platform.totalUsers')}
                 value={data.totalUsers}
                 icon={Users}
                 tone="purple"
-                sublabel="عبر جميع المحلات"
+                sublabel={copy('عبر جميع المحلات')}
               />
               <StatCard
                 label={t('platform.mrr')}
@@ -95,12 +96,12 @@ export function PlatformDashboardPage() {
                 moneyTone="credit"
                 icon={TrendingUp}
                 tone="credit"
-                sublabel="من الاشتراكات النشطة"
+                sublabel={copy('من الاشتراكات النشطة')}
               />
             </div>
           </section>
 
-          <section aria-label="حالات المحلات">
+          <section aria-label={copy('حالات المحلات')}>
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <StatCard
                 label={t('platform.activeTenants')}

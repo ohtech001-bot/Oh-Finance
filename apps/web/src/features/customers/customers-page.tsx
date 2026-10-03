@@ -1,3 +1,4 @@
+import { copy } from '@/lib/copy';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -287,8 +288,8 @@ export function CustomersPage() {
               <Button
                 variant="outline"
                 size="icon"
-                title={locale === 'he' ? 'החזרת הזמנה' : 'إرجاع طلبية'}
-                aria-label={`${locale === 'he' ? 'החזרת הזמנה' : 'إرجاع طلبية'}: ${row.name}`}
+                title={locale === 'he' ? 'החזרת הזמנה' : copy('إرجاع طلبية')}
+                aria-label={`${locale === 'he' ? 'החזרת הזמנה' : copy('إرجاع طلبية')}: ${row.name}`}
                 onClick={() => setReturnTarget(row)}
               >
                 <RotateCcw aria-hidden />
@@ -662,7 +663,7 @@ function isPaymentDue(customer: Customer, today: string): boolean {
 }
 
 function formatDueDay(day: number, locale: 'ar' | 'he' | 'en'): string {
-  if (locale === 'ar') return `يوم ${day} من كل شهر`;
+  if (locale === 'ar') return copy('يوم {{value0}} من كل شهر', { value0: day });
   if (locale === 'he') return `בכל ${day} בחודש`;
   return `Day ${day} of every month`;
 }

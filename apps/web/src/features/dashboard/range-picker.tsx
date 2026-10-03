@@ -1,3 +1,4 @@
+import { copy } from '@/lib/copy';
 import type { DashboardRangePreset } from '@oh/contracts';
 import { DateRangeFilter } from '@oh/ui';
 import { CalendarRange } from 'lucide-react';
@@ -84,8 +85,8 @@ export function RangePicker({
           to={value.to ?? ''}
           onFromChange={(from) => onChange({ ...value, preset: 'custom', from })}
           onToChange={(to) => onChange({ ...value, preset: 'custom', to })}
-          fromLabel={locale === 'he' ? 'מתאריך' : 'من تاريخ'}
-          toLabel={locale === 'he' ? 'עד תאריך' : 'إلى تاريخ'}
+          fromLabel={locale === 'he' ? 'מתאריך' : copy('من تاريخ')}
+          toLabel={locale === 'he' ? 'עד תאריך' : copy('إلى تاريخ')}
         />
       ) : null}
     </div>

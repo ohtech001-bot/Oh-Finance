@@ -1,3 +1,5 @@
+import { copy, useCopy } from '@/lib/copy';
+import { currentLocale } from '@/lib/i18n';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { CreditCard, Package, ShieldCheck } from 'lucide-react';
@@ -57,7 +59,7 @@ export function SubscriptionPage() {
           message={
             subscriptionQuery.error instanceof ApiRequestError
               ? subscriptionQuery.error.message
-              : 'تعذّر تحميل بيانات الاشتراك.'
+              : copy('تعذّر تحميل بيانات الاشتراك.')
           }
           requestId={
             subscriptionQuery.error instanceof ApiRequestError
@@ -89,27 +91,29 @@ export function SubscriptionPage() {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* ── معلومات الاشتراك ─────────────────────────────────────────── */}
         <Card className="lg:col-span-1">
-          <CardHeader title="معلومات الاشتراك" />
+          <CardHeader title={copy('معلومات الاشتراك')} />
           <CardBody>
             <dl className="space-y-4 text-sm">
               <Row label={t('subscription.currentPlan')}>
-                <span className="font-semibold text-fg">{subscription.plan.nameAr}</span>
+                <span className="text-fg font-semibold">
+                  {currentLocale() === 'he' ? subscription.plan.nameHe : subscription.plan.nameAr}
+                </span>
               </Row>
 
               <Row label={t('subscription.status')}>
                 <StatusBadge tone={badge.tone} withDot>
-                  {badge.label}
+                  {copy(badge.label)}
                 </StatusBadge>
               </Row>
 
               <Row label={t('subscription.startDate')}>
-                <span className="tabular-nums text-fg" dir="ltr">
+                <span className="text-fg tabular-nums" dir="ltr">
                   {subscription.currentPeriodStart.slice(0, 10)}
                 </span>
               </Row>
 
               <Row label={t('subscription.endDate')}>
-                <span className="tabular-nums text-fg" dir="ltr">
+                <span className="text-fg tabular-nums" dir="ltr">
                   {subscription.currentPeriodEnd.slice(0, 10)}
                 </span>
               </Row>
@@ -124,20 +128,32 @@ export function SubscriptionPage() {
               </Row>
 
               <Row label={t('subscription.paymentStatus')}>
-                <span className="font-medium text-fg">{t(`subscription.paymentStatuses.${subscription.paymentStatus}`)}</span>
+                <span className="text-fg font-medium">
+                  {t(`subscription.paymentStatuses.${subscription.paymentStatus}`)}
+                </span>
               </Row>
 
               <Row label={t('subscription.paidAmount')}>
-                <MoneyText value={subscription.paidAmount} currency={currency} tone="credit" size="md" />
+                <MoneyText
+                  value={subscription.paidAmount}
+                  currency={currency}
+                  tone="credit"
+                  size="md"
+                />
               </Row>
 
               <Row label={t('subscription.remainingAmount')}>
-                <MoneyText value={subscription.remainingAmount} currency={currency} tone="debit" size="md" />
+                <MoneyText
+                  value={subscription.remainingAmount}
+                  currency={currency}
+                  tone="debit"
+                  size="md"
+                />
               </Row>
 
               {subscription.trialEndsAt ? (
-                <Row label="نهاية الفترة التجريبية">
-                  <span className="tabular-nums text-warning" dir="ltr">
+                <Row label={copy('نهاية الفترة التجريبية')}>
+                  <span className="text-warning tabular-nums" dir="ltr">
                     {subscription.trialEndsAt.slice(0, 10)}
                   </span>
                 </Row>
@@ -157,11 +173,11 @@ export function SubscriptionPage() {
               return (
                 <div key={row.label}>
                   <div className="flex items-center justify-between text-[13px]">
-                    <span className="flex items-center gap-2 font-medium text-fg">
-                      {row.label}
+                    <span className="text-fg flex items-center gap-2 font-medium">
+                      {copy(row.label)}
                       {!row.live ? (
-                        <span className="rounded-pill bg-neutral-soft px-1.5 py-0.5 text-[10px] font-medium text-neutral">
-                          يُربط لاحقًا
+                        <span className="rounded-pill bg-neutral-soft text-neutral px-1.5 py-0.5 text-[10px] font-medium">
+                          {copy('يُربط لاحقًا')}
                         </span>
                       ) : null}
                     </span>
@@ -174,12 +190,12 @@ export function SubscriptionPage() {
                   </div>
 
                   <div
-                    className="mt-2 h-2 w-full overflow-hidden rounded-full bg-border-subtle"
+                    className="bg-border-subtle mt-2 h-2 w-full overflow-hidden rounded-full"
                     role="progressbar"
                     aria-valuenow={percent}
                     aria-valuemin={0}
                     aria-valuemax={100}
-                    aria-label={row.label}
+                    aria-label={copy(row.label)}
                   >
                     <div
                       className={cn(
@@ -198,10 +214,10 @@ export function SubscriptionPage() {
 
       {/* ── الباقات المتاحة ──────────────────────────────────────────── */}
       <Card>
-        <CardHeader title="الباقات المتاحة" />
+        <CardHeader title={copy('الباقات المتاحة')} />
         <CardBody>
           {plansQuery.isLoading ? (
-            <p className="text-sm text-fg-muted">{t('common.loading')}</p>
+            <p className="text-fg-muted text-sm">{t('common.loading')}</p>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               {(plansQuery.data ?? []).map((plan) => {
@@ -219,7 +235,9 @@ export function SubscriptionPage() {
                   >
                     <div className="flex items-start justify-between">
                       <div>
-                        <h3 className="text-card-title text-fg">{plan.nameAr}</h3>
+                        <h3 className="text-card-title text-fg">
+                          {currentLocale() === 'he' ? plan.nameHe : plan.nameAr}
+                        </h3>
                         <div className="mt-1.5 flex items-baseline gap-1">
                           <MoneyText
                             value={plan.priceMonthly}
@@ -227,38 +245,38 @@ export function SubscriptionPage() {
                             size="lg"
                             tone="plain"
                           />
-                          <span className="text-xs text-fg-muted">/ شهريًا</span>
+                          <span className="text-fg-muted text-xs">{copy('/ شهريًا')}</span>
                         </div>
                       </div>
 
                       {isCurrent ? (
                         <StatusBadge tone="credit">
                           <ShieldCheck className="size-3" aria-hidden />
-                          الحالية
+                          {copy('الحالية')}
                         </StatusBadge>
                       ) : (
-                        <Package className="size-5 text-fg-subtle" aria-hidden />
+                        <Package className="text-fg-subtle size-5" aria-hidden />
                       )}
                     </div>
 
-                    <ul className="mt-4 space-y-1.5 text-[13px] text-fg-muted">
+                    <ul className="text-fg-muted mt-4 space-y-1.5 text-[13px]">
                       <li className="flex justify-between">
-                        <span>المحلات</span>
-                        <span className="tabular-nums text-fg">{plan.maxStores}</span>
+                        <span>{copy('المحلات')}</span>
+                        <span className="text-fg tabular-nums">{plan.maxStores}</span>
                       </li>
                       <li className="flex justify-between">
-                        <span>المستخدمون</span>
-                        <span className="tabular-nums text-fg">{plan.maxUsers}</span>
+                        <span>{copy('المستخدمون')}</span>
+                        <span className="text-fg tabular-nums">{plan.maxUsers}</span>
                       </li>
                       <li className="flex justify-between">
-                        <span>الزبائن</span>
-                        <span className="tabular-nums text-fg">
+                        <span>{copy('الزبائن')}</span>
+                        <span className="text-fg tabular-nums">
                           {plan.maxCustomers.toLocaleString('en-US')}
                         </span>
                       </li>
                       <li className="flex justify-between">
-                        <span>الطلبات / شهر</span>
-                        <span className="tabular-nums text-fg">
+                        <span>{copy('الطلبات / شهر')}</span>
+                        <span className="text-fg tabular-nums">
                           {plan.maxOrdersPerMonth.toLocaleString('en-US')}
                         </span>
                       </li>
@@ -273,9 +291,10 @@ export function SubscriptionPage() {
             صادق بدل زر لا يعمل: تغيير الباقة يستلزم فوترة (المرحلة 9).
             زر «ترقية» ينقر فلا يحدث شيء أسوأ من غياب الزر.
           */}
-          <p className="mt-5 rounded-ctrl border border-border bg-card-muted px-4 py-3 text-[13px] text-fg-muted">
-            لترقية باقتك، تواصل مع إدارة المنصة. الترقية الذاتية والفوترة
-            الإلكترونية تُفعَّلان في المرحلة 9.
+          <p className="rounded-ctrl border-border bg-card-muted text-fg-muted mt-5 border px-4 py-3 text-[13px]">
+            {copy(
+              'لترقية باقتك، تواصل مع إدارة المنصة. الترقية الذاتية والفوترة الإلكترونية تُفعَّلان في المرحلة 9.',
+            )}
           </p>
         </CardBody>
       </Card>
@@ -284,6 +303,8 @@ export function SubscriptionPage() {
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  useCopy();
+
   return (
     <div className="flex items-center justify-between gap-3">
       <dt className="text-fg-muted">{label}</dt>

@@ -7,7 +7,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('statement order links', () => {
+describe.each(['ar', 'he'] as const)('statement order links (%s)', (locale) => {
   it('links order numbers to the application without making payment references into order links', () => {
     const write = vi.fn();
     const target = {
@@ -31,7 +31,7 @@ describe('statement order links', () => {
     };
     printCustomerStatement({
       targetWindow: target,
-      locale: 'ar',
+      locale,
       currency: 'ILS',
       store: null,
       customer: {
@@ -84,5 +84,10 @@ describe('statement order links', () => {
     }
     expect(html.textContent).toContain('PAY-00001');
     expect(html.querySelector('a[href*="/orders/payment"]')).toBeNull();
+    if (locale === 'he') {
+      expect(write.mock.calls[0]![0]).toContain('lang="he"');
+      expect(html.textContent).toContain('פירוט חשבון');
+      expect(html.textContent).not.toMatch(/[\u0600-\u06ff]/u);
+    }
   });
 });

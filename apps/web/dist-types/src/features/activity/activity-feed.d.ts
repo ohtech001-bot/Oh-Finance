@@ -5,5 +5,5 @@ export interface ActivityFeedProps {
     emptyText?: string;
     className?: string;
 }
-export declare function ActivityFeed({ items, loading, emptyText, className }: ActivityFeedProps): import("react").JSX.Element;
+export declare function ActivityFeed({ items, loading, emptyText, className, }: ActivityFeedProps): import("react").JSX.Element;
 //# sourceMappingURL=activity-feed.d.ts.map

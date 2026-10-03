@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from '@oh/ui';
+import { Toaster, UiLocalizationProvider } from '@oh/ui';
 
 import './lib/i18n';
 import './styles/globals.css';
@@ -17,6 +17,17 @@ import { currentLocale } from './lib/i18n';
 import { LOCALES } from '@oh/config';
 import { StartupLoader } from './features/loading/startup-loader';
 import { FullPageLoader } from './components/full-page-loader';
+import { RouteMetadata } from './app/route-metadata';
+import { copy } from './lib/copy';
+
+function LocalizedUi({ children }: { children: React.ReactNode }) {
+  useTranslation();
+  return (
+    <UiLocalizationProvider locale={currentLocale()} translate={copy}>
+      {children}
+    </UiLocalizationProvider>
+  );
+}
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
@@ -77,18 +88,21 @@ if (!root) {
 createRoot(root).render(
   <StrictMode>
     <AppErrorBoundary>
-      <ThemeProvider>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <StartupLoader>
-              <Suspense fallback={<FullPageLoader />}>
-                <RouterProvider router={router} />
-              </Suspense>
-              <LocalizedToaster />
-            </StartupLoader>
-          </AuthProvider>
-        </QueryClientProvider>
-      </ThemeProvider>
+      <LocalizedUi>
+        <ThemeProvider>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <RouteMetadata router={router} />
+              <StartupLoader>
+                <Suspense fallback={<FullPageLoader />}>
+                  <RouterProvider router={router} />
+                </Suspense>
+                <LocalizedToaster />
+              </StartupLoader>
+            </AuthProvider>
+          </QueryClientProvider>
+        </ThemeProvider>
+      </LocalizedUi>
     </AppErrorBoundary>
   </StrictMode>,
 );

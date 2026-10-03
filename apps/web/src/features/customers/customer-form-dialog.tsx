@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -35,6 +36,8 @@ export interface CustomerFormDialogProps {
  *    (`.omit` في updateCustomerSchema).
  */
 export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFormDialogProps) {
+  useCopy();
+
   const isEdit = Boolean(customer);
   const locale = currentLocale();
   const labels = {
@@ -47,7 +50,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
       phoneHint: 'يجب أن يتكوّن من 10 أرقام ويبدأ بـ 05.',
     },
     he: {
-      debtLimit: 'מסגרת',
+      debtLimit: 'מסגרת אשראי',
       debtLimitHint: 'ברירת המחדל היא 1,500 ₪ וניתן לשנות אותה.',
       paymentDueDate: 'יום התשלום החודשי',
       paymentDueDateHint: 'לדוגמה: 15 פירושו שמועד התשלום הוא בכל 15 בחודש.',
@@ -124,24 +127,24 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
       if (isEdit && customer) {
         const { openingBalance: _drop, ...rest } = values;
         await update.mutateAsync(rest);
-        toast.success('حُدّثت بيانات الزبون');
+        toast.success(copy('حُدّثت بيانات الزبون'));
       } else {
         await create.mutateAsync(values);
-        toast.success('أُضيف الزبون بنجاح');
+        toast.success(copy('أُضيف الزبون بنجاح'));
       }
       onOpenChange(false);
     } catch (error) {
       if (error instanceof ApiRequestError) {
         if (error.fields) {
           for (const [field, messages] of Object.entries(error.fields)) {
-            setError(field as keyof CreateCustomerRequest, { message: messages.join('، ') });
+            setError(field as keyof CreateCustomerRequest, { message: messages.join(copy('، ')) });
           }
           return;
         }
         toast.apiError(error.message, error.requestId);
         return;
       }
-      toast.error('تعذّر الحفظ. حاول مجددًا.');
+      toast.error(copy('تعذّر الحفظ. حاول مجددًا.'));
     }
   });
 
@@ -151,28 +154,35 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="lg">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'تعديل بيانات الزبون' : 'إضافة زبون جديد'}</DialogTitle>
+          <DialogTitle>
+            {isEdit ? copy('تعديل بيانات الزبون') : copy('إضافة زبون جديد')}
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={onSubmit} noValidate>
           <DialogBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="اسم الزبون" error={errors.name?.message} required>
+            <Field label={copy('اسم الزبون')} error={errors.name?.message} required>
               {(p) => (
                 <Input
                   {...p}
                   {...register('name')}
-                  placeholder="أحمد محمود"
+                  placeholder={copy('أحمد محمود')}
                   error={Boolean(errors.name)}
                   autoFocus
                 />
               )}
             </Field>
 
-            <Field label="الشركة" error={errors.company?.message}>
-              {(p) => <Input {...p} {...register('company')} placeholder="اختياري" />}
+            <Field label={copy('الشركة')} error={errors.company?.message}>
+              {(p) => <Input {...p} {...register('company')} placeholder={copy('اختياري')} />}
             </Field>
 
-            <Field label="الهاتف" hint={labels.phoneHint} error={errors.phone?.message} required>
+            <Field
+              label={copy('الهاتف')}
+              hint={labels.phoneHint}
+              error={errors.phone?.message}
+              required
+            >
               {(p) => (
                 <Input
                   {...p}
@@ -186,7 +196,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
               )}
             </Field>
 
-            <Field label="البريد الإلكتروني" error={errors.email?.message}>
+            <Field label={copy('البريد الإلكتروني')} error={errors.email?.message}>
               {(p) => (
                 <Input
                   {...p}
@@ -198,23 +208,29 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
               )}
             </Field>
 
-            <Field label="المدينة" error={errors.city?.message} required>
+            <Field label={copy('المدينة')} error={errors.city?.message} required>
               {(p) => (
                 <Input
                   {...p}
                   {...register('city')}
-                  placeholder="صندلة"
+                  placeholder={copy('صندلة')}
                   error={Boolean(errors.city)}
                 />
               )}
             </Field>
 
-            <Field label="الرقم الضريبي" error={errors.taxNumber?.message}>
-              {(p) => <Input {...p} {...register('taxNumber')} dir="ltr" placeholder="اختياري" />}
+            <Field label={copy('الرقم الضريبي')} error={errors.taxNumber?.message}>
+              {(p) => (
+                <Input {...p} {...register('taxNumber')} dir="ltr" placeholder={copy('اختياري')} />
+              )}
             </Field>
 
-            <Field label="العنوان" error={errors.address?.message} className="sm:col-span-2">
-              {(p) => <Input {...p} {...register('address')} placeholder="الحي، الشارع" />}
+            <Field
+              label={copy('العنوان')}
+              error={errors.address?.message}
+              className="sm:col-span-2"
+            >
+              {(p) => <Input {...p} {...register('address')} placeholder={copy('الحي، الشارع')} />}
             </Field>
 
             <Field
@@ -256,7 +272,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
             {/* الرصيد الافتتاحي — عند الإضافة فقط */}
             {!isEdit ? (
               <Field
-                label="الرصيد الافتتاحي"
+                label={copy('الرصيد الافتتاحي')}
                 hint={labels.openingHint}
                 error={errors.openingBalance?.message}
                 className="sm:col-span-2"
@@ -281,11 +297,11 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
 
           <DialogFooter>
             <Button type="submit" variant="brand" loading={pending}>
-              {isEdit ? 'حفظ التغييرات' : 'إضافة الزبون'}
+              {isEdit ? copy('حفظ التغييرات') : copy('إضافة الزبون')}
             </Button>
             <DialogClose asChild>
               <Button type="button" variant="outline" disabled={pending}>
-                إلغاء
+                {copy('إلغاء')}
               </Button>
             </DialogClose>
           </DialogFooter>

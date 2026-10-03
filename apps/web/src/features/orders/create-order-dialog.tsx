@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronDown, ChevronUp, Pencil, Plus, Search, Trash2 } from 'lucide-react';
@@ -69,6 +70,8 @@ export function CreateOrderDialog({
   fixedCustomerId,
   order,
 }: CreateOrderDialogProps) {
+  useCopy();
+
   const { user } = useAuth();
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
 
@@ -180,11 +183,11 @@ export function CreateOrderDialog({
 
   const submit = (confirm: boolean) => {
     if (!customerId) {
-      toast.error('اختر الزبون.');
+      toast.error(copy('اختر الزبون.'));
       return;
     }
     if (validItems.length === 0) {
-      toast.error('أضف منتجًا واحدًا صحيحًا على الأقل.');
+      toast.error(copy('أضف منتجًا واحدًا صحيحًا على الأقل.'));
       return;
     }
     if (order) {
@@ -198,12 +201,16 @@ export function CreateOrderDialog({
         },
         {
           onSuccess: (updated) => {
-            toast.success(`حُفظت تعديلات الطلب ${displayOrderNumber(updated.number)}`);
+            toast.success(
+              copy('حُفظت تعديلات الطلب {{value0}}', {
+                value0: displayOrderNumber(updated.number),
+              }),
+            );
             onOpenChange(false);
           },
           onError: (e) => {
             if (e instanceof ApiRequestError) toast.apiError(e.message, e.requestId);
-            else toast.error('تعذّر تعديل الطلب.');
+            else toast.error(copy('تعذّر تعديل الطلب.'));
           },
         },
       );
@@ -211,20 +218,20 @@ export function CreateOrderDialog({
     }
 
     if (!/^\d+(\.\d{1,4})?$/.test(paidAmount)) {
-      toast.error('أدخل مبلغًا مدفوعًا صحيحًا، أو اكتب 0 عند عدم الدفع.');
+      toast.error(copy('أدخل مبلغًا مدفوعًا صحيحًا، أو اكتب 0 عند عدم الدفع.'));
       return;
     }
     const paymentAmount = paidAmount;
     if (!confirm && greaterThan(paymentAmount, '0')) {
-      toast.error('سجّل الطلب كمؤكد حتى يمكن حفظ الدفعة معه.');
+      toast.error(copy('سجّل الطلب كمؤكد حتى يمكن حفظ الدفعة معه.'));
       return;
     }
     if (greaterThan(paymentAmount, '0') && !liveTotal) {
-      toast.error('انتظر ظهور إجمالي الطلب قبل تسجيل الدفعة.');
+      toast.error(copy('انتظر ظهور إجمالي الطلب قبل تسجيل الدفعة.'));
       return;
     }
     if (liveTotal && greaterThan(paymentAmount, liveTotal)) {
-      toast.error('المبلغ المدفوع لا يمكن أن يتجاوز إجمالي الطلب.');
+      toast.error(copy('المبلغ المدفوع لا يمكن أن يتجاوز إجمالي الطلب.'));
       return;
     }
     create.mutate(
@@ -258,15 +265,19 @@ export function CreateOrderDialog({
               {
                 onSuccess: () => {
                   toast.success(
-                    `حُفظ الطلب ${displayOrderNumber(createdOrder.number)} وسُجّلت الدفعة النقدية`,
+                    copy('حُفظ الطلب {{value0}} وسُجّلت الدفعة النقدية', {
+                      value0: displayOrderNumber(createdOrder.number),
+                    }),
                   );
                   onOpenChange(false);
                 },
                 onError: (e) => {
                   toast.error(
                     e instanceof ApiRequestError
-                      ? `حُفظ الطلب، لكن تعذّر تسجيل الدفعة: ${e.message}`
-                      : 'حُفظ الطلب، لكن تعذّر تسجيل الدفعة.',
+                      ? copy('حُفظ الطلب، لكن تعذّر تسجيل الدفعة: {{value0}}', {
+                          value0: e.message,
+                        })
+                      : copy('حُفظ الطلب، لكن تعذّر تسجيل الدفعة.'),
                   );
                   onOpenChange(false);
                 },
@@ -275,16 +286,20 @@ export function CreateOrderDialog({
           } else {
             toast.success(
               confirm
-                ? `أُكِّد الطلب ${displayOrderNumber(createdOrder.number)}`
-                : `حُفظ الطلب ${displayOrderNumber(createdOrder.number)} كمسودة`,
-              confirm ? `الإجمالي: ${createdOrder.total}` : undefined,
+                ? copy('أُكِّد الطلب {{value0}}', {
+                    value0: displayOrderNumber(createdOrder.number),
+                  })
+                : copy('حُفظ الطلب {{value0}} كمسودة', {
+                    value0: displayOrderNumber(createdOrder.number),
+                  }),
+              confirm ? copy('الإجمالي: {{value0}}', { value0: createdOrder.total }) : undefined,
             );
             onOpenChange(false);
           }
         },
         onError: (e) => {
           if (e instanceof ApiRequestError) toast.apiError(e.message, e.requestId);
-          else toast.error('تعذّر حفظ الطلب.');
+          else toast.error(copy('تعذّر حفظ الطلب.'));
         },
       },
     );
@@ -299,13 +314,15 @@ export function CreateOrderDialog({
       <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>
-            {order ? `تعديل الطلب ${displayOrderNumber(order.number)}` : 'إضافة طلب جديد'}
+            {order
+              ? copy('تعديل الطلب {{value0}}', { value0: displayOrderNumber(order.number) })
+              : copy('إضافة طلب جديد')}
           </DialogTitle>
         </DialogHeader>
 
         <DialogBody className="space-y-5">
           {!fixedCustomerId && !order ? (
-            <Field label="الزبون" required>
+            <Field label={copy('الزبون')} required>
               {(p) => (
                 <div className="relative">
                   <Input
@@ -318,7 +335,7 @@ export function CreateOrderDialog({
                     }}
                     onFocus={() => setCustomerPickerOpen(true)}
                     onBlur={() => window.setTimeout(() => setCustomerPickerOpen(false), 150)}
-                    placeholder="اكتب اسم الزبون…"
+                    placeholder={copy('اكتب اسم الزبون…')}
                     startIcon={<Search className="size-4" />}
                     autoComplete="off"
                   />
@@ -326,21 +343,23 @@ export function CreateOrderDialog({
                     <div className="border-border bg-card shadow-pop rounded-card absolute inset-x-0 top-[calc(100%+6px)] z-50 max-h-64 overflow-y-auto border p-1.5">
                       {customerSearch.trim() !== debouncedCustomerSearch ||
                       customersQuery.isLoading ? (
-                        <p className="text-fg-muted px-3 py-4 text-center text-sm">جارٍ البحث…</p>
+                        <p className="text-fg-muted px-3 py-4 text-center text-sm">
+                          {copy('جارٍ البحث…')}
+                        </p>
                       ) : customersQuery.isError ? (
                         <div className="text-danger px-3 py-3 text-sm" role="alert">
-                          تعذر تحميل الزبائن. تحقق من الاتصال وحاول مجددًا.
+                          {copy('تعذر تحميل الزبائن. تحقق من الاتصال وحاول مجددًا.')}
                           <button
                             type="button"
                             className="mt-2 block underline"
                             onClick={() => void customersQuery.refetch()}
                           >
-                            إعادة المحاولة
+                            {copy('إعادة المحاولة')}
                           </button>
                         </div>
                       ) : customers.length === 0 ? (
                         <p className="text-fg-muted px-3 py-4 text-center text-sm">
-                          لا يوجد زبون مطابق.
+                          {copy('لا يوجد زبون مطابق.')}
                         </p>
                       ) : (
                         customers.map((customer) => (
@@ -381,7 +400,7 @@ export function CreateOrderDialog({
           {/* المنتجات */}
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-fg text-[13px] font-semibold">المنتجات</h3>
+              <h3 className="text-fg text-[13px] font-semibold">{copy('المنتجات')}</h3>
               <Button
                 variant="outline"
                 size="sm"
@@ -393,18 +412,18 @@ export function CreateOrderDialog({
                 }
               >
                 <Plus aria-hidden />
-                إضافة منتج
+                {copy('إضافة منتج')}
               </Button>
             </div>
 
             <div className="space-y-2">
               {/* رؤوس الأعمدة */}
               <div className="text-fg-muted hidden grid-cols-[1fr_70px_90px_80px_120px] gap-2 px-1 text-[11px] font-medium sm:grid">
-                <span>اسم المنتج</span>
-                <span className="text-center">الكمية</span>
-                <span className="text-center">السعر للوحدة</span>
-                <span className="text-center">خصم المنتج</span>
-                <span className="text-end">المجموع</span>
+                <span>{copy('اسم المنتج')}</span>
+                <span className="text-center">{copy('الكمية')}</span>
+                <span className="text-center">{copy('السعر للوحدة')}</span>
+                <span className="text-center">{copy('خصم المنتج')}</span>
+                <span className="text-end">{copy('المجموع')}</span>
               </div>
 
               {items.map((item, i) => {
@@ -424,12 +443,14 @@ export function CreateOrderDialog({
                       }
                       className="border-border bg-card hover:bg-card-muted rounded-ctrl flex h-11 w-full items-center gap-2 border px-3 text-start transition-colors"
                       aria-expanded="false"
-                      aria-label={`تعديل المنتج ${item.name.trim() || i + 1}`}
-                      title="تعديل المنتج"
+                      aria-label={copy('تعديل المنتج {{value0}}', {
+                        value0: item.name.trim() || i + 1,
+                      })}
+                      title={copy('تعديل المنتج')}
                     >
                       <ChevronDown className="text-fg-muted size-4 shrink-0" aria-hidden />
                       <span className="text-fg min-w-0 flex-1 truncate text-sm font-semibold">
-                        {item.name.trim() || `منتج ${i + 1}`}
+                        {item.name.trim() || copy('منتج {{value0}}', { value0: i + 1 })}
                       </span>
                       {lineTotal ? (
                         <MoneyText value={lineTotal} currency={currency} tone="plain" size="sm" />
@@ -450,20 +471,26 @@ export function CreateOrderDialog({
                       aria-expanded="true"
                     >
                       <ChevronUp className="size-4" aria-hidden />
-                      <span>{item.name.trim() || `تفاصيل المنتج ${i + 1}`}</span>
-                      <span className="ms-auto">إخفاء التفاصيل</span>
+                      <span>
+                        {item.name.trim() || copy('تفاصيل المنتج {{value0}}', { value0: i + 1 })}
+                      </span>
+                      <span className="ms-auto">{copy('إخفاء التفاصيل')}</span>
                     </button>
                     <label className="col-span-2 sm:col-span-1">
-                      <span className="text-fg-muted mb-1 block text-xs sm:hidden">اسم المنتج</span>
+                      <span className="text-fg-muted mb-1 block text-xs sm:hidden">
+                        {copy('اسم المنتج')}
+                      </span>
                       <input
                         value={item.name}
                         onChange={(e) => updateItem(i, { name: e.target.value })}
-                        placeholder="شوال رمل"
+                        placeholder={copy('شوال رمل')}
                         className={`${cellClass} w-full`}
                       />
                     </label>
                     <label>
-                      <span className="text-fg-muted mb-1 block text-xs sm:hidden">الكمية</span>
+                      <span className="text-fg-muted mb-1 block text-xs sm:hidden">
+                        {copy('الكمية')}
+                      </span>
                       <input
                         value={item.quantity}
                         onChange={(e) => updateItem(i, { quantity: e.target.value })}
@@ -475,7 +502,7 @@ export function CreateOrderDialog({
                     </label>
                     <label>
                       <span className="text-fg-muted mb-1 block text-xs sm:hidden">
-                        السعر للوحدة
+                        {copy('السعر للوحدة')}
                       </span>
                       <input
                         value={item.unitPrice}
@@ -487,7 +514,9 @@ export function CreateOrderDialog({
                       />
                     </label>
                     <label>
-                      <span className="text-fg-muted mb-1 block text-xs sm:hidden">خصم المنتج</span>
+                      <span className="text-fg-muted mb-1 block text-xs sm:hidden">
+                        {copy('خصم المنتج')}
+                      </span>
                       <input
                         value={item.discount}
                         onChange={(e) => updateItem(i, { discount: e.target.value })}
@@ -504,7 +533,9 @@ export function CreateOrderDialog({
                     </label>
                     <div className="flex items-end justify-between gap-2 px-1">
                       <div className="flex min-w-0 flex-1 flex-col justify-end">
-                        <span className="text-fg-muted mb-1 text-xs sm:hidden">المجموع</span>
+                        <span className="text-fg-muted mb-1 text-xs sm:hidden">
+                          {copy('المجموع')}
+                        </span>
                         {lineTotal ? (
                           <MoneyText
                             value={lineTotal}
@@ -523,7 +554,7 @@ export function CreateOrderDialog({
                           setItems((p) => (p.length > 1 ? p.filter((_, idx) => idx !== i) : p));
                         }}
                         className="rounded-ctrl text-fg-muted hover:bg-danger-soft hover:text-danger flex size-9 shrink-0 items-center justify-center"
-                        aria-label="حذف المنتج"
+                        aria-label={copy('حذف المنتج')}
                       >
                         <Trash2 className="size-4" />
                       </button>
@@ -541,7 +572,7 @@ export function CreateOrderDialog({
                 : 'border-border grid grid-cols-2 gap-3 border-t pt-5 sm:gap-4'
             }
           >
-            <Field label="خصم على الطلب" hint="أدخل قيمة الخصم على كامل الطلب">
+            <Field label={copy('خصم على الطلب')} hint={copy('أدخل قيمة الخصم على كامل الطلب')}>
               {(p) => (
                 <Input
                   {...p}
@@ -554,7 +585,10 @@ export function CreateOrderDialog({
               )}
             </Field>
             {!order ? (
-              <Field label="المبلغ المدفوع الآن" hint="المبلغ النقدي الذي دفعه الزبون لهذا الطلب">
+              <Field
+                label={copy('المبلغ المدفوع الآن')}
+                hint={copy('المبلغ النقدي الذي دفعه الزبون لهذا الطلب')}
+              >
                 {(p) => (
                   <Input
                     {...p}
@@ -571,27 +605,29 @@ export function CreateOrderDialog({
 
           {!order && customerId && greaterThan(automaticCreditAmount, '0') ? (
             <div className="rounded-ctrl border-success/30 bg-success-soft border p-4">
-              <p className="text-fg text-sm font-semibold">سيُستخدم رصيد الزبون تلقائيًا</p>
+              <p className="text-fg text-sm font-semibold">
+                {copy('سيُستخدم رصيد الزبون تلقائيًا')}
+              </p>
               <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
                 <div>
-                  <span className="text-fg-muted block">المسحوب من الرصيد</span>
+                  <span className="text-fg-muted block">{copy('المسحوب من الرصيد')}</span>
                   <MoneyText value={automaticCreditAmount} currency={currency} tone="credit" />
                 </div>
                 <div>
-                  <span className="text-fg-muted block">المتبقي بعد الرصيد</span>
+                  <span className="text-fg-muted block">{copy('المتبقي بعد الرصيد')}</span>
                   <MoneyText value={remainingAfterCredit} currency={currency} tone="debit" />
                 </div>
               </div>
             </div>
           ) : null}
 
-          <Field label="ملاحظات" hint="اكتب أي تفاصيل إضافية تخص الطلب">
+          <Field label={copy('ملاحظات')} hint={copy('اكتب أي تفاصيل إضافية تخص الطلب')}>
             {(p) => (
               <Input
                 {...p}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="ملاحظات اختيارية"
+                placeholder={copy('ملاحظات اختيارية')}
               />
             )}
           </Field>
@@ -599,7 +635,7 @@ export function CreateOrderDialog({
           {/* تفاصيل الطلب والمجموع الحي */}
           {liveTotal && validItems.length > 0 ? (
             <div>
-              <h3 className="text-fg mb-3 text-sm font-bold">تفاصيل الطلب</h3>
+              <h3 className="text-fg mb-3 text-sm font-bold">{copy('تفاصيل الطلب')}</h3>
               <div className="border-border rounded-ctrl overflow-hidden border">
                 <table className="w-full table-fixed border-collapse text-[11px] sm:text-xs">
                   <colgroup>
@@ -610,10 +646,12 @@ export function CreateOrderDialog({
                   </colgroup>
                   <thead className="bg-card-muted text-fg-muted">
                     <tr className="border-border border-b">
-                      <th className="px-2 py-2.5 text-start font-semibold">المنتج</th>
-                      <th className="px-1 py-2.5 text-center font-semibold">الكمية</th>
-                      <th className="px-1 py-2.5 text-center font-semibold">سعر الوحدة</th>
-                      <th className="px-2 py-2.5 text-end font-semibold">السعر الكلي</th>
+                      <th className="px-2 py-2.5 text-start font-semibold">{copy('المنتج')}</th>
+                      <th className="px-1 py-2.5 text-center font-semibold">{copy('الكمية')}</th>
+                      <th className="px-1 py-2.5 text-center font-semibold">
+                        {copy('سعر الوحدة')}
+                      </th>
+                      <th className="px-2 py-2.5 text-end font-semibold">{copy('السعر الكلي')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -650,7 +688,7 @@ export function CreateOrderDialog({
                 </table>
               </div>
               <div className="border-border mt-3 flex items-center justify-between border-t pt-3">
-                <span className="text-fg font-bold">المجموع</span>
+                <span className="text-fg font-bold">{copy('المجموع')}</span>
                 <MoneyText value={liveTotal} currency={currency} tone="plain" size="lg" />
               </div>
             </div>
@@ -660,7 +698,7 @@ export function CreateOrderDialog({
         <DialogFooter>
           {order ? (
             <Button variant="brand" onClick={() => submit(false)} loading={update.isPending}>
-              حفظ التعديلات
+              {copy('حفظ التعديلات')}
             </Button>
           ) : (
             <>
@@ -669,14 +707,14 @@ export function CreateOrderDialog({
                 onClick={() => submit(true)}
                 loading={create.isPending || createPayment.isPending}
               >
-                تأكيد الطلب
+                {copy('تأكيد الطلب')}
               </Button>
               <Button
                 variant="outline"
                 onClick={() => submit(false)}
                 disabled={create.isPending || createPayment.isPending}
               >
-                حفظ كمسودة
+                {copy('حفظ كمسودة')}
               </Button>
             </>
           )}
@@ -685,7 +723,7 @@ export function CreateOrderDialog({
               variant="outline"
               disabled={create.isPending || update.isPending || createPayment.isPending}
             >
-              إلغاء
+              {copy('إلغاء')}
             </Button>
           </DialogClose>
         </DialogFooter>

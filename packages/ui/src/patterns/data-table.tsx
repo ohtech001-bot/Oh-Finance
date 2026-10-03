@@ -1,3 +1,4 @@
+import { useUiTranslation } from '../localization.js';
 import { ChevronDown, ChevronsUpDown, ChevronUp } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 import { TableSkeleton } from '../primitives/skeleton.js';
@@ -89,22 +90,24 @@ export function DataTable<T>({
   className,
   tableClassName,
 }: DataTableProps<T>) {
+  const copy = useUiTranslation();
+
   if (loading) {
     return (
       <div
         className={cn(
-          'overflow-hidden rounded-card border border-border bg-card',
-          mobileRender && 'border-0 bg-transparent md:border md:bg-card',
+          'rounded-card border-border bg-card overflow-hidden border',
+          mobileRender && 'md:bg-card border-0 bg-transparent md:border',
           className,
         )}
       >
         {mobileRender ? (
           <>
-            <div className="space-y-3 md:hidden" aria-label="جارٍ التحميل">
+            <div className="space-y-3 md:hidden" aria-label={copy('جارٍ التحميل')}>
               {Array.from({ length: 3 }, (_, index) => (
                 <div
                   key={index}
-                  className="rounded-card border-border bg-card space-y-4 border p-4 shadow-card"
+                  className="rounded-card border-border bg-card shadow-card space-y-4 border p-4"
                 >
                   <div className="bg-card-muted h-5 w-2/3 animate-pulse rounded" />
                   <div className="grid grid-cols-2 gap-3">
@@ -128,7 +131,7 @@ export function DataTable<T>({
 
   if (error) {
     return (
-      <div className={cn('rounded-card border border-border bg-card', className)}>
+      <div className={cn('rounded-card border-border bg-card border', className)}>
         <ErrorState message={error.message} requestId={error.requestId} onRetry={onRetry} />
       </div>
     );
@@ -136,12 +139,12 @@ export function DataTable<T>({
 
   if (rows.length === 0) {
     return (
-      <div className={cn('rounded-card border border-border bg-card', className)}>
+      <div className={cn('rounded-card border-border bg-card border', className)}>
         {isFiltered && onResetFilters ? (
           <NoResultsState onReset={onResetFilters} />
         ) : (
           <EmptyState
-            title={empty?.title ?? 'لا توجد بيانات'}
+            title={empty?.title ?? copy('لا توجد بيانات')}
             description={empty?.description}
             action={empty?.action}
           />
@@ -153,8 +156,8 @@ export function DataTable<T>({
   return (
     <div
       className={cn(
-        'rounded-card border border-border bg-card shadow-card',
-        mobileRender && 'border-0 bg-transparent shadow-none md:border md:bg-card md:shadow-card',
+        'rounded-card border-border bg-card shadow-card border',
+        mobileRender && 'md:bg-card md:shadow-card border-0 bg-transparent shadow-none md:border',
         className,
       )}
     >
@@ -169,10 +172,10 @@ export function DataTable<T>({
       {/* الجدول يتمرّر داخل حاويته — لا تتمرّر الصفحة أفقيًا. */}
       <div className={cn('overflow-x-auto', mobileRender && 'hidden md:block')}>
         <table className={cn('w-full border-collapse text-sm', tableClassName)}>
-          <caption className="sr-only">{caption}</caption>
+          <caption className="sr-only">{copy(caption)}</caption>
 
           <thead>
-            <tr className="border-b border-border bg-card-muted">
+            <tr className="border-border bg-card-muted border-b">
               {columns.map((col, i) => {
                 const sortable = Boolean(col.key && onSortChange);
                 const isSorted = sort?.key === col.key;
@@ -190,7 +193,7 @@ export function DataTable<T>({
                         : undefined
                     }
                     className={cn(
-                      'h-12 px-4 text-table-head text-fg-muted',
+                      'text-table-head text-fg-muted h-12 px-4',
                       ALIGN_CLASS[col.align ?? 'start'],
                       col.hideBelow && HIDE_CLASS[col.hideBelow],
                     )}
@@ -200,12 +203,12 @@ export function DataTable<T>({
                         type="button"
                         onClick={() => col.key && onSortChange?.(col.key)}
                         className={cn(
-                          'inline-flex items-center gap-1.5 rounded transition-colors hover:text-fg',
-                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                          'hover:text-fg inline-flex items-center gap-1.5 rounded transition-colors',
+                          'focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2',
                           isSorted && 'text-fg',
                         )}
                       >
-                        {col.header}
+                        {copy(col.header)}
                         {isSorted && sort ? (
                           sort.order === 'asc' ? (
                             <ChevronUp className="size-3.5" aria-hidden />
@@ -217,7 +220,7 @@ export function DataTable<T>({
                         )}
                       </button>
                     ) : (
-                      col.header
+                      copy(col.header)
                     )}
                   </th>
                 );
@@ -231,8 +234,8 @@ export function DataTable<T>({
                 key={rowKey(row)}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
                 className={cn(
-                  'border-b border-border-subtle transition-colors last:border-0',
-                  onRowClick && 'cursor-pointer hover:bg-card-muted',
+                  'border-border-subtle border-b transition-colors last:border-0',
+                  onRowClick && 'hover:bg-card-muted cursor-pointer',
                   rowClassName?.(row),
                 )}
               >
@@ -240,7 +243,7 @@ export function DataTable<T>({
                   <td
                     key={col.key ?? `cell-${colIndex}`}
                     className={cn(
-                      'h-14 px-4 text-fg',
+                      'text-fg h-14 px-4',
                       ALIGN_CLASS[col.align ?? 'start'],
                       col.hideBelow && HIDE_CLASS[col.hideBelow],
                     )}

@@ -5,6 +5,8 @@ import { DEFAULT_LOCALE, LOCALES, type LocaleCode } from '@oh/config';
 
 import ar from '../locales/ar.json' with { type: 'json' };
 import he from '../locales/he.json' with { type: 'json' };
+import copyAr from '../locales/copy-ar.json' with { type: 'json' };
+import copyHe from '../locales/copy-he.json' with { type: 'json' };
 
 export const APP_LOCALE_CODES = ['ar', 'he'] as const;
 export type AppLocaleCode = (typeof APP_LOCALE_CODES)[number];
@@ -25,8 +27,8 @@ void i18n
   .use(initReactI18next)
   .init({
     resources: {
-      ar: { translation: ar },
-      he: { translation: he },
+      ar: { translation: ar, copy: copyAr },
+      he: { translation: he, copy: copyHe },
     },
     fallbackLng: DEFAULT_LOCALE,
     supportedLngs: APP_LOCALE_CODES,
@@ -49,6 +51,8 @@ export function applyLocale(locale: LocaleCode): void {
 
   document.documentElement.lang = locale;
   document.documentElement.dir = definition.dir;
+  const skipLink = document.getElementById('skip-to-content');
+  if (skipLink) skipLink.textContent = i18n.t('accessibility.skipToContent', { lng: locale });
 
   // العبرية تحتاج خطًا مختلفًا — لا يدعم IBM Plex Sans Arabic العبرية.
   document.documentElement.classList.toggle('font-he', locale === 'he');

@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Customer, PaginatedResult } from '@oh/contracts';
@@ -31,6 +32,8 @@ export function RecordPaymentDialog({
   onOpenChange,
   fixedCustomerId,
 }: RecordPaymentDialogProps) {
+  useCopy();
+
   const { user } = useAuth();
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
   const [customerId, setCustomerId] = useState(fixedCustomerId ?? '');
@@ -71,7 +74,7 @@ export function RecordPaymentDialog({
 
   const submit = () => {
     if (!customerId || !validAmount) {
-      toast.error('اختر الزبون وأدخل مبلغًا صحيحًا.');
+      toast.error(copy('اختر الزبون وأدخل مبلغًا صحيحًا.'));
       return;
     }
     create.mutate(
@@ -88,14 +91,14 @@ export function RecordPaymentDialog({
       {
         onSuccess: (payment) => {
           toast.success(
-            `سُجّلت الدفعة ${payment.number}`,
-            `الرصيد الجديد: ${payment.balanceAfter}`,
+            copy('سُجّلت الدفعة {{value0}}', { value0: payment.number }),
+            copy('الرصيد الجديد: {{value0}}', { value0: payment.balanceAfter }),
           );
           onOpenChange(false);
         },
         onError: (error) => {
           if (error instanceof ApiRequestError) toast.apiError(error.message, error.requestId);
-          else toast.error('تعذّر تسجيل الدفعة.');
+          else toast.error(copy('تعذّر تسجيل الدفعة.'));
         },
       },
     );
@@ -105,11 +108,11 @@ export function RecordPaymentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="md">
         <DialogHeader>
-          <DialogTitle>تسجيل دفعة نقدية</DialogTitle>
+          <DialogTitle>{copy('تسجيل دفعة نقدية')}</DialogTitle>
         </DialogHeader>
         <DialogBody className="space-y-4">
           {!fixedCustomerId ? (
-            <Field label="الزبون" required>
+            <Field label={copy('الزبون')} required>
               {(props) => (
                 <select
                   {...props}
@@ -117,7 +120,7 @@ export function RecordPaymentDialog({
                   onChange={(event) => setCustomerId(event.target.value)}
                   className={inputClass}
                 >
-                  <option value="">اختر زبونًا…</option>
+                  <option value="">{copy('اختر زبونًا…')}</option>
                   {(customersQuery.data?.items ?? []).map((customer) => (
                     <option key={customer.id} value={customer.id}>
                       {customer.name}
@@ -130,7 +133,7 @@ export function RecordPaymentDialog({
 
           {selectedCustomer ? (
             <div className="rounded-ctrl border-border bg-card-muted flex items-center justify-between border px-4 py-3">
-              <span className="text-fg-muted text-sm">الرصيد الحالي</span>
+              <span className="text-fg-muted text-sm">{copy('الرصيد الحالي')}</span>
               <MoneyText
                 value={toMoneyString(negate(selectedCustomer.balance), 2)}
                 currency={currency}
@@ -139,7 +142,7 @@ export function RecordPaymentDialog({
             </div>
           ) : null}
 
-          <Field label="المبلغ" required>
+          <Field label={copy('المبلغ')} required>
             {(props) => (
               <Input
                 {...props}
@@ -152,9 +155,11 @@ export function RecordPaymentDialog({
             )}
           </Field>
 
-          <Field label="طريقة الدفع">{(props) => <Input {...props} value="نقدي" readOnly />}</Field>
+          <Field label={copy('طريقة الدفع')}>
+            {(props) => <Input {...props} value={copy('نقدي')} readOnly />}
+          </Field>
 
-          <Field label="ملاحظات">
+          <Field label={copy('ملاحظات')}>
             {(props) => (
               <Input {...props} value={notes} onChange={(event) => setNotes(event.target.value)} />
             )}
@@ -162,11 +167,11 @@ export function RecordPaymentDialog({
         </DialogBody>
         <DialogFooter>
           <Button variant="brand" onClick={submit} loading={create.isPending}>
-            تسجيل الدفعة
+            {copy('تسجيل الدفعة')}
           </Button>
           <DialogClose asChild>
             <Button variant="outline" disabled={create.isPending}>
-              إلغاء
+              {copy('إلغاء')}
             </Button>
           </DialogClose>
         </DialogFooter>

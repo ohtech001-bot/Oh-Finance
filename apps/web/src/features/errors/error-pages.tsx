@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Link, useNavigate, useRouteError } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -22,6 +23,8 @@ function ErrorPageShell({
   tone,
   children,
 }: ErrorPageShellProps) {
+  useCopy();
+
   const toneClass = {
     danger: 'bg-danger-soft text-danger',
     warning: 'bg-warning-soft text-warning',
@@ -176,19 +179,19 @@ export class AppErrorBoundary extends Component<{ children: ReactNode }, ErrorBo
             <AlertOctagon className="text-danger size-8" />
           </div>
 
-          <h1 className="text-page-title text-fg mt-6">حدث خطأ في التطبيق</h1>
+          <h1 className="text-page-title text-fg mt-6">{copy('حدث خطأ في التطبيق')}</h1>
           <p className="text-fg-muted mt-2 max-w-md text-sm">
-            نعتذر — حدث خطأ غير متوقع أثناء عرض الصفحة. بياناتك محفوظة ولم يتأثر شيء منها.
+            {copy('نعتذر — حدث خطأ غير متوقع أثناء عرض الصفحة. بياناتك محفوظة ولم يتأثر شيء منها.')}
           </p>
 
           <div className="mt-8 flex gap-3">
             <Button variant="brand" onClick={() => window.location.reload()}>
               <RefreshCw aria-hidden />
-              تحديث الصفحة
+              {copy('تحديث الصفحة')}
             </Button>
             <Button variant="outline" onClick={() => (window.location.href = '/')}>
               <Home aria-hidden />
-              العودة للرئيسية
+              {copy('العودة للرئيسية')}
             </Button>
           </div>
 

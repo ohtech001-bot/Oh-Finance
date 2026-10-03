@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MoreHorizontal, Plus } from 'lucide-react';
@@ -53,8 +54,8 @@ export function MobileTabBar({ items, onOpenMore, fab }: MobileTabBarProps) {
             type="button"
             onClick={fab.onClick}
             disabled={fab.disabled}
-            title={fab.label}
-            aria-label={fab.label}
+            title={copy(fab.label)}
+            aria-label={copy(fab.label)}
             className={cn(
               'absolute -top-5 flex size-16 items-center justify-center rounded-full',
               'bg-brand shadow-pop text-white transition-transform',
@@ -64,7 +65,7 @@ export function MobileTabBar({ items, onOpenMore, fab }: MobileTabBarProps) {
           >
             <Plus className="size-8" aria-hidden />
           </button>
-          <span className="text-fg-muted text-[11px] font-medium">{fab.label}</span>
+          <span className="text-fg-muted text-[11px] font-medium">{copy(fab.label)}</span>
         </div>
       ) : null}
 
@@ -89,6 +90,8 @@ export function MobileTabBar({ items, onOpenMore, fab }: MobileTabBarProps) {
 }
 
 function TabItem({ item, label }: { item: NavItem; label: string }) {
+  useCopy();
+
   const prefetchRoute = useNavigationPrefetch();
   return (
     <NavLink

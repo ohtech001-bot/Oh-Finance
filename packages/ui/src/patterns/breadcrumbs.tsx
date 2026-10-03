@@ -1,3 +1,4 @@
+import { useUiTranslation } from '../localization.js';
 import { ChevronLeft } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 
@@ -24,8 +25,13 @@ export interface BreadcrumbsProps {
  * الحالية بدل قراءته كرابط قابل للنقر.
  */
 export function Breadcrumbs({ items, linkAs: Link, className }: BreadcrumbsProps) {
+  const copy = useUiTranslation();
+
   return (
-    <nav aria-label="مسار التنقّل" className={cn('flex items-center gap-1.5 text-[13px]', className)}>
+    <nav
+      aria-label={copy('مسار التنقّل')}
+      className={cn('flex items-center gap-1.5 text-[13px]', className)}
+    >
       <ol className="flex flex-wrap items-center gap-1.5">
         {items.map((item, index) => {
           const isLast = index === items.length - 1;
@@ -35,22 +41,25 @@ export function Breadcrumbs({ items, linkAs: Link, className }: BreadcrumbsProps
               {isLast || !item.href ? (
                 <span
                   aria-current={isLast ? 'page' : undefined}
-                  className={isLast ? 'font-medium text-fg' : 'text-fg-muted'}
+                  className={isLast ? 'text-fg font-medium' : 'text-fg-muted'}
                 >
                   {item.label}
                 </span>
               ) : Link ? (
-                <Link to={item.href} className="text-fg-muted transition-colors hover:text-accent">
+                <Link to={item.href} className="text-fg-muted hover:text-accent transition-colors">
                   {item.label}
                 </Link>
               ) : (
-                <a href={item.href} className="text-fg-muted transition-colors hover:text-accent">
+                <a href={item.href} className="text-fg-muted hover:text-accent transition-colors">
                   {item.label}
                 </a>
               )}
 
               {!isLast ? (
-                <ChevronLeft className="size-3.5 text-fg-subtle rtl:rotate-0 ltr:rotate-180" aria-hidden />
+                <ChevronLeft
+                  className="text-fg-subtle size-3.5 ltr:rotate-180 rtl:rotate-0"
+                  aria-hidden
+                />
               ) : null}
             </li>
           );
@@ -87,15 +96,10 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <div
-      className={cn(
-        'flex items-start justify-between gap-3',
-        className,
-      )}
-    >
+    <div className={cn('flex items-start justify-between gap-3', className)}>
       <div className="min-w-0">
         <div className="flex items-center gap-2.5">
-          {Icon ? <Icon className="size-6 text-fg-muted" aria-hidden /> : null}
+          {Icon ? <Icon className="text-fg-muted size-6" aria-hidden /> : null}
           <h1 className="text-page-title text-fg">{title}</h1>
         </div>
 
@@ -103,7 +107,7 @@ export function PageHeader({
           <Breadcrumbs items={breadcrumbs} linkAs={linkAs} className="mt-1.5 hidden sm:flex" />
         ) : null}
 
-        {description ? <p className="mt-1.5 text-sm text-fg-muted">{description}</p> : null}
+        {description ? <p className="text-fg-muted mt-1.5 text-sm">{description}</p> : null}
       </div>
 
       {actions ? (

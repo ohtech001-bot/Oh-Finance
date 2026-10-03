@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { currentLocale } from '@/lib/i18n';
 import { CreditCard, Edit3, MessageCircle } from 'lucide-react';
 import type {
   PaginatedResult,
@@ -197,7 +198,9 @@ export function PlatformSubscriptionsPage() {
             <div className="border-border-subtle flex items-start justify-between gap-3 border-b p-4">
               <div className="min-w-0">
                 <h2 className="text-fg truncate font-semibold">{item.tenantName}</h2>
-                <p className="text-fg-muted mt-1 text-xs">{item.plan.nameAr}</p>
+                <p className="text-fg-muted mt-1 text-xs">
+                  {currentLocale() === 'he' ? item.plan.nameHe : item.plan.nameAr}
+                </p>
               </div>
               <span
                 className={

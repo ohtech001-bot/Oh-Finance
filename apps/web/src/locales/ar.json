@@ -1,4 +1,5 @@
 {
+  "accessibility": { "skipToContent": "تخطّي إلى المحتوى الرئيسي" },
   "app": {
     "name": "OH Finance",
     "tagline": "إدارة الزبائن والطلبات الآجلة والدفعات"

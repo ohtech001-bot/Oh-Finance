@@ -1,3 +1,4 @@
+import { copy } from '@/lib/copy';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -48,7 +49,7 @@ export function ForgotPasswordPage() {
     } catch (err) {
       // حتى الخطأ لا يكشف وجود البريد — 429 (حد المعدل) هو الوحيد الممكن.
       if (err instanceof ApiRequestError && err.code === 'RATE_LIMITED') {
-        setError('محاولات كثيرة. انتظر قليلًا ثم أعد المحاولة.');
+        setError(copy('محاولات كثيرة. انتظر قليلًا ثم أعد المحاولة.'));
         return;
       }
       setError(t('errors.network'));
@@ -59,23 +60,25 @@ export function ForgotPasswordPage() {
     return (
       <AuthLayout
         title={t('auth.resetSent')}
-        subtitle="تحقّق من بريدك الإلكتروني"
+        subtitle={copy('تحقّق من بريدك الإلكتروني')}
         icon={MailCheck}
       >
         <div className="space-y-5 text-center">
-          <p className="text-sm text-fg-muted">
-            إن كان هذا البريد مسجّلًا لدينا، فستصلك رسالة تحتوي على رابط إعادة
-            تعيين كلمة المرور خلال دقائق.
+          <p className="text-fg-muted text-sm">
+            {copy(
+              'إن كان هذا البريد مسجّلًا لدينا، فستصلك رسالة تحتوي على رابط إعادة تعيين كلمة المرور خلال دقائق.',
+            )}
           </p>
 
           {/* الحقيقة كاملة — لا نترك المستخدم ينتظر رسالة لن تصل. */}
-          <div className="rounded-ctrl border border-warning/30 bg-warning-soft px-4 py-3 text-start">
-            <p className="text-[13px] font-semibold text-warning">
-              إرسال البريد قيد التطوير (المرحلة 7)
+          <div className="rounded-ctrl border-warning/30 bg-warning-soft border px-4 py-3 text-start">
+            <p className="text-warning text-[13px] font-semibold">
+              {copy('إرسال البريد قيد التطوير (المرحلة 7)')}
             </p>
-            <p className="mt-1 text-xs text-warning/90">
-              وحدة الرسائل لم تُفعَّل بعد. للاستعادة الآن، راجع صاحب المحل أو
-              المدير العام لإعادة تعيين كلمة مرورك يدويًا.
+            <p className="text-warning/90 mt-1 text-xs">
+              {copy(
+                'وحدة الرسائل لم تُفعَّل بعد. للاستعادة الآن، راجع صاحب المحل أو المدير العام لإعادة تعيين كلمة مرورك يدويًا.',
+              )}
             </p>
           </div>
 
@@ -91,15 +94,14 @@ export function ForgotPasswordPage() {
   }
 
   return (
-    <AuthLayout
-      title={t('auth.forgotTitle')}
-      subtitle={t('auth.forgotSubtitle')}
-      icon={KeyRound}
-    >
+    <AuthLayout title={t('auth.forgotTitle')} subtitle={t('auth.forgotSubtitle')} icon={KeyRound}>
       <form onSubmit={onSubmit} className="space-y-5" noValidate>
         {error ? (
-          <div role="alert" className="rounded-ctrl border border-danger/30 bg-danger-soft px-4 py-3">
-            <p className="text-sm font-medium text-danger">{error}</p>
+          <div
+            role="alert"
+            className="rounded-ctrl border-danger/30 bg-danger-soft border px-4 py-3"
+          >
+            <p className="text-danger text-sm font-medium">{error}</p>
           </div>
         ) : null}
 

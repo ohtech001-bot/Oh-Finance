@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -9,6 +10,8 @@ import { ApiRequestError, api } from '@/lib/api';
 import { AuthLayout } from './auth-layout';
 
 export function ResetPasswordPage() {
+  useCopy();
+
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') ?? '';
   const [done, setDone] = useState(false);
@@ -28,7 +31,7 @@ export function ResetPasswordPage() {
       setRequestError(
         error instanceof ApiRequestError
           ? error.message
-          : 'تعذّر تعيين كلمة السر. حاول فتح الرابط مرة أخرى.',
+          : copy('تعذّر تعيين كلمة السر. حاول فتح الرابط مرة أخرى.'),
       );
     }
   });
@@ -36,23 +39,27 @@ export function ResetPasswordPage() {
   if (done) {
     return (
       <AuthLayout
-        title="تم تعيين كلمة السر"
-        subtitle="يمكنك الآن الدخول إلى المنظومة"
+        title={copy('تم تعيين كلمة السر')}
+        subtitle={copy('يمكنك الآن الدخول إلى المنظومة')}
         icon={CheckCircle2}
       >
         <Button variant="brand" className="w-full" asChild>
-          <Link to="/login">تسجيل الدخول</Link>
+          <Link to="/login">{copy('تسجيل الدخول')}</Link>
         </Button>
       </AuthLayout>
     );
   }
 
   return (
-    <AuthLayout title="تعيين كلمة سر جديدة" subtitle="اختر كلمة سر قوية لحسابك" icon={KeyRound}>
+    <AuthLayout
+      title={copy('تعيين كلمة سر جديدة')}
+      subtitle={copy('اختر كلمة سر قوية لحسابك')}
+      icon={KeyRound}
+    >
       <form onSubmit={submit} className="space-y-4">
         {!token ? (
           <p className="text-danger text-sm" role="alert">
-            رابط تعيين كلمة السر غير مكتمل.
+            {copy('رابط تعيين كلمة السر غير مكتمل.')}
           </p>
         ) : null}
         {requestError ? (
@@ -60,7 +67,11 @@ export function ResetPasswordPage() {
             {requestError}
           </p>
         ) : null}
-        <Field label="كلمة السر الجديدة" error={form.formState.errors.password?.message} required>
+        <Field
+          label={copy('كلمة السر الجديدة')}
+          error={form.formState.errors.password?.message}
+          required
+        >
           {(props) => (
             <Input
               {...props}
@@ -72,7 +83,7 @@ export function ResetPasswordPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((value) => !value)}
-                  aria-label={showPassword ? 'إخفاء كلمة السر' : 'إظهار كلمة السر'}
+                  aria-label={showPassword ? copy('إخفاء كلمة السر') : copy('إظهار كلمة السر')}
                 >
                   {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
@@ -81,7 +92,7 @@ export function ResetPasswordPage() {
           )}
         </Field>
         <Field
-          label="تأكيد كلمة السر"
+          label={copy('تأكيد كلمة السر')}
           error={form.formState.errors.confirmPassword?.message}
           required
         >
@@ -102,7 +113,7 @@ export function ResetPasswordPage() {
           loading={form.formState.isSubmitting}
           disabled={!token}
         >
-          تعيين كلمة السر
+          {copy('تعيين كلمة السر')}
         </Button>
       </form>
     </AuthLayout>

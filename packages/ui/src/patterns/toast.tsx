@@ -1,3 +1,4 @@
+import { useUiTranslation } from '../localization.js';
 import { Toaster as SonnerToaster, toast as sonnerToast } from 'sonner';
 
 /**
@@ -46,9 +47,14 @@ export const toast = {
    */
   apiError: (message: string, requestId?: string) =>
     sonnerToast.error(message, {
-      description: requestId ? `الرقم المرجعي: ${requestId}` : undefined,
+      description: requestId ? <ReferenceMessage requestId={requestId} /> : undefined,
     }),
 
   promise: sonnerToast.promise,
   dismiss: sonnerToast.dismiss,
 };
+
+function ReferenceMessage({ requestId }: { requestId: string }) {
+  const copy = useUiTranslation();
+  return <span>{copy('الرقم المرجعي: {{value0}}', { value0: requestId })}</span>;
+}

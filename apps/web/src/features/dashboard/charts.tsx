@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { useMemo } from 'react';
 import {
   Bar,
@@ -68,6 +69,8 @@ export function CollectionRateChart({
   metric: KpiMetric;
   large?: boolean;
 }) {
+  useCopy();
+
   const locale = currentLocale() === 'he' ? 'he' : 'ar';
   const value = Number(metric.value);
   const displayed = Number.isFinite(value) ? value : 0;
@@ -82,7 +85,7 @@ export function CollectionRateChart({
 
   return (
     <section
-      aria-label={COLLECTION_LABELS[locale].title}
+      aria-label={copy(COLLECTION_LABELS[locale].title)}
       className={`rounded-card border-border bg-card shadow-card flex h-full items-center gap-4 border p-5 ${
         large
           ? 'min-h-64 flex-col justify-center text-center sm:min-h-72'
@@ -93,7 +96,7 @@ export function CollectionRateChart({
         <h2
           className={large ? 'text-fg text-lg font-semibold' : 'text-fg-muted text-sm font-medium'}
         >
-          {COLLECTION_LABELS[locale].title}
+          {copy(COLLECTION_LABELS[locale].title)}
         </h2>
         <p className="text-fg-subtle mt-2 text-xs leading-5">
           {COLLECTION_LABELS[locale].collected}
@@ -156,6 +159,8 @@ export function TrendChart({
   height?: number;
   emptyText?: string;
 }) {
+  useCopy();
+
   const locale = currentLocale() === 'he' ? 'he' : 'ar';
   const resolvedEmptyText = emptyText ?? TREND_LABELS[locale].empty;
   const { data, ids } = useMemo(() => {

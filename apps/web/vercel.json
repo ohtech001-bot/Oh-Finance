@@ -6,6 +6,10 @@
   "framework": "vite",
   "headers": [
     {
+      "source": "/(login|forgot-password|reset-password|change-initial-password|customers|orders|payments|ledger|reports|employees|settings|support|platform)(.*)",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         {

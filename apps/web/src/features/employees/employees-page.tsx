@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -47,6 +48,8 @@ import { ApiRequestError, api } from '@/lib/api';
 const QUERY_KEY = ['employees'] as const;
 
 export function EmployeesPage() {
+  useCopy();
+
   const { can } = useAuth();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
@@ -82,9 +85,9 @@ export function EmployeesPage() {
       createForm.reset();
       setCreateOpen(false);
       setShowCreatePassword(false);
-      toast.success('تمت إضافة العامل بنجاح.');
+      toast.success(copy('تمت إضافة العامل بنجاح.'));
     },
-    onError: (error) => showMutationError(error, 'تعذّرت إضافة العامل.'),
+    onError: (error) => showMutationError(error, copy('تعذّرت إضافة العامل.')),
   });
   const update = useMutation({
     mutationFn: (body: UpdateWorkerRequest) =>
@@ -94,9 +97,9 @@ export function EmployeesPage() {
       setEditTarget(null);
       setShowEditPassword(false);
       editForm.reset();
-      toast.success('تم تعديل بيانات العامل.');
+      toast.success(copy('تم تعديل بيانات العامل.'));
     },
-    onError: (error) => showMutationError(error, 'تعذّر تعديل العامل.'),
+    onError: (error) => showMutationError(error, copy('تعذّر تعديل العامل.')),
   });
   const setStatus = useMutation({
     mutationFn: (worker: Worker) =>
@@ -106,18 +109,18 @@ export function EmployeesPage() {
     onSuccess: () => {
       void refresh();
       setStatusTarget(null);
-      toast.success('تم تحديث حالة العامل.');
+      toast.success(copy('تم تحديث حالة العامل.'));
     },
-    onError: (error) => showMutationError(error, 'تعذّر تحديث حالة العامل.'),
+    onError: (error) => showMutationError(error, copy('تعذّر تحديث حالة العامل.')),
   });
   const remove = useMutation({
     mutationFn: (id: string) => api.delete<void>(`/employees/${id}`),
     onSuccess: () => {
       void refresh();
       setDeleteTarget(null);
-      toast.success('تم حذف العامل.');
+      toast.success(copy('تم حذف العامل.'));
     },
-    onError: (error) => showMutationError(error, 'تعذّر حذف العامل.'),
+    onError: (error) => showMutationError(error, copy('تعذّر حذف العامل.')),
   });
 
   const openEdit = (worker: Worker) => {
@@ -139,26 +142,26 @@ export function EmployeesPage() {
       >
         <Button variant="outline" size="sm" onClick={() => openEdit(worker)}>
           <Pencil aria-hidden />
-          تعديل
+          {copy('تعديل')}
         </Button>
         <Button variant="outline" size="sm" onClick={() => setStatusTarget(worker)}>
           <Power aria-hidden />
-          {worker.status === 'ACTIVE' ? 'تعطيل' : 'تفعيل'}
+          {worker.status === 'ACTIVE' ? copy('تعطيل') : copy('تفعيل')}
         </Button>
         <Button variant="outline" size="sm" onClick={() => setDeleteTarget(worker)}>
           <Trash2 className="text-danger" aria-hidden />
-          حذف
+          {copy('حذف')}
         </Button>
       </div>
     ) : null;
 
   const columns: Column<Worker>[] = [
     {
-      header: 'الاسم',
+      header: copy('الاسم'),
       render: (row) => <span className="text-fg font-semibold">{row.name}</span>,
     },
     {
-      header: 'رقم الهاتف',
+      header: copy('رقم الهاتف'),
       render: (row) => (
         <span className="text-fg tabular-nums" dir="ltr">
           {row.phone}
@@ -166,7 +169,7 @@ export function EmployeesPage() {
       ),
     },
     {
-      header: 'البريد الإلكتروني',
+      header: copy('البريد الإلكتروني'),
       render: (row) => (
         <span className="text-fg" dir="ltr">
           {row.email}
@@ -174,20 +177,20 @@ export function EmployeesPage() {
       ),
     },
     {
-      header: 'الوظيفة',
-      render: () => <span className="text-fg">عامل</span>,
+      header: copy('الوظيفة'),
+      render: () => <span className="text-fg">{copy('عامل')}</span>,
     },
     {
-      header: 'الحالة',
+      header: copy('الحالة'),
       align: 'center',
       render: (row) => (
         <StatusBadge tone={row.status === 'ACTIVE' ? 'credit' : 'neutral'}>
-          {row.status === 'ACTIVE' ? 'نشط' : 'متوقف'}
+          {row.status === 'ACTIVE' ? copy('نشط') : copy('متوقف')}
         </StatusBadge>
       ),
     },
     {
-      header: 'الإجراءات',
+      header: copy('الإجراءات'),
       align: 'end',
       width: '290px',
       render: actions,
@@ -197,21 +200,21 @@ export function EmployeesPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="الموظفون"
-        description="إدارة حسابات العاملين في المحل."
+        title={copy('الموظفون')}
+        description={copy('إدارة حسابات العاملين في المحل.')}
         icon={Users}
         actions={
           can('employees.manage') ? (
             <Button variant="brand" onClick={() => setCreateOpen(true)}>
               <Plus aria-hidden />
-              إضافة عامل
+              {copy('إضافة عامل')}
             </Button>
           ) : undefined
         }
       />
 
       <DataTable
-        caption="عمال المحل"
+        caption={copy('عمال المحل')}
         columns={columns}
         rows={employees.data ?? []}
         rowKey={(row) => row.id}
@@ -222,7 +225,7 @@ export function EmployeesPage() {
                 message:
                   employees.error instanceof ApiRequestError
                     ? employees.error.message
-                    : 'تعذّر تحميل الموظفين.',
+                    : copy('تعذّر تحميل الموظفين.'),
                 requestId:
                   employees.error instanceof ApiRequestError
                     ? employees.error.requestId
@@ -232,10 +235,10 @@ export function EmployeesPage() {
         }
         onRetry={() => void employees.refetch()}
         empty={{
-          title: 'لا يوجد عمال بعد',
-          description: 'أضف أول عامل ليتمكن من الدخول والعمل في المحل.',
+          title: copy('لا يوجد عمال بعد'),
+          description: copy('أضف أول عامل ليتمكن من الدخول والعمل في المحل.'),
           action: can('employees.manage')
-            ? { label: 'إضافة عامل', onClick: () => setCreateOpen(true) }
+            ? { label: copy('إضافة عامل'), onClick: () => setCreateOpen(true) }
             : undefined,
         }}
         mobileRender={(row) => (
@@ -256,7 +259,7 @@ export function EmployeesPage() {
                 </p>
               </div>
               <StatusBadge tone={row.status === 'ACTIVE' ? 'credit' : 'neutral'}>
-                {row.status === 'ACTIVE' ? 'نشط' : 'متوقف'}
+                {row.status === 'ACTIVE' ? copy('نشط') : copy('متوقف')}
               </StatusBadge>
             </div>
             {can('employees.manage') ? (
@@ -279,13 +282,13 @@ export function EmployeesPage() {
         <DialogContent size="md">
           <form onSubmit={createForm.handleSubmit((values) => create.mutate(values))}>
             <DialogHeader>
-              <DialogTitle>إضافة عامل</DialogTitle>
-              <DialogDescription>أدخل بيانات الدخول الخاصة بالعامل.</DialogDescription>
+              <DialogTitle>{copy('إضافة عامل')}</DialogTitle>
+              <DialogDescription>{copy('أدخل بيانات الدخول الخاصة بالعامل.')}</DialogDescription>
             </DialogHeader>
             <DialogBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <WorkerIdentityFields form={createForm} />
               <Field
-                label="كلمة السر للدخول"
+                label={copy('كلمة السر للدخول')}
                 error={createForm.formState.errors.password?.message}
                 required
               >
@@ -310,11 +313,11 @@ export function EmployeesPage() {
             <DialogFooter>
               <Button type="submit" variant="brand" loading={create.isPending}>
                 <Plus aria-hidden />
-                إضافة العامل
+                {copy('إضافة العامل')}
               </Button>
               <DialogClose asChild>
                 <Button type="button" variant="outline" disabled={create.isPending}>
-                  إلغاء
+                  {copy('إلغاء')}
                 </Button>
               </DialogClose>
             </DialogFooter>
@@ -334,14 +337,14 @@ export function EmployeesPage() {
         <DialogContent size="md">
           <form onSubmit={editForm.handleSubmit((values) => update.mutate(values))}>
             <DialogHeader>
-              <DialogTitle>تعديل العامل</DialogTitle>
-              <DialogDescription>عدّل بيانات العامل ثم احفظ التغييرات.</DialogDescription>
+              <DialogTitle>{copy('تعديل العامل')}</DialogTitle>
+              <DialogDescription>{copy('عدّل بيانات العامل ثم احفظ التغييرات.')}</DialogDescription>
             </DialogHeader>
             <DialogBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <WorkerIdentityFields form={editForm} />
               <Field
-                label="كلمة سر جديدة"
-                hint="اتركها فارغة للاحتفاظ بكلمة السر الحالية."
+                label={copy('كلمة سر جديدة')}
+                hint={copy('اتركها فارغة للاحتفاظ بكلمة السر الحالية.')}
                 error={editForm.formState.errors.password?.message}
               >
                 {(props) => (
@@ -365,11 +368,11 @@ export function EmployeesPage() {
             <DialogFooter>
               <Button type="submit" variant="brand" loading={update.isPending}>
                 <Pencil aria-hidden />
-                حفظ التغييرات
+                {copy('حفظ التغييرات')}
               </Button>
               <DialogClose asChild>
                 <Button type="button" variant="outline" disabled={update.isPending}>
-                  إلغاء
+                  {copy('إلغاء')}
                 </Button>
               </DialogClose>
             </DialogFooter>
@@ -380,13 +383,17 @@ export function EmployeesPage() {
       <ConfirmDialog
         open={statusTarget !== null}
         onOpenChange={(value) => !value && setStatusTarget(null)}
-        title={statusTarget?.status === 'ACTIVE' ? 'تعطيل العامل' : 'تفعيل العامل'}
+        title={statusTarget?.status === 'ACTIVE' ? copy('تعطيل العامل') : copy('تفعيل العامل')}
         description={
           statusTarget?.status === 'ACTIVE'
-            ? `سيُمنع "${statusTarget?.name ?? ''}" من الدخول وتُنهي جلساته الحالية.`
-            : `سيتمكن "${statusTarget?.name ?? ''}" من تسجيل الدخول مجدداً.`
+            ? copy('سيُمنع "{{value0}}" من الدخول وتُنهي جلساته الحالية.', {
+                value0: statusTarget?.name ?? '',
+              })
+            : copy('سيتمكن "{{value0}}" من تسجيل الدخول مجدداً.', {
+                value0: statusTarget?.name ?? '',
+              })
         }
-        confirmLabel={statusTarget?.status === 'ACTIVE' ? 'تعطيل' : 'تفعيل'}
+        confirmLabel={statusTarget?.status === 'ACTIVE' ? copy('تعطيل') : copy('تفعيل')}
         variant={statusTarget?.status === 'ACTIVE' ? 'danger' : 'brand'}
         loading={setStatus.isPending}
         onConfirm={() => statusTarget && setStatus.mutate(statusTarget)}
@@ -395,9 +402,11 @@ export function EmployeesPage() {
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(value) => !value && setDeleteTarget(null)}
-        title="حذف العامل"
-        description={`سيُحذف حساب "${deleteTarget?.name ?? ''}" نهائياً ولن يتمكن من الدخول.`}
-        confirmLabel="حذف العامل"
+        title={copy('حذف العامل')}
+        description={copy('سيُحذف حساب "{{value0}}" نهائياً ولن يتمكن من الدخول.', {
+          value0: deleteTarget?.name ?? '',
+        })}
+        confirmLabel={copy('حذف العامل')}
         variant="danger"
         loading={remove.isPending}
         onConfirm={() => deleteTarget && remove.mutate(deleteTarget.id)}
@@ -410,9 +419,11 @@ type WorkerIdentityForm =
   ReturnType<typeof useForm<CreateWorkerRequest>> | ReturnType<typeof useForm<UpdateWorkerRequest>>;
 
 function WorkerIdentityFields({ form }: { form: WorkerIdentityForm }) {
+  useCopy();
+
   return (
     <>
-      <Field label="الاسم" error={form.formState.errors.name?.message} required>
+      <Field label={copy('الاسم')} error={form.formState.errors.name?.message} required>
         {(props) => (
           <Input
             {...props}
@@ -422,7 +433,7 @@ function WorkerIdentityFields({ form }: { form: WorkerIdentityForm }) {
           />
         )}
       </Field>
-      <Field label="رقم الهاتف" error={form.formState.errors.phone?.message} required>
+      <Field label={copy('رقم الهاتف')} error={form.formState.errors.phone?.message} required>
         {(props) => (
           <Input
             {...props}
@@ -435,7 +446,11 @@ function WorkerIdentityFields({ form }: { form: WorkerIdentityForm }) {
           />
         )}
       </Field>
-      <Field label="البريد الإلكتروني" error={form.formState.errors.email?.message} required>
+      <Field
+        label={copy('البريد الإلكتروني')}
+        error={form.formState.errors.email?.message}
+        required
+      >
         {(props) => (
           <Input
             {...props}
@@ -458,13 +473,15 @@ function PasswordVisibilityButton({
   visible: boolean;
   onToggle: () => void;
 }) {
+  useCopy();
+
   return (
     <button
       type="button"
       className="text-fg-muted hover:text-fg rounded-icon p-1"
       onClick={onToggle}
-      title={visible ? 'إخفاء كلمة السر' : 'إظهار كلمة السر'}
-      aria-label={visible ? 'إخفاء كلمة السر' : 'إظهار كلمة السر'}
+      title={visible ? copy('إخفاء كلمة السر') : copy('إظهار كلمة السر')}
+      aria-label={visible ? copy('إخفاء كلمة السر') : copy('إظهار كلمة السر')}
     >
       {visible ? <EyeOff className="size-4" aria-hidden /> : <Eye className="size-4" aria-hidden />}
     </button>

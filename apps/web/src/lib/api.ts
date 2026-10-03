@@ -1,3 +1,4 @@
+import { copy, localizedError } from '@/lib/copy';
 import type { ApiError } from '@oh/contracts';
 
 /**
@@ -39,6 +40,10 @@ export class ApiRequestError extends Error {
   ) {
     super(message);
     this.name = 'ApiRequestError';
+    Object.defineProperty(this, 'message', {
+      configurable: true,
+      get: () => localizedError(message),
+    });
   }
 
   get isUnauthenticated(): boolean {
@@ -125,7 +130,7 @@ async function request<T>(
   const method = (options.method ?? 'GET').toUpperCase();
 
   if (sessionInvalidated && !SESSION_RECOVERY_PATHS.has(path)) {
-    throw new ApiRequestError(401, 'UNAUTHENTICATED', 'انتهت الجلسة. سجّل الدخول مجددًا.');
+    throw new ApiRequestError(401, 'UNAUTHENTICATED', copy('انتهت الجلسة. سجّل الدخول مجددًا.'));
   }
 
   const headers = new Headers(options.headers);
@@ -182,7 +187,7 @@ async function request<T>(
     throw new ApiRequestError(
       response.status,
       error.code ?? 'INTERNAL',
-      error.message ?? 'حدث خطأ غير متوقع.',
+      error.message ?? copy('حدث خطأ غير متوقع.'),
       error.fields,
       error.requestId ?? requestId,
     );

@@ -1,5 +1,6 @@
 import { forwardRef, useId } from 'react';
 import { cn } from '../lib/cn.js';
+import { useUiTranslation } from '../localization.js';
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   /** أيقونة في بداية الحقل (RTL: على اليمين — تلقائيًا). */
@@ -13,7 +14,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     <div className="relative w-full">
       {startIcon ? (
         <span
-          className="pointer-events-none absolute inset-y-0 start-3 flex items-center text-fg-subtle"
+          className="text-fg-subtle pointer-events-none absolute inset-y-0 start-3 flex items-center"
           aria-hidden
         >
           {startIcon}
@@ -24,11 +25,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         ref={ref}
         type={type}
         className={cn(
-          'h-11 w-full rounded-ctrl border bg-card px-3 text-sm text-fg',
+          'rounded-ctrl bg-card text-fg h-11 w-full border px-3 text-sm',
           'placeholder:text-fg-subtle',
           'transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-accent',
-          'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-card-muted',
+          'focus-visible:ring-ring focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2',
+          'disabled:bg-card-muted disabled:cursor-not-allowed disabled:opacity-50',
           // خصائص منطقية (ps/pe) — تنعكس تلقائيًا في RTL/LTR.
           startIcon && 'ps-10',
           endIcon && 'pe-10',
@@ -40,7 +41,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       />
 
       {endIcon ? (
-        <span className="absolute inset-y-0 end-3 flex items-center text-fg-subtle">{endIcon}</span>
+        <span className="text-fg-subtle absolute inset-y-0 end-3 flex items-center">{endIcon}</span>
       ) : null}
     </div>
   ),
@@ -73,6 +74,7 @@ export interface FieldProps {
  * — يسمع «حقل نصي» فقط، ولا يعرف لماذا رُفض نموذجه.
  */
 export function Field({ label, error, hint, required, className, children }: FieldProps) {
+  const copy = useUiTranslation();
   const id = useId();
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
@@ -81,8 +83,8 @@ export function Field({ label, error, hint, required, className, children }: Fie
 
   return (
     <div className={cn('space-y-1.5', className)}>
-      <label htmlFor={id} className="block text-[13px] font-medium text-fg">
-        {label}
+      <label htmlFor={id} className="text-fg block text-[13px] font-medium">
+        {copy(label)}
         {/*
           ⚠️ النجمة `aria-hidden`، والإلزام يُبلَّغ عبر `aria-required` على الحقل.
 
@@ -92,7 +94,7 @@ export function Field({ label, error, hint, required, className, children }: Fie
           من اسمه.
         */}
         {required ? (
-          <span className="ms-1 text-danger" aria-hidden>
+          <span className="text-danger ms-1" aria-hidden>
             *
           </span>
         ) : null}
@@ -106,15 +108,15 @@ export function Field({ label, error, hint, required, className, children }: Fie
       })}
 
       {hint && !error ? (
-        <p id={hintId} className="text-xs text-fg-muted">
-          {hint}
+        <p id={hintId} className="text-fg-muted text-xs">
+          {copy(hint)}
         </p>
       ) : null}
 
       {error ? (
         // role="alert" يجعل قارئ الشاشة يُعلن الخطأ فور ظهوره.
-        <p id={errorId} role="alert" className="text-xs font-medium text-danger">
-          {error}
+        <p id={errorId} role="alert" className="text-danger text-xs font-medium">
+          {copy(error)}
         </p>
       ) : null}
     </div>

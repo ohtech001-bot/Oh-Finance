@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -132,7 +133,7 @@ export function DashboardPage() {
                           className="rounded-ctrl hover:bg-card-muted flex items-center justify-between gap-2 px-2 py-2"
                         >
                           <MoneyText value={o.total} currency={currency} tone="plain" size="sm" />
-                          <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
+                          <StatusBadge tone={badge.tone}>{copy(badge.label)}</StatusBadge>
                           <span className="text-fg flex-1 truncate text-end text-[13px]">
                             {o.customerName}
                           </span>
@@ -161,7 +162,7 @@ export function DashboardPage() {
                       >
                         <MoneyText value={p.amount} currency={currency} tone="credit" size="sm" />
                         <span className="text-fg-muted text-xs">
-                          {PAYMENT_METHOD_LABELS[p.method]}
+                          {copy(PAYMENT_METHOD_LABELS[p.method])}
                         </span>
                         <div className="flex flex-1 flex-col items-end">
                           <span className="text-fg truncate text-[13px]">{p.customerName}</span>
@@ -260,6 +261,8 @@ const ALERT_STYLE = {
 } as const;
 
 function AlertsPanel({ alerts, currency }: { alerts: DashboardAlert[]; currency: CurrencyCode }) {
+  useCopy();
+
   return (
     <div className="space-y-2">
       {alerts.map((a) => {
@@ -270,7 +273,7 @@ function AlertsPanel({ alerts, currency }: { alerts: DashboardAlert[]; currency:
             className={`rounded-card flex items-center gap-3 px-4 py-3 text-[13px] ${s.bg} ${s.fg}`}
           >
             <Icon className="size-4 shrink-0" aria-hidden />
-            <span className="flex-1">{a.message}</span>
+            <span className="flex-1">{copy(a.message)}</span>
             {a.amount ? (
               <span className="font-semibold tabular-nums" dir="ltr">
                 {formatMoney(a.amount, { currency, withSymbol: false })}
@@ -304,6 +307,8 @@ function ViewAll({ to }: { to: string }) {
 }
 
 function Empty({ text }: { text: string }) {
+  useCopy();
+
   return <p className="text-fg-subtle py-8 text-center text-[13px]">{text}</p>;
 }
 

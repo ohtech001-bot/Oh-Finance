@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -90,7 +91,7 @@ export function SettingsPage() {
     <div className="space-y-6">
       {selectedSection ? (
         <SettingsSectionHeader
-          label={selectedSection.label}
+          label={copy(selectedSection.label)}
           description={selectedSection.description}
           icon={selectedSection.icon}
           onBack={() => setActiveTab(null)}
@@ -196,6 +197,8 @@ function SettingsTab({
   description: string;
   icon: React.ComponentType<{ className?: string }>;
 }) {
+  useCopy();
+
   return (
     <TabsTrigger
       value={value}
@@ -216,6 +219,8 @@ function SettingsTab({
 // ── مكوّنات مساعدة ──────────────────────────────────────────────────────────
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  useCopy();
+
   return (
     <Card className="mt-4">
       <CardHeader title={title} />
@@ -287,7 +292,7 @@ function GeneralForm({ data, canManage }: { data: StoreSettings; canManage: bool
         <Field label={t('common.language')}>
           {(p) => (
             <select {...p} {...register('language')} className={selectCls} disabled={!canManage}>
-              <option value="ar">العربية</option>
+              <option value="ar">{copy('العربية')}</option>
               <option value="he">עברית</option>
             </select>
           )}
@@ -578,6 +583,8 @@ function SubscriptionInfo({
   value: string;
   ltr?: boolean;
 }) {
+  useCopy();
+
   return (
     <div className="rounded-ctrl border-border-subtle bg-card-muted border p-3">
       <dt className="text-fg-muted text-xs">{label}</dt>
@@ -599,6 +606,8 @@ function ToggleRow({
   onChange: (v: boolean) => void;
   disabled?: boolean;
 }) {
+  useCopy();
+
   return (
     <div className="rounded-ctrl border-border flex items-center justify-between border px-3 py-2.5">
       <span className="text-fg text-[13px]">{label}</span>

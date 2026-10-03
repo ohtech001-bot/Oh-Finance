@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -36,9 +37,11 @@ import { PaymentMethodsDonut, SalesPaymentsLine, WeekdayBars } from './reports-c
  *  لا حساب في الواجهة، لا بيانات وهمية.
  */
 export function ReportsPage() {
+  useCopy();
+
   const { user } = useAuth();
   const locale = currentLocale();
-  const copy = REPORT_DEBT_COPY[locale];
+  const labels = REPORT_DEBT_COPY[locale];
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
   const [range, setRange] = useState<RangeValue>({ preset: 'last_30_days' });
   const ready = range.preset !== 'custom' || Boolean(range.from && range.to);
@@ -49,9 +52,9 @@ export function ReportsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="التقارير"
+        title={copy('التقارير')}
         icon={BarChart3}
-        breadcrumbs={[{ label: 'الرئيسية', href: '/' }, { label: 'التقارير' }]}
+        breadcrumbs={[{ label: copy('الرئيسية'), href: '/' }, { label: copy('التقارير') }]}
         linkAs={Link}
       />
 
@@ -66,7 +69,9 @@ export function ReportsPage() {
       ) : isError ? (
         <Card>
           <ErrorState
-            message={error instanceof ApiRequestError ? error.message : 'تعذّر تحميل التقارير.'}
+            message={
+              error instanceof ApiRequestError ? error.message : copy('تعذّر تحميل التقارير.')
+            }
             requestId={error instanceof ApiRequestError ? error.requestId : undefined}
             onRetry={() => void refetch()}
           />
@@ -76,7 +81,7 @@ export function ReportsPage() {
           {/* ── المؤشرات ─────────────────────────────────────────────── */}
           <div className="space-y-3 sm:space-y-4">
             <StatCard
-              label="المبلغ المتبقي (الديون)"
+              label={copy('المبلغ المتبقي (الديون)')}
               money={data.kpis.outstanding.value}
               currency={currency}
               moneyTone="debit"
@@ -85,13 +90,13 @@ export function ReportsPage() {
             />
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <StatCard
-                label="إجمالي الطلبات"
+                label={copy('إجمالي الطلبات')}
                 value={Number(data.kpis.ordersCount.value)}
                 icon={ShoppingBag}
                 tone="brand"
               />
               <StatCard
-                label="عدد الزبائن الكلي"
+                label={copy('عدد الزبائن الكلي')}
                 value={data.kpis.totalCustomers}
                 icon={Users}
                 tone="purple"
@@ -101,14 +106,14 @@ export function ReportsPage() {
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Card>
-              <CardHeader title="المبيعات والمدفوعات" />
+              <CardHeader title={copy('المبيعات والمدفوعات')} />
               <CardBody>
                 <SalesPaymentsLine data={data.salesVsPayments} currency={currency} />
               </CardBody>
             </Card>
 
             <Card>
-              <CardHeader title="عدد الطلبات حسب اليوم" />
+              <CardHeader title={copy('عدد الطلبات حسب اليوم')} />
               <CardBody>
                 <WeekdayBars data={data.ordersByWeekday} />
               </CardBody>
@@ -117,32 +122,32 @@ export function ReportsPage() {
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <DebtList
-              title={copy.topDebtors}
-              empty={copy.noDebt}
+              title={labels.topDebtors}
+              empty={labels.noDebt}
               rows={data.topDebtors}
               currency={currency}
               icon="debt"
-              dueLabel={copy.monthlyDue}
-              limitLabel={copy.creditLimit}
+              dueLabel={labels.monthlyDue}
+              limitLabel={labels.creditLimit}
             />
             <DebtList
-              title={copy.urgent}
-              empty={copy.noUrgent}
+              title={labels.urgent}
+              empty={labels.noUrgent}
               rows={data.urgentCustomers}
               currency={currency}
               icon="urgent"
-              dueLabel={copy.monthlyDue}
-              limitLabel={copy.creditLimit}
+              dueLabel={labels.monthlyDue}
+              limitLabel={labels.creditLimit}
             />
           </div>
 
           {/* ── صف القوائم الثلاثة ───────────────────────────────────── */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <Card>
-              <CardHeader title="أعلى الزبائن مبيعًا" />
+              <CardHeader title={copy('أعلى الزبائن مبيعًا')} />
               <CardBody>
                 {data.topCustomers.length === 0 ? (
-                  <Empty text="لا توجد مبيعات في الفترة." />
+                  <Empty text={copy('لا توجد مبيعات في الفترة.')} />
                 ) : (
                   <ol className="space-y-1">
                     {data.topCustomers.map((c, i) => (
@@ -172,10 +177,10 @@ export function ReportsPage() {
             </Card>
 
             <Card>
-              <CardHeader title="أكثر المنتجات مبيعًا" />
+              <CardHeader title={copy('أكثر المنتجات مبيعًا')} />
               <CardBody>
                 {data.topProducts.length === 0 ? (
-                  <Empty text="لا توجد منتجات مباعة في الفترة." />
+                  <Empty text={copy('لا توجد منتجات مباعة في الفترة.')} />
                 ) : (
                   <ol className="space-y-1">
                     {data.topProducts.map((p, i) => (
@@ -200,7 +205,7 @@ export function ReportsPage() {
             </Card>
 
             <Card>
-              <CardHeader title="ملخص طرق الدفع" />
+              <CardHeader title={copy('ملخص طرق الدفع')} />
               <CardBody>
                 <PaymentMethodsDonut data={data.paymentMethods} currency={currency} />
                 <ul className="border-border mt-3 space-y-2 border-t pt-3">
@@ -213,7 +218,7 @@ export function ReportsPage() {
                         {formatMoney(m.amount, { currency, withSymbol: false })}
                       </span>
                       <span className="text-fg-muted flex-1 text-end">
-                        {PAYMENT_METHOD_LABELS[m.method]}
+                        {copy(PAYMENT_METHOD_LABELS[m.method])}
                       </span>
                       <span className="text-fg font-semibold tabular-nums" dir="ltr">
                         {m.pct}%
@@ -228,7 +233,7 @@ export function ReportsPage() {
           {/* ── أداء الموظفين (أساسي) ────────────────────────────────── */}
           {data.employeePerformance.length > 0 ? (
             <Card>
-              <CardHeader title="أداء الموظفين" />
+              <CardHeader title={copy('أداء الموظفين')} />
               <CardBody>
                 <ul className="space-y-1">
                   {data.employeePerformance.map((e) => (
@@ -238,11 +243,11 @@ export function ReportsPage() {
                     >
                       <div className="flex items-center gap-4">
                         <span className="text-fg-muted text-[13px]">
-                          مبيعات:{' '}
+                          {copy('مبيعات:')}{' '}
                           <MoneyText value={e.sales} currency={currency} tone="plain" size="sm" />
                         </span>
                         <span className="text-fg-muted text-[13px]">
-                          مقبوضات:{' '}
+                          {copy('مقبوضات:')}{' '}
                           <MoneyText
                             value={e.payments}
                             currency={currency}
@@ -251,7 +256,7 @@ export function ReportsPage() {
                           />
                         </span>
                         <span className="text-fg-muted text-[13px] tabular-nums">
-                          {e.orders} طلب
+                          {e.orders} {copy('طلب')}
                         </span>
                       </div>
                       <div className="flex flex-1 items-center justify-end gap-2.5">
@@ -271,6 +276,8 @@ export function ReportsPage() {
 }
 
 function Empty({ text }: { text: string }) {
+  useCopy();
+
   return <p className="text-fg-subtle py-8 text-center text-[13px]">{text}</p>;
 }
 
@@ -325,6 +332,8 @@ function DebtList({
   dueLabel: string;
   limitLabel: string;
 }) {
+  useCopy();
+
   const Icon = icon === 'urgent' ? TriangleAlert : CalendarClock;
   return (
     <Card>

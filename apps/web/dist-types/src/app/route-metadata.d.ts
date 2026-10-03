@@ -1,0 +1,7 @@
+import type { router as AppRouter } from './router';
+export declare const PUBLIC_TITLE = "OH Finance | \u0625\u062F\u0627\u0631\u0629 \u0623\u0639\u0645\u0627\u0644\u0643 \u0628\u0630\u0643\u0627\u0621";
+export declare const PUBLIC_DESCRIPTION = "\u0646\u0638\u0651\u0645 \u0632\u0628\u0627\u0626\u0646 \u0645\u062D\u0644\u0643 \u0648\u0637\u0644\u0628\u0627\u062A\u0643 \u0648\u062F\u0641\u0639\u0627\u062A\u0643 \u0648\u062D\u0633\u0627\u0628\u0627\u062A\u0643 \u0648\u062A\u0642\u0627\u0631\u064A\u0631\u0643 \u0645\u0639 OH Finance \u0645\u0646 O&H Tech. \u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627 \u0644\u0625\u0639\u062F\u0627\u062F \u062D\u0633\u0627\u0628 \u0639\u0645\u0644\u0643.";
+export declare function RouteMetadata({ router }: {
+    router: typeof AppRouter;
+}): null;
+//# sourceMappingURL=route-metadata.d.ts.map

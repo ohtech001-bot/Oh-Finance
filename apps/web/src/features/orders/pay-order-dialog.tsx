@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { useEffect, useState } from 'react';
 import type { OrderDetail } from '@oh/contracts';
 import { greaterThan, min, subtract, toMoneyString, type CurrencyCode } from '@oh/money';
@@ -34,6 +35,8 @@ export function PayOrderDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  useCopy();
+
   const { user } = useAuth();
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
   const [amount, setAmount] = useState('');
@@ -58,31 +61,35 @@ export function PayOrderDialog({
 
   const submit = () => {
     if (!order || !/^\d+(\.\d{1,4})?$/.test(amount) || !greaterThan(amount, '0')) {
-      toast.error('أدخل مبلغًا صحيحًا أكبر من صفر.');
+      toast.error(copy('أدخل مبلغًا صحيحًا أكبر من صفر.'));
       return;
     }
     const callbacks = {
       onSuccess: () => {
         toast.success(
           useCredit
-            ? `دُفع الطلب ${displayOrderNumber(order.number)} من رصيد الزبون`
-            : `سُجّلت دفعة نقدية للطلب ${displayOrderNumber(order.number)}`,
+            ? copy('دُفع الطلب {{value0}} من رصيد الزبون', {
+                value0: displayOrderNumber(order.number),
+              })
+            : copy('سُجّلت دفعة نقدية للطلب {{value0}}', {
+                value0: displayOrderNumber(order.number),
+              }),
         );
         onOpenChange(false);
       },
       onError: (error: unknown) => {
         if (error instanceof ApiRequestError) toast.apiError(error.message, error.requestId);
-        else toast.error('تعذّر دفع الطلب.');
+        else toast.error(copy('تعذّر دفع الطلب.'));
       },
     };
 
     if (useCredit) {
       if (greaterThan(amount, credit.data?.availableAmount ?? '0')) {
-        toast.error('المبلغ يتجاوز رصيد الزبون المتاح.');
+        toast.error(copy('المبلغ يتجاوز رصيد الزبون المتاح.'));
         return;
       }
       if (greaterThan(amount, order.remainingAmount)) {
-        toast.error('لا يمكن استخدام رصيد أكبر من المبلغ المتبقي على الطلب.');
+        toast.error(copy('لا يمكن استخدام رصيد أكبر من المبلغ المتبقي على الطلب.'));
         return;
       }
       applyCredit.mutate({ body: { orderId: order.id, amount }, idempotencyKey }, callbacks);
@@ -110,18 +117,20 @@ export function PayOrderDialog({
       <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>
-            {order ? `دفع الطلب ${displayOrderNumber(order.number)}` : 'دفع الطلب'}
+            {order
+              ? copy('دفع الطلب {{value0}}', { value0: displayOrderNumber(order.number) })
+              : copy('دفع الطلب')}
           </DialogTitle>
         </DialogHeader>
         <DialogBody className="space-y-4">
           {order ? (
             <div className="bg-card-muted rounded-ctrl border-border flex items-center justify-between border px-4 py-3">
-              <span className="text-fg-muted text-sm">المتبقي على الطلب</span>
+              <span className="text-fg-muted text-sm">{copy('المتبقي على الطلب')}</span>
               <MoneyText value={order.remainingAmount} currency={currency} tone="debit" />
             </div>
           ) : null}
 
-          <Field label="المبلغ" required>
+          <Field label={copy('المبلغ')} required>
             {(props) => (
               <Input
                 {...props}
@@ -136,9 +145,9 @@ export function PayOrderDialog({
 
           <div className="rounded-ctrl border-border flex items-center justify-between gap-4 border p-4">
             <div className="min-w-0">
-              <p className="text-fg text-sm font-semibold">الدفع من رصيد الزبون</p>
+              <p className="text-fg text-sm font-semibold">{copy('الدفع من رصيد الزبون')}</p>
               <div className="text-fg-muted mt-1 flex items-center gap-1 text-xs">
-                <span>المتاح:</span>
+                <span>{copy('المتاح:')}</span>
                 <MoneyText
                   value={credit.data?.availableAmount ?? '0.00'}
                   currency={currency}
@@ -151,30 +160,30 @@ export function PayOrderDialog({
               checked={useCredit}
               onCheckedChange={setUseCredit}
               disabled={credit.isLoading || !greaterThan(credit.data?.availableAmount ?? '0', '0')}
-              aria-label="الدفع من رصيد الزبون"
+              aria-label={copy('الدفع من رصيد الزبون')}
             />
           </div>
 
           <p className="text-fg-muted text-xs">
             {useCredit
-              ? 'لن تُسجّل دفعة نقدية جديدة؛ سيُستخدم الرصيد السابق فقط.'
-              : 'سيُسجّل المبلغ كدفعة نقدية استلمها المحل.'}
+              ? copy('لن تُسجّل دفعة نقدية جديدة؛ سيُستخدم الرصيد السابق فقط.')
+              : copy('سيُسجّل المبلغ كدفعة نقدية استلمها المحل.')}
           </p>
 
           {!useCredit && greaterThan(excessAmount, '0') ? (
             <div className="bg-success-soft text-success rounded-ctrl border-current/20 border p-3 text-sm">
-              سيُسدَّد الطلب بالكامل، ويُحفظ المبلغ الزائد كرصيد للزبون بقيمة{' '}
+              {copy('سيُسدَّد الطلب بالكامل، ويُحفظ المبلغ الزائد كرصيد للزبون بقيمة')}{' '}
               <MoneyText value={excessAmount} currency={currency} tone="credit" size="sm" />.
             </div>
           ) : null}
         </DialogBody>
         <DialogFooter>
           <Button variant="brand" onClick={submit} loading={pending}>
-            دفع الطلب
+            {copy('دفع الطلب')}
           </Button>
           <DialogClose asChild>
             <Button variant="outline" disabled={pending}>
-              إلغاء
+              {copy('إلغاء')}
             </Button>
           </DialogClose>
         </DialogFooter>

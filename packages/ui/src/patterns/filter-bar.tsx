@@ -1,3 +1,4 @@
+import { useUiTranslation } from '../localization.js';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 import { Button } from '../primitives/button.js';
@@ -18,7 +19,7 @@ export function FilterBar({ children, className }: FilterBarProps) {
   return (
     <div
       className={cn(
-        'flex flex-wrap items-center gap-3 rounded-card border border-border bg-card p-4 shadow-card',
+        'rounded-card border-border bg-card shadow-card flex flex-wrap items-center gap-3 border p-4',
         className,
       )}
     >
@@ -40,15 +41,17 @@ export function SearchFilter({
   placeholder = 'بحث سريع…',
   className,
 }: SearchFilterProps) {
+  const copy = useUiTranslation();
+
   return (
     <div className={cn('min-w-[200px] flex-1', className)}>
       <Input
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+        placeholder={copy(placeholder)}
         startIcon={<Search className="size-4" />}
-        aria-label={placeholder}
+        aria-label={copy(placeholder)}
       />
     </div>
   );
@@ -72,21 +75,23 @@ export function SelectFilter({
   label,
   className,
 }: SelectFilterProps) {
+  const copy = useUiTranslation();
+
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      aria-label={label}
+      aria-label={copy(label)}
       className={cn(
-        'h-11 min-w-[150px] rounded-ctrl border border-border bg-card px-3 text-sm text-fg',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-accent',
+        'rounded-ctrl border-border bg-card text-fg h-11 min-w-[150px] border px-3 text-sm',
+        'focus-visible:ring-ring focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2',
         className,
       )}
     >
-      <option value="">{allLabel}</option>
+      <option value="">{copy(allLabel)}</option>
       {options.map((option) => (
         <option key={option.value} value={option.value}>
-          {option.label}
+          {copy(option.label)}
         </option>
       ))}
     </select>
@@ -119,10 +124,14 @@ export function DateRangeFilter({
   fromLabel = 'من تاريخ',
   toLabel = 'إلى تاريخ',
 }: DateRangeFilterProps) {
+  const copy = useUiTranslation();
+
   return (
-    <div className={cn('grid w-full min-w-0 grid-cols-1 gap-3 sm:w-auto sm:grid-cols-2', className)}>
+    <div
+      className={cn('grid w-full min-w-0 grid-cols-1 gap-3 sm:w-auto sm:grid-cols-2', className)}
+    >
       <label className="min-w-0 space-y-1">
-        <span className="text-fg-muted block text-xs font-medium">{fromLabel}</span>
+        <span className="text-fg-muted block text-xs font-medium">{copy(fromLabel)}</span>
         <Input
           type="date"
           value={from}
@@ -130,20 +139,20 @@ export function DateRangeFilter({
           // `max` يمنع اختيار مدى مقلوب في الواجهة أصلًا — الخادم يتحقق أيضًا.
           max={to || undefined}
           dir="ltr"
-          aria-label={fromLabel}
-          className="block min-w-0 max-w-full appearance-none w-full sm:w-[180px]"
+          aria-label={copy(fromLabel)}
+          className="block w-full min-w-0 max-w-full appearance-none sm:w-[180px]"
         />
       </label>
       <label className="min-w-0 space-y-1">
-        <span className="text-fg-muted block text-xs font-medium">{toLabel}</span>
+        <span className="text-fg-muted block text-xs font-medium">{copy(toLabel)}</span>
         <Input
           type="date"
           value={to}
           onChange={(e) => onToChange(e.target.value)}
           min={from || undefined}
           dir="ltr"
-          aria-label={toLabel}
-          className="block min-w-0 max-w-full appearance-none w-full sm:w-[180px]"
+          aria-label={copy(toLabel)}
+          className="block w-full min-w-0 max-w-full appearance-none sm:w-[180px]"
         />
       </label>
     </div>
@@ -157,12 +166,14 @@ export function AdvancedFilterButton({
   onClick: () => void;
   activeCount?: number;
 }) {
+  const copy = useUiTranslation();
+
   return (
     <Button variant="outline" onClick={onClick}>
       <SlidersHorizontal aria-hidden />
-      تصفية متقدمة
+      {copy('تصفية متقدمة')}
       {activeCount ? (
-        <span className="ms-1 flex size-5 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-white tabular-nums">
+        <span className="bg-accent ms-1 flex size-5 items-center justify-center rounded-full text-[11px] font-bold tabular-nums text-white">
           {activeCount}
         </span>
       ) : null}

@@ -14,15 +14,25 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="OH Finance" />
-    <meta name="description" content="نظام إدارة الزبائن والطلبات الآجلة والدفعات والديون" />
+    <meta
+      name="description"
+      content="نظّم زبائن محلك وطلباتك ودفعاتك وحساباتك وتقاريرك مع OH Finance من O&amp;H Tech. تواصل معنا لإعداد حساب عملك."
+    />
+    <meta property="og:title" content="OH Finance | إدارة أعمالك بذكاء" />
+    <meta
+      property="og:description"
+      content="منظومة واحدة لإدارة الزبائن والطلبات والدفعات والحسابات والتقارير."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="OH Finance" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
 
-    <!-- لا فهرسة: نظام أعمال خاص، لا موقع عام. -->
-    <meta name="robots" content="noindex, nofollow" />
+    <!-- Route metadata and private-route response headers keep business screens unindexed. -->
+    <meta name="robots" content="index, follow" />
 
-    <title>OH Finance</title>
+    <title>OH Finance | إدارة أعمالك بذكاء</title>
   </head>
   <body>
     <!--
@@ -30,6 +40,7 @@
       مستخدم لوحة المفاتيح لا يضطر للمرور على 12 عنصر تنقّل في كل صفحة.
     -->
     <a
+      id="skip-to-content"
       href="#main-content"
       class="focus:rounded-ctrl focus:bg-accent sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-[100] focus:px-4 focus:py-2 focus:text-white"
     >

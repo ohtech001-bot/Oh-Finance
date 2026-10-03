@@ -69,10 +69,14 @@ const labels = {
     paid: 'المدفوع',
     balanceAfter: 'الرصيد بعد',
     reference: 'المرجع',
+    returned: 'مرتجع',
+    fullyReturned: 'مرتجع بالكامل',
+    returns: 'المرتجعات',
+    net: 'الصافي بعد الإرجاع',
     noValue: '—',
   },
   he: {
-    title: 'דף חשבון',
+    title: 'פירוט חשבון',
     accountOwner: 'פרטי בעל החשבון',
     accountDetails: 'פרטי החשבון',
     name: 'שם',
@@ -85,7 +89,7 @@ const labels = {
     currentDebt: 'חוב נוכחי',
     availableCredit: 'יתרת זכות',
     settled: 'החשבון מאוזן',
-    debtLimit: 'מסגרת',
+    debtLimit: 'מסגרת אשראי',
     dueDate: 'תאריך תשלום',
     totalOrders: 'סך ההזמנות',
     orderDetails: 'פרטי ההזמנות',
@@ -98,10 +102,10 @@ const labels = {
     orderTotal: 'סכום ההזמנה',
     paymentStatus: 'מצב תשלום',
     statusPaid: 'שולם',
-    statusPaidFromCredit: 'שולם מיתרת הלקוח',
+    statusPaidFromCredit: 'שולם מיתרת הזכות של הלקוח',
     statusPartiallyPaid: 'שולם חלקית',
     statusUnpaid: 'לא שולם',
-    creditApplied: 'נוכה מהיתרה',
+    creditApplied: 'שולם מיתרת הזכות',
     totalSettled: 'סה״כ שולם',
     remaining: 'נותר לתשלום',
     financialMovements: 'תנועות כספיות',
@@ -110,8 +114,12 @@ const labels = {
     movement: 'סוג תנועה',
     debt: 'חוב',
     paid: 'שולם',
-    balanceAfter: 'יתרה לאחר',
+    balanceAfter: 'יתרה לאחר התנועה',
     reference: 'אסמכתה',
+    returned: 'הוחזר',
+    fullyReturned: 'הוחזר במלואו',
+    returns: 'החזרות',
+    net: 'סה״כ לאחר החזרות',
     noValue: '—',
   },
   en: {
@@ -155,6 +163,10 @@ const labels = {
     paid: 'Paid',
     balanceAfter: 'Balance after',
     reference: 'Reference',
+    returned: 'Returned',
+    fullyReturned: 'Fully returned',
+    returns: 'Returns',
+    net: 'Net after returns',
     noValue: '—',
   },
 } as const;
@@ -172,7 +184,7 @@ const movementLabels: Record<LocaleCode, Record<LedgerEntryType, string>> = {
   he: {
     OPENING_BALANCE: 'יתרת פתיחה',
     ORDER_DEBIT: 'הזמנה',
-    PAYMENT_CREDIT: 'תשלום',
+    PAYMENT_CREDIT: 'תקבול',
     ADJUSTMENT_DEBIT: 'התאמת חובה',
     ADJUSTMENT_CREDIT: 'התאמת זכות',
     REVERSAL: 'ביטול תנועה',
@@ -247,7 +259,9 @@ export function printCustomerStatement({
       ? text.availableCredit
       : text.settled;
   const balanceClass = isPositive(balance) ? 'debt' : isNegative(balance) ? 'credit' : '';
-  const address = [customer.address, customer.city].filter(Boolean).join('، ');
+  const address = [customer.address, customer.city]
+    .filter(Boolean)
+    .join(locale === 'ar' ? '، ' : ', ');
   const logo = store?.logoUrl ? `<img class="logo" src="${escapeHtml(store.logoUrl)}" alt="">` : '';
   const detail = (label: string, value: string | null | undefined, ltr = false) =>
     value
@@ -276,7 +290,7 @@ export function printCustomerStatement({
         isZero(subtract(order.paidAmount, order.creditAppliedAmount));
       const paymentStatus =
         order.netTotal === '0.00' && order.returnedAmount !== '0.00'
-          ? 'مرتجع بالكامل / הוחזר במלואו'
+          ? text.fullyReturned
           : order.remainingAmount === '0.00'
             ? paidEntirelyFromCredit
               ? text.statusPaidFromCredit
@@ -287,7 +301,7 @@ export function printCustomerStatement({
       const products = order.items
         .map(
           (item) => `<tr>
-            <td>${item.returned ? `<s>${escapeHtml(item.name)}</s> (مرتجع / הוחזר)` : escapeHtml(item.name)}</td>
+            <td>${item.returned ? `<s>${escapeHtml(item.name)}</s> (${escapeHtml(text.returned)})` : escapeHtml(item.name)}</td>
             <td>${escapeHtml(item.quantity)}</td>
             <td>${money(item.unitPrice)}</td>
             <td>${money(item.lineTotal)}</td>
@@ -305,7 +319,7 @@ export function printCustomerStatement({
           <span>${escapeHtml(text.creditApplied)}: <strong>${money(order.creditAppliedAmount)}</strong></span>
           <span>${escapeHtml(text.totalSettled)}: <strong>${money(order.paidAmount)}</strong></span>
           <span>${escapeHtml(text.remaining)}: <strong>${money(order.remainingAmount)}</strong></span>
-          ${order.returnedAmount && order.returnedAmount !== '0.00' ? `<span>مرتجعات / החזרות: <strong>${money(order.returnedAmount)}</strong></span><span>الصافي / נטו: <strong>${money(order.netTotal ?? order.total)}</strong></span>` : ''}
+          ${order.returnedAmount && order.returnedAmount !== '0.00' ? `<span>${escapeHtml(text.returns)}: <strong>${money(order.returnedAmount)}</strong></span><span>${escapeHtml(text.net)}: <strong>${money(order.netTotal ?? order.total)}</strong></span>` : ''}
         </div>
         <h3>${escapeHtml(text.products)}</h3>
         <table class="products-table">

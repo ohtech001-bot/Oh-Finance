@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CircleCheck, CircleDollarSign, Printer, WalletCards } from 'lucide-react';
@@ -46,6 +47,8 @@ export function CustomerStatementDialog({
   open,
   onOpenChange,
 }: CustomerStatementDialogProps) {
+  useCopy();
+
   const { user } = useAuth();
   const locale = currentLocale();
   const statementQuery = useStatement(open ? customer.id : undefined);
@@ -76,7 +79,7 @@ export function CustomerStatementDialog({
     if (!statement) return;
     const targetWindow = window.open('', '_blank', 'width=980,height=760');
     if (!targetWindow) {
-      toast.error('اسمح بفتح نافذة الطباعة من المتصفح.');
+      toast.error(copy('اسمح بفتح نافذة الطباعة من المتصفح.'));
       return;
     }
 
@@ -104,7 +107,7 @@ export function CustomerStatementDialog({
     } catch (error) {
       targetWindow.close();
       if (error instanceof ApiRequestError) toast.apiError(error.message, error.requestId);
-      else toast.error('تعذّر تجهيز كشف الحساب للطباعة.');
+      else toast.error(copy('تعذّر تجهيز كشف الحساب للطباعة.'));
     } finally {
       setPrinting(false);
     }
@@ -112,14 +115,14 @@ export function CustomerStatementDialog({
 
   const columns: Column<LedgerEntry>[] = [
     {
-      header: 'التاريخ والوقت',
+      header: copy('التاريخ والوقت'),
       render: (row) => <StatementDate value={row.occurredAt} locale={locale} />,
     },
     {
-      header: 'الحركة',
+      header: copy('الحركة'),
       render: (row) => (
         <div>
-          <p className="text-fg text-sm font-medium">{LEDGER_TYPE_LABELS[row.entryType]}</p>
+          <p className="text-fg text-sm font-medium">{copy(LEDGER_TYPE_LABELS[row.entryType])}</p>
           {row.refNumber ? <p className="text-fg-muted text-xs">{orderReference(row)}</p> : null}
           {row.refType === 'ORDER' && row.refId && orderPaymentStates.has(row.refId) ? (
             <OrderPaymentBadge state={orderPaymentStates.get(row.refId)!} locale={locale} />
@@ -128,7 +131,7 @@ export function CustomerStatementDialog({
       ),
     },
     {
-      header: 'الدين',
+      header: copy('الدين'),
       align: 'end',
       render: (row) =>
         row.debit !== '0.00' ? (
@@ -145,7 +148,7 @@ export function CustomerStatementDialog({
         ),
     },
     {
-      header: 'مدفوع',
+      header: copy('مدفوع'),
       align: 'end',
       render: (row) =>
         row.credit !== '0.00' ? (
@@ -155,7 +158,7 @@ export function CustomerStatementDialog({
         ),
     },
     {
-      header: 'الرصيد بعد الحركة',
+      header: copy('الرصيد بعد الحركة'),
       align: 'end',
       render: (row) => (
         <MoneyText value={row.runningBalance} currency={currency} tone="auto" withSymbol={false} />
@@ -167,7 +170,10 @@ export function CustomerStatementDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="xl">
         <DialogHeader>
-          <DialogTitle>كشف حساب {customer.name}</DialogTitle>
+          <DialogTitle>
+            {copy('كشف حساب')}
+            {customer.name}
+          </DialogTitle>
         </DialogHeader>
 
         <DialogBody className="space-y-4">
@@ -181,7 +187,7 @@ export function CustomerStatementDialog({
               message={
                 statementQuery.error instanceof ApiRequestError
                   ? statementQuery.error.message
-                  : 'تعذّر تحميل كشف الحساب.'
+                  : copy('تعذّر تحميل كشف الحساب.')
               }
               onRetry={() => void statementQuery.refetch()}
             />
@@ -193,20 +199,20 @@ export function CustomerStatementDialog({
               />
 
               <DataTable
-                caption={`كشف حساب ${customer.name}`}
+                caption={copy('كشف حساب {{value0}}', { value0: customer.name })}
                 columns={columns}
                 rows={statement.entries}
                 rowKey={(row) => row.id}
                 empty={{
-                  title: 'لا توجد حركات مالية',
-                  description: 'ستظهر الطلبات والدفعات هنا عند تسجيلها.',
+                  title: copy('لا توجد حركات مالية'),
+                  description: copy('ستظهر الطلبات والدفعات هنا عند تسجيلها.'),
                 }}
                 mobileRender={(row) => (
                   <article className="border-border rounded-card border p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-fg truncate text-sm font-semibold">
-                          {LEDGER_TYPE_LABELS[row.entryType]}
+                          {copy(LEDGER_TYPE_LABELS[row.entryType])}
                         </p>
                         <StatementDate value={row.occurredAt} locale={locale} />
                         {orderReference(row)}
@@ -223,14 +229,14 @@ export function CustomerStatementDialog({
                     </div>
                     <div className="border-border-subtle mt-3 grid grid-cols-2 gap-3 border-t pt-3">
                       <MovementAmount
-                        label="الدين"
+                        label={copy('الدين')}
                         value={row.debit}
                         currency={currency}
                         tone="debit"
                         settled={settledOrder(row)}
                       />
                       <MovementAmount
-                        label="المدفوع"
+                        label={copy('المدفوع')}
                         value={row.credit}
                         currency={currency}
                         tone="credit"
@@ -247,11 +253,11 @@ export function CustomerStatementDialog({
           {statement && statement.entries.length > 0 ? (
             <Button variant="outline" onClick={() => void handlePrint()} loading={printing}>
               <Printer aria-hidden />
-              طباعة
+              {copy('طباعة')}
             </Button>
           ) : null}
           <DialogClose asChild>
-            <Button variant="outline">إغلاق</Button>
+            <Button variant="outline">{copy('إغلاق')}</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>
@@ -266,6 +272,8 @@ function OrderPaymentBadge({
   state: StatementOrderPaymentState;
   locale: ReturnType<typeof currentLocale>;
 }) {
+  useCopy();
+
   const labels = {
     ar: {
       PAID_FROM_CREDIT: 'مدفوع من رصيد الزبون',
@@ -304,14 +312,20 @@ function OrderPaymentBadge({
 }
 
 function AccountBalanceSummary({ balance, currency }: { balance: string; currency: CurrencyCode }) {
+  useCopy();
+
   const owesMoney = isPositive(balance);
   const hasCredit = isNegative(balance);
-  const title = owesMoney ? 'دين حالي على الزبون' : hasCredit ? 'رصيد متاح للزبون' : 'الحساب مسدّد';
-  const description = owesMoney
-    ? 'هذا هو المبلغ المطلوب من الزبون سداده للمحل.'
+  const title = owesMoney
+    ? copy('دين حالي على الزبون')
     : hasCredit
-      ? 'يمكن للزبون استخدام هذا الرصيد في طلباته القادمة.'
-      : 'لا يوجد دين على الزبون ولا رصيد مدفوع مسبقًا.';
+      ? copy('رصيد متاح للزبون')
+      : copy('الحساب مسدّد');
+  const description = owesMoney
+    ? copy('هذا هو المبلغ المطلوب من الزبون سداده للمحل.')
+    : hasCredit
+      ? copy('يمكن للزبون استخدام هذا الرصيد في طلباته القادمة.')
+      : copy('لا يوجد دين على الزبون ولا رصيد مدفوع مسبقًا.');
   const value = owesMoney || hasCredit ? toMoneyString(abs(balance), 2) : '0.00';
   const Icon = owesMoney ? CircleDollarSign : hasCredit ? WalletCards : CircleCheck;
   const tone = owesMoney ? 'debit' : hasCredit ? 'credit' : 'neutral';
@@ -366,6 +380,8 @@ function MovementAmount({
   tone: 'debit' | 'credit';
   settled?: boolean;
 }) {
+  useCopy();
+
   return (
     <div>
       <p className="text-fg-muted mb-1 text-xs">{label}</p>
@@ -386,6 +402,8 @@ function MovementAmount({
 }
 
 function StatementDate({ value, locale }: { value: string; locale: string }) {
+  useCopy();
+
   const date = new Date(value);
   return (
     <div className="text-xs">

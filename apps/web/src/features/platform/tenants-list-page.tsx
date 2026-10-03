@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
@@ -80,7 +81,9 @@ export function TenantsListPage() {
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['platform'] });
       toast.success(
-        variables.body.status === 'SUSPENDED' ? 'أُوقف المحل وأُنهيت جلساته.' : 'فُعّل المحل.',
+        variables.body.status === 'SUSPENDED'
+          ? copy('أُوقف المحل وأُنهيت جلساته.')
+          : copy('فُعّل المحل.'),
       );
       setStatusTarget(null);
       setReason('');
@@ -186,7 +189,7 @@ export function TenantsListPage() {
         const badge = TENANT_STATUS_BADGE[row.status as TenantStatus];
         return (
           <StatusBadge tone={badge.tone} withDot>
-            {badge.label}
+            {copy(badge.label)}
           </StatusBadge>
         );
       },
@@ -269,7 +272,7 @@ export function TenantsListPage() {
             setSearch(value);
             setPage(1);
           }}
-          placeholder="ابحث بالاسم أو المعرّف…"
+          placeholder={copy('ابحث بالاسم أو المعرّف…')}
         />
         <SelectFilter
           className="max-sm:w-full"
@@ -278,20 +281,20 @@ export function TenantsListPage() {
             setStatus(value);
             setPage(1);
           }}
-          allLabel="كل الحالات"
+          allLabel={copy('كل الحالات')}
           label={t('common.status')}
           options={[
-            { value: 'ACTIVE', label: 'نشط' },
-            { value: 'TRIAL', label: 'تجريبي' },
-            { value: 'SUSPENDED', label: 'موقوف' },
-            { value: 'CANCELLED', label: 'ملغى' },
+            { value: 'ACTIVE', label: copy('نشط') },
+            { value: 'TRIAL', label: copy('تجريبي') },
+            { value: 'SUSPENDED', label: copy('موقوف') },
+            { value: 'CANCELLED', label: copy('ملغى') },
           ]}
         />
       </FilterBar>
 
       <div>
         <DataTable
-          caption="قائمة المحلات المسجّلة في المنصة"
+          caption={copy('قائمة المحلات المسجّلة في المنصة')}
           columns={columns}
           rows={query.data?.items ?? []}
           rowKey={(row) => row.id}
@@ -302,7 +305,7 @@ export function TenantsListPage() {
                   message:
                     query.error instanceof ApiRequestError
                       ? query.error.message
-                      : 'تعذّر تحميل المحلات.',
+                      : copy('تعذّر تحميل المحلات.'),
                   requestId:
                     query.error instanceof ApiRequestError ? query.error.requestId : undefined,
                 }
@@ -338,7 +341,7 @@ export function TenantsListPage() {
                         {row.name}
                       </Link>
                       <StatusBadge tone={badge.tone} withDot>
-                        {badge.label}
+                        {copy(badge.label)}
                       </StatusBadge>
                     </div>
                     <p className="text-fg-muted mt-1 truncate text-xs">
@@ -430,7 +433,7 @@ export function TenantsListPage() {
                 setPageSize(size);
                 setPage(1);
               }}
-              itemLabel="محل"
+              itemLabel={copy('محل')}
             />
           </div>
         ) : null}
@@ -453,21 +456,25 @@ export function TenantsListPage() {
       >
         <DialogContent size="sm" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
-            <DialogTitle>{suspending ? 'إيقاف المحل' : 'تفعيل المحل'}</DialogTitle>
+            <DialogTitle>{suspending ? copy('إيقاف المحل') : copy('تفعيل المحل')}</DialogTitle>
             <DialogDescription>
               {suspending
-                ? `سيُوقف "${statusTarget?.name}" وتُنهى جميع جلسات مستخدميه فورًا.`
-                : `سيُعاد تفعيل "${statusTarget?.name}" ويستطيع مستخدموه الدخول مجددًا.`}
+                ? copy('سيُوقف "{{value0}}" وتُنهى جميع جلسات مستخدميه فورًا.', {
+                    value0: statusTarget?.name,
+                  })
+                : copy('سيُعاد تفعيل "{{value0}}" ويستطيع مستخدموه الدخول مجددًا.', {
+                    value0: statusTarget?.name,
+                  })}
             </DialogDescription>
           </DialogHeader>
 
           <DialogBody>
             <Field
-              label={suspending ? t('platform.suspendReason') : 'سبب التفعيل'}
-              hint="يُسجَّل في سجل التدقيق ولا يمكن حذفه أو تعديله."
+              label={suspending ? t('platform.suspendReason') : copy('سبب التفعيل')}
+              hint={copy('يُسجَّل في سجل التدقيق ولا يمكن حذفه أو تعديله.')}
               error={
                 reason.length > 0 && reason.trim().length < 3
-                  ? 'السبب يجب أن يكون 3 أحرف على الأقل.'
+                  ? copy('السبب يجب أن يكون 3 أحرف على الأقل.')
                   : undefined
               }
               required
@@ -477,7 +484,7 @@ export function TenantsListPage() {
                   {...props}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder="مثال: عدم سداد الاشتراك"
+                  placeholder={copy('مثال: عدم سداد الاشتراك')}
                   maxLength={500}
                   autoFocus
                 />
@@ -526,6 +533,8 @@ function MobileTenantMetric({
   value: string;
   ltr?: boolean;
 }) {
+  useCopy();
+
   return (
     <div className="bg-card min-w-0 p-3">
       <p className="text-fg-muted truncate text-[11px]">{label}</p>
@@ -550,6 +559,8 @@ function MobileTenantContact({
   value: string | null;
   href?: string;
 }) {
+  useCopy();
+
   const content = (
     <span className="text-fg min-w-0 truncate text-sm" dir="ltr">
       {value || '—'}

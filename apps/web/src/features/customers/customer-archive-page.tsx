@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArchiveRestore, CalendarClock, ChevronLeft, RotateCcw, Users } from 'lucide-react';
@@ -60,7 +61,8 @@ const COPY = {
   },
   en: {
     title: 'Customer Archive',
-    description: 'Customers can be restored for 30 days after archiving, then they are deleted automatically.',
+    description:
+      'Customers can be restored for 30 days after archiving, then they are deleted automatically.',
     customers: 'Customers',
     search: 'Search by customer name or phone…',
     name: 'Customer name',
@@ -80,6 +82,8 @@ const COPY = {
 } as const;
 
 export function CustomerArchivePage() {
+  useCopy();
+
   const locale = currentLocale();
   const labels = COPY[locale];
   const { can } = useAuth();
@@ -164,7 +168,7 @@ export function CustomerArchivePage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title={labels.title}
+        title={copy(labels.title)}
         description={labels.description}
         icon={ArchiveRestore}
         breadcrumbs={[{ label: labels.customers, href: '/customers' }, { label: labels.title }]}
@@ -184,7 +188,7 @@ export function CustomerArchivePage() {
 
       <div>
         <DataTable<Customer>
-          caption={labels.title}
+          caption={copy(labels.title)}
           columns={columns}
           rows={list.data?.items ?? []}
           rowKey={(customer) => customer.id}
@@ -276,6 +280,8 @@ export function CustomerArchivePage() {
 }
 
 function ArchiveDate({ value, locale }: { value: string | null; locale: keyof typeof COPY }) {
+  useCopy();
+
   return (
     <span className="tabular-nums" dir="ltr">
       {formatDate(value, locale)}
@@ -284,6 +290,8 @@ function ArchiveDate({ value, locale }: { value: string | null; locale: keyof ty
 }
 
 function ArchiveMetric({ label, value }: { label: string; value: string }) {
+  useCopy();
+
   return (
     <div className="min-w-0">
       <p className="text-fg-muted text-xs">{label}</p>

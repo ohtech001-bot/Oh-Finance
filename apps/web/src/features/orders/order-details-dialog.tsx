@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { useState } from 'react';
 import { Check, Pencil, Trash2, WalletCards } from 'lucide-react';
 import type { Customer, OrderDetail, Payment, StoreSettings } from '@oh/contracts';
@@ -62,6 +63,8 @@ export function OrderDetailsDialog({
   onOpenChange: (open: boolean) => void;
   onEdit?: (orderId: string) => void;
 }) {
+  useCopy();
+
   const { user, can } = useAuth();
   const currency = (user?.store?.currency ?? 'ILS') as CurrencyCode;
   const orderQuery = useOrder(open ? orderId : undefined);
@@ -88,12 +91,14 @@ export function OrderDetailsDialog({
       { version: order.version, overrideCreditLimit: false },
       {
         onSuccess: (confirmed) => {
-          toast.success(`أُكِّد الطلب ${displayOrderNumber(confirmed.number)}`);
+          toast.success(
+            copy('أُكِّد الطلب {{value0}}', { value0: displayOrderNumber(confirmed.number) }),
+          );
           setConfirmOpen(false);
         },
         onError: (error) => {
           if (error instanceof ApiRequestError) toast.apiError(error.message, error.requestId);
-          else toast.error('تعذّر تأكيد الطلب.');
+          else toast.error(copy('تعذّر تأكيد الطلب.'));
         },
       },
     );
@@ -106,13 +111,15 @@ export function OrderDetailsDialog({
       { id: order.id, version: order.version },
       {
         onSuccess: () => {
-          toast.success(`حُذفت مسودة الطلب ${displayOrderNumber(order.number)}`);
+          toast.success(
+            copy('حُذفت مسودة الطلب {{value0}}', { value0: displayOrderNumber(order.number) }),
+          );
           setDeleteOpen(false);
           onOpenChange(false);
         },
         onError: (error) => {
           if (error instanceof ApiRequestError) toast.apiError(error.message, error.requestId);
-          else toast.error('تعذّر حذف مسودة الطلب.');
+          else toast.error(copy('تعذّر حذف مسودة الطلب.'));
         },
       },
     );
@@ -126,7 +133,7 @@ export function OrderDetailsDialog({
       paperSize === 'A4' ? 'width=1000,height=850' : 'width=420,height=720',
     );
     if (!printWindow) {
-      toast.error('اسمح بفتح نافذة الطباعة من المتصفح.');
+      toast.error(copy('اسمح بفتح نافذة الطباعة من المتصفح.'));
       return;
     }
 
@@ -158,7 +165,7 @@ export function OrderDetailsDialog({
     } catch (error) {
       printWindow.close();
       if (error instanceof ApiRequestError) toast.apiError(error.message, error.requestId);
-      else toast.error('تعذّرت طباعة الطلب.');
+      else toast.error(copy('تعذّرت طباعة الطلب.'));
     }
   };
 
@@ -168,7 +175,9 @@ export function OrderDetailsDialog({
         <DialogContent size="xl">
           <DialogHeader>
             <DialogTitle>
-              {order ? `الطلب ${displayOrderNumber(order.number)}` : 'تفاصيل الطلب'}
+              {order
+                ? copy('الطلب {{value0}}', { value0: displayOrderNumber(order.number) })
+                : copy('تفاصيل الطلب')}
             </DialogTitle>
           </DialogHeader>
           <DialogBody className="space-y-5">
@@ -182,7 +191,7 @@ export function OrderDetailsDialog({
                 message={
                   orderQuery.error instanceof ApiRequestError
                     ? orderQuery.error.message
-                    : 'تعذّر تحميل الطلب.'
+                    : copy('تعذّر تحميل الطلب.')
                 }
                 onRetry={() => void orderQuery.refetch()}
               />
@@ -190,24 +199,32 @@ export function OrderDetailsDialog({
               <>
                 <section className="border-border grid grid-cols-1 gap-4 border-b pb-5 md:grid-cols-2">
                   <div>
-                    <h3 className="text-fg mb-3 text-sm font-semibold">تفاصيل الزبون</h3>
+                    <h3 className="text-fg mb-3 text-sm font-semibold">{copy('تفاصيل الزبون')}</h3>
                     <dl className="space-y-2 text-sm">
-                      <Info label="الاسم" value={order.customerName} />
+                      <Info label={copy('الاسم')} value={order.customerName} />
                       {customerQuery.data?.phone ? (
-                        <Info label="الهاتف" value={customerQuery.data.phone} ltr />
+                        <Info label={copy('الهاتف')} value={customerQuery.data.phone} ltr />
                       ) : null}
                       {customerQuery.data?.email ? (
-                        <Info label="البريد الإلكتروني" value={customerQuery.data.email} ltr />
+                        <Info
+                          label={copy('البريد الإلكتروني')}
+                          value={customerQuery.data.email}
+                          ltr
+                        />
                       ) : null}
                       {customerQuery.data?.city ? (
-                        <Info label="المدينة" value={customerQuery.data.city} />
+                        <Info label={copy('المدينة')} value={customerQuery.data.city} />
                       ) : null}
                     </dl>
                   </div>
                   <div>
-                    <h3 className="text-fg mb-3 text-sm font-semibold">تفاصيل الطلب</h3>
+                    <h3 className="text-fg mb-3 text-sm font-semibold">{copy('تفاصيل الطلب')}</h3>
                     <dl className="space-y-2 text-sm">
-                      <Info label="رقم الطلب" value={displayOrderNumber(order.number)} ltr />
+                      <Info
+                        label={copy('رقم الطلب')}
+                        value={displayOrderNumber(order.number)}
+                        ltr
+                      />
                       <Info
                         label={dateCopy.receivedDate}
                         value={formatOrderDate(order.issuedAt)}
@@ -233,18 +250,18 @@ export function OrderDetailsDialog({
                         </>
                       ) : null}
                       <div className="flex items-center justify-between gap-3">
-                        <dt className="text-fg-muted">حالة الدفع</dt>
+                        <dt className="text-fg-muted">{copy('حالة الدفع')}</dt>
                         <dd>
                           <StatusBadge tone={paid ? 'credit' : partiallyPaid ? 'partial' : 'debit'}>
                             {order.netTotal === '0.00' && order.returnedAmount !== '0.00'
                               ? locale === 'he'
                                 ? 'הוחזר במלואו'
-                                : 'مرتجع بالكامل'
+                                : copy('مرتجع بالكامل')
                               : paid
-                                ? 'مدفوع'
+                                ? copy('مدفوع')
                                 : partiallyPaid
-                                  ? 'مدفوع جزئيًا'
-                                  : 'غير مدفوع'}
+                                  ? copy('مدفوع جزئيًا')
+                                  : copy('غير مدفوع')}
                           </StatusBadge>
                         </dd>
                       </div>
@@ -253,15 +270,15 @@ export function OrderDetailsDialog({
                 </section>
 
                 <section>
-                  <h3 className="text-fg mb-3 text-sm font-semibold">منتجات الطلب</h3>
+                  <h3 className="text-fg mb-3 text-sm font-semibold">{copy('منتجات الطلب')}</h3>
                   <div className="rounded-card border-border overflow-x-auto border">
                     <table className="w-full border-collapse text-sm">
                       <thead className="bg-card-muted text-fg-muted">
                         <tr>
-                          <th className="p-3 text-start">المنتج</th>
-                          <th className="p-3 text-center">الكمية</th>
-                          <th className="p-3 text-end">السعر</th>
-                          <th className="p-3 text-end">الإجمالي</th>
+                          <th className="p-3 text-start">{copy('المنتج')}</th>
+                          <th className="p-3 text-center">{copy('الكمية')}</th>
+                          <th className="p-3 text-end">{copy('السعر')}</th>
+                          <th className="p-3 text-end">{copy('الإجمالي')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -275,7 +292,7 @@ export function OrderDetailsDialog({
                               </span>
                               {item.returned && (
                                 <span className="text-fg-muted block text-xs">
-                                  {locale === 'he' ? 'הוחזר' : 'مرتجع'}
+                                  {locale === 'he' ? 'הוחזר' : copy('مرتجع')}
                                 </span>
                               )}
                             </td>
@@ -299,7 +316,9 @@ export function OrderDetailsDialog({
 
                 {(order.returns?.length ?? 0) > 0 && (
                   <section className="border-border space-y-2 border-t pt-4">
-                    <h3 className="font-semibold">{locale === 'he' ? 'החזרות' : 'المرتجعات'}</h3>
+                    <h3 className="font-semibold">
+                      {locale === 'he' ? 'החזרות' : copy('المرتجعات')}
+                    </h3>
                     {order.returns?.map((entry) => (
                       <div
                         key={entry.id}
@@ -315,36 +334,36 @@ export function OrderDetailsDialog({
                 )}
                 <section className="border-border border-t pt-5">
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <Amount label="قيمة الطلب" value={order.total} currency={currency} />
+                    <Amount label={copy('قيمة الطلب')} value={order.total} currency={currency} />
                     {order.returnedAmount && order.returnedAmount !== '0.00' ? (
                       <>
                         <Amount
-                          label={locale === 'he' ? 'החזרות' : 'قيمة المرتجعات'}
+                          label={locale === 'he' ? 'החזרות' : copy('قيمة المرتجعات')}
                           value={order.returnedAmount}
                           currency={currency}
                           tone="credit"
                         />
                         <Amount
-                          label={locale === 'he' ? 'נטו לאחר החזרות' : 'الصافي بعد الإرجاع'}
+                          label={locale === 'he' ? 'נטו לאחר החזרות' : copy('الصافي بعد الإرجاع')}
                           value={order.netTotal ?? order.total}
                           currency={currency}
                         />
                       </>
                     ) : null}
                     <Amount
-                      label="المسحوب من رصيد الزبون"
+                      label={copy('المسحوب من رصيد الزبون')}
                       value={order.creditAppliedAmount}
                       currency={currency}
                       tone="credit"
                     />
                     <Amount
-                      label="إجمالي المسدد"
+                      label={copy('إجمالي المسدد')}
                       value={order.paidAmount}
                       currency={currency}
                       tone="credit"
                     />
                     <Amount
-                      label="المتبقي للسداد"
+                      label={copy('المتبقي للسداد')}
                       value={order.remainingAmount}
                       currency={currency}
                       tone={paid ? 'plain' : 'debit'}
@@ -370,7 +389,7 @@ export function OrderDetailsDialog({
                     }}
                   >
                     <Pencil aria-hidden />
-                    تعديل
+                    {copy('تعديل')}
                   </Button>
                 ) : null}
                 <DialogClose asChild>
@@ -378,7 +397,7 @@ export function OrderDetailsDialog({
                     variant="outline"
                     className={order && editable && can('orders.update') ? undefined : 'col-span-2'}
                   >
-                    إغلاق
+                    {copy('إغلاق')}
                   </Button>
                 </DialogClose>
               </div>
@@ -392,7 +411,7 @@ export function OrderDetailsDialog({
                       onClick={() => setDeleteOpen(true)}
                     >
                       <Trash2 aria-hidden />
-                      حذف الطلب
+                      {copy('حذف الطلب')}
                     </Button>
                   ) : null}
                   {can('orders.confirm') ? (
@@ -402,7 +421,7 @@ export function OrderDetailsDialog({
                       onClick={() => setConfirmOpen(true)}
                     >
                       <Check aria-hidden />
-                      تأكيد الطلب
+                      {copy('تأكيد الطلب')}
                     </Button>
                   ) : null}
                 </div>
@@ -413,7 +432,7 @@ export function OrderDetailsDialog({
               can('payments.create') ? (
                 <Button variant="brand" onClick={() => setPayOpen(true)}>
                   <WalletCards aria-hidden />
-                  دفع الطلب
+                  {copy('دفع الطلب')}
                 </Button>
               ) : null}
 
@@ -435,13 +454,16 @@ export function OrderDetailsDialog({
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title="تأكيد الطلب"
+        title={copy('تأكيد الطلب')}
         description={
           order
-            ? `هل تريد تأكيد الطلب ${displayOrderNumber(order.number)}؟ سيُسجّل المبلغ على حساب الزبون ولا يمكن تعديل الطلب بعد التأكيد.`
+            ? copy(
+                'هل تريد تأكيد الطلب {{value0}}؟ سيُسجّل المبلغ على حساب الزبون ولا يمكن تعديل الطلب بعد التأكيد.',
+                { value0: displayOrderNumber(order.number) },
+              )
             : ''
         }
-        confirmLabel="تأكيد الطلب"
+        confirmLabel={copy('تأكيد الطلب')}
         variant="brand"
         loading={confirmOrder.isPending}
         onConfirm={handleConfirm}
@@ -449,13 +471,15 @@ export function OrderDetailsDialog({
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        title="حذف مسودة الطلب"
+        title={copy('حذف مسودة الطلب')}
         description={
           order
-            ? `هل تريد حذف مسودة الطلب ${displayOrderNumber(order.number)} نهائيًا؟ لا يمكن التراجع عن هذا الإجراء.`
+            ? copy('هل تريد حذف مسودة الطلب {{value0}} نهائيًا؟ لا يمكن التراجع عن هذا الإجراء.', {
+                value0: displayOrderNumber(order.number),
+              })
             : ''
         }
-        confirmLabel="حذف الطلب"
+        confirmLabel={copy('حذف الطلب')}
         variant="danger"
         loading={deleteOrder.isPending}
         onConfirm={handleDelete}
@@ -465,6 +489,8 @@ export function OrderDetailsDialog({
 }
 
 function Info({ label, value, ltr }: { label: string; value: string; ltr?: boolean }) {
+  useCopy();
+
   return (
     <div className="flex items-center justify-between gap-3">
       <dt className="text-fg-muted">{label}</dt>
@@ -486,6 +512,8 @@ function Amount({
   currency: CurrencyCode;
   tone?: 'plain' | 'credit' | 'debit';
 }) {
+  useCopy();
+
   return (
     <div className="rounded-card border-border bg-card-muted border p-4 text-center">
       <p className="text-fg-muted mb-2 text-sm">{label}</p>

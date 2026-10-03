@@ -1,3 +1,4 @@
+import { copy, useCopy } from '@/lib/copy';
 import { useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -225,7 +226,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
                   >
                     <NotificationMark notification={notification} />
                     <div className="min-w-0 flex-1">
-                      <p className="text-fg text-sm font-semibold">{content.title}</p>
+                      <p className="text-fg text-sm font-semibold">{copy(content.title)}</p>
                       <p className="text-fg-muted mt-0.5 line-clamp-2 text-xs">
                         {content.description}
                       </p>
@@ -363,6 +364,8 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
 }
 
 function NotificationMark({ notification }: { notification: NotificationItem }) {
+  useCopy();
+
   const Icon =
     notification.kind === 'PAYMENT_RECEIVED'
       ? CircleDollarSign
@@ -403,7 +406,7 @@ function notificationText(
               number: displayOrderNumber(notification.orderNumber),
               amount,
             })
-          : notification.description,
+          : copy(notification.description),
     };
   }
   if (notification.kind === 'PAYMENT_RECEIVED') {
@@ -415,7 +418,7 @@ function notificationText(
               customer: notification.customerName,
               amount,
             })
-          : notification.description,
+          : copy(notification.description),
     };
   }
 
