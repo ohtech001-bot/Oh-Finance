@@ -70,6 +70,61 @@ jobs:
           FILE_ID=$(echo "$RESPONSE" | python3 -c             'import json,sys; print(json.load(sys.stdin)["id"])')
 
           test -n "$FILE_ID"
-
           echo "Backup uploaded successfully to Google Drive."
           echo "Google Drive File ID: $FILE_ID"
+
+      - name: Delete backups older than 15 days
+        env:
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+        run: |
+          set -euo pipefail
+
+          python3 <<'PY'
+          import json
+          import os
+          import urllib.parse
+          import urllib.request
+          from datetime import datetime, timedelta, timezone
+
+          token = os.environ["GOOGLE_ACCESS_TOKEN"]
+          folder_id = os.environ["GDRIVE_FOLDER_ID"]
+          cutoff = datetime.now(timezone.utc) - timedelta(days=15)
+          cutoff_rfc3339 = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+          query = f"'{folder_id}' in parents and trashed = false and createdTime < '{cutoff_rfc3339}'"
+          params = urllib.parse.urlencode({
+              "q": query,
+              "fields": "files(id,name,createdTime),nextPageToken",
+              "pageSize": 1000,
+          })
+
+          url = "https://www.googleapis.com/drive/v3/files?" + params
+          req = urllib.request.Request(
+              url,
+              headers={"Authorization": f"Bearer {token}"},
+          )
+
+          with urllib.request.urlopen(req) as response:
+              data = json.load(response)
+
+          deleted = 0
+          for item in data.get("files", []):
+              name = item.get("name", "")
+              if not (name.startswith("OH-Finance_") and name.endswith(".dump.gz")):
+                  continue
+
+              delete_url = "https://www.googleapis.com/drive/v3/files/" + urllib.parse.quote(item["id"])
+              delete_req = urllib.request.Request(
+                  delete_url,
+                  headers={"Authorization": f"Bearer {token}"},
+                  method="DELETE",
+              )
+
+              with urllib.request.urlopen(delete_req) as response:
+                  response.read()
+
+              deleted += 1
+              print(f"Deleted old backup: {name}")
+
+          print(f"Retention cleanup complete. Deleted {deleted} backup(s) older than 15 days.")
+          PY
