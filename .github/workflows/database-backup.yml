@@ -30,31 +30,19 @@ jobs:
           token_format: access_token
           access_token_scopes: https://www.googleapis.com/auth/drive
 
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-
-      - name: Create database backup
+      - name: Create database backup with PostgreSQL 17
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
 
           mkdir -p backup
-
           DATE="$(TZ=Asia/Jerusalem date +'%Y-%m-%d_%H-%M-%S')"
-
           FILE="OH-Finance_${DATE}.dump"
 
-          pg_dump "$SUPABASE_DB_URL" \
-            --format=custom \
-            --no-owner \
-            --no-privileges \
-            --file="backup/$FILE"
+          docker run --rm             -e SUPABASE_DB_URL="$SUPABASE_DB_URL"             -v "$PWD/backup:/backup"             postgres:17             sh -c 'pg_dump "$SUPABASE_DB_URL" --format=custom --no-owner --no-privileges --file="/backup/'"$FILE"'"'
 
           gzip "backup/$FILE"
-
           echo "BACKUP_FILE=${FILE}.gz" >> "$GITHUB_ENV"
 
       - name: Verify backup
@@ -73,20 +61,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          RESPONSE=$(curl \
-            --fail-with-body \
-            --silent \
-            --show-error \
-            -X POST \
-            -H "Authorization: Bearer $ACCESS_TOKEN" \
-            -F "metadata={\"name\":\"$BACKUP_FILE\",\"parents\":[\"$GDRIVE_FOLDER_ID\"]};type=application/json;charset=UTF-8" \
-            -F "file=@backup/$BACKUP_FILE;type=application/gzip" \
-            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name")
+          RESPONSE=$(curl             --fail-with-body             --silent             --show-error             -X POST             -H "Authorization: Bearer $ACCESS_TOKEN"             -F "metadata={\"name\":\"$BACKUP_FILE\",\"parents\":[\"$GDRIVE_FOLDER_ID\"]};type=application/json;charset=UTF-8"             -F "file=@backup/$BACKUP_FILE;type=application/gzip"             "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name")
 
           echo "$RESPONSE"
 
-          FILE_ID=$(echo "$RESPONSE" | python3 -c \
-            'import json,sys; print(json.load(sys.stdin)["id"])')
+          FILE_ID=$(echo "$RESPONSE" | python3 -c             'import json,sys; print(json.load(sys.stdin)["id"])')
 
           test -n "$FILE_ID"
 
