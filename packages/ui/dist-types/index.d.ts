@@ -1,4 +1,5 @@
 export { cn } from './lib/cn.js';
+export { WhatsAppIcon, WHATSAPP_ICON_PATH } from './brands/whatsapp.js';
 export { UiLocalizationProvider, useUiTranslation, useUiLocale } from './localization.js';
 export { Button, buttonVariants, type ButtonProps } from './primitives/button.js';
 export { Input, Field, type InputProps, type FieldProps } from './primitives/input.js';

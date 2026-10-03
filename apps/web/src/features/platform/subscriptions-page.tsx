@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { currentLocale } from '@/lib/i18n';
-import { CreditCard, Edit3, MessageCircle } from 'lucide-react';
+import { CreditCard, Edit3 } from 'lucide-react';
 import type {
   PaginatedResult,
   Subscription,
@@ -11,6 +11,7 @@ import type {
 import { PERMISSIONS } from '@oh/config';
 import {
   Button,
+  WhatsAppIcon,
   Dialog,
   DialogBody,
   DialogContent,
@@ -153,7 +154,7 @@ export function PlatformSubscriptionsPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                           >
-                            <MessageCircle aria-hidden />
+                            <WhatsAppIcon aria-hidden />
                             {t('subscription.sendReminder')}
                           </a>
                         </Button>
@@ -254,7 +255,7 @@ export function PlatformSubscriptionsPage() {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <MessageCircle aria-hidden />
+                    <WhatsAppIcon aria-hidden />
                     {t('subscription.sendReminder')}
                   </a>
                 </Button>

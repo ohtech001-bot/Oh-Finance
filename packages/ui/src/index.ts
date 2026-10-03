@@ -1,5 +1,6 @@
 // ── الأدوات ──────────────────────────────────────────────────────────────────
 export { cn } from './lib/cn.js';
+export { WhatsAppIcon, WHATSAPP_ICON_PATH } from './brands/whatsapp.js';
 export { UiLocalizationProvider, useUiTranslation, useUiLocale } from './localization.js';
 
 // ── البدائيات ────────────────────────────────────────────────────────────────

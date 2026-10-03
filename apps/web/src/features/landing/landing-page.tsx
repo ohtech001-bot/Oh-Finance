@@ -1,5 +1,5 @@
 import { copy, useCopy } from '@/lib/copy';
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowDown,
@@ -11,7 +11,7 @@ import {
   Mail,
   Maximize2,
   Menu,
-  MessageCircle,
+  Phone,
   ShieldCheck,
 } from 'lucide-react';
 import {
@@ -22,11 +22,20 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  WhatsAppIcon,
 } from '@oh/ui';
 import { FEATURES, SCREENS, SECTIONS, STEPS, SUBSCRIPTION_MESSAGE } from './landing-content';
 import { changeLocale, currentLocale } from '@/lib/i18n';
 import { useLandingMotion } from './use-landing-motion';
+import { LandingTools, AccessibilityFilters } from './landing-tools';
+import { MoneyFlight } from './money-flight';
+import {
+  ACCESSIBILITY_STORAGE_KEY,
+  accessibilityFilter,
+  readAccessibilitySettings,
+} from './accessibility-settings';
 import './landing.css';
+import './landing-tools.css';
 
 function Subscribe({
   children = copy('اشترك الآن'),
@@ -44,7 +53,7 @@ function Subscribe({
       target="_blank"
       rel="noopener noreferrer"
     >
-      <MessageCircle size={18} aria-hidden="true" />
+      <WhatsAppIcon width={18} height={18} aria-hidden="true" />
       <span>{children}</span>
       <ArrowUpLeft size={17} aria-hidden="true" />
     </a>
@@ -57,7 +66,7 @@ function Brand() {
   return (
     <a className="oh-brand" href="#home" aria-label={copy('OH Finance، الرئيسية')}>
       <img
-        src="/landing/brand-mark.webp"
+        src="/landing/brand-mark-transparent.webp"
         alt={copy('شعار OH Finance الحالي')}
         width="46"
         height="46"
@@ -274,15 +283,46 @@ export function LandingPage() {
   useCopy();
 
   const root = useRef<HTMLDivElement>(null);
-  useLandingMotion(root);
+  const [accessibility, setAccessibility] = useState(readAccessibilitySettings);
+  useEffect(() => {
+    try {
+      localStorage.setItem(ACCESSIBILITY_STORAGE_KEY, JSON.stringify(accessibility));
+    } catch {
+      /* Storage can be unavailable in private mode. */
+    }
+  }, [accessibility]);
+  useLandingMotion(root, accessibility.pauseMotion);
   return (
-    <div className="oh-landing" dir="rtl" lang={currentLocale()} ref={root}>
+    <div
+      className="oh-landing"
+      dir="rtl"
+      lang={currentLocale()}
+      ref={root}
+      style={
+        {
+          '--a11y-scale': accessibility.textScale / 100,
+          '--a11y-filter': accessibilityFilter(accessibility),
+        } as CSSProperties
+      }
+      data-readable-font={accessibility.readableFont}
+      data-line-spacing={accessibility.lineSpacing}
+      data-letter-spacing={accessibility.letterSpacing}
+      data-align-left={accessibility.alignLeft}
+      data-hide-images={accessibility.hideImages}
+      data-highlight-links={accessibility.highlightLinks}
+      data-underline-links={accessibility.underlineLinks}
+      data-high-contrast={accessibility.highContrast}
+      data-motion-paused={accessibility.pauseMotion}
+      data-text-enlarged={accessibility.textScale > 100}
+    >
+      <AccessibilityFilters />
+      <MoneyFlight />
       <Header />
       <main id="main-content">
         <section className="oh-hero" id="home" aria-labelledby="oh-hero-title">
           <img
             className="oh-hero__image"
-            src="/landing/brand-hero.webp"
+            src="/landing/brand-transparent.webp"
             alt=""
             aria-hidden="true"
             width="960"
@@ -406,7 +446,7 @@ export function LandingPage() {
                 { value: 2, label: copy('لغتان: العربية والعبرية') },
                 { value: 4, label: copy('خطوات للبدء') },
               ].map((fact) => (
-                <div key={fact.label} data-reveal>
+                <div key={fact.value} data-reveal>
                   <dt>
                     <span data-counter={fact.value} aria-hidden="true">
                       {fact.value}
@@ -526,7 +566,7 @@ export function LandingPage() {
                 <span dir="ltr">info@oh-tech.co</span>
               </a>
               <a href="tel:+972552616622">
-                <MessageCircle size={16} aria-hidden="true" />
+                <Phone size={16} aria-hidden="true" />
                 <span dir="ltr">0552616622</span>
               </a>
             </div>
@@ -540,6 +580,7 @@ export function LandingPage() {
           </div>
         </div>
       </footer>
+      <LandingTools settings={accessibility} onChange={setAccessibility} />
     </div>
   );
 }

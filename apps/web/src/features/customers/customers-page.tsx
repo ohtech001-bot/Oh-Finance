@@ -8,7 +8,6 @@ import {
   CalendarClock,
   CalendarDays,
   ChevronLeft,
-  MessageCircle,
   Pencil,
   Plus,
   RotateCcw,
@@ -27,6 +26,7 @@ import {
 } from '@oh/money';
 import {
   Button,
+  WhatsAppIcon,
   cn,
   ConfirmDialog,
   DataTable,
@@ -198,7 +198,7 @@ export function CustomersPage() {
                     aria-label={`${debtUsageLabels.messageTitle}: ${row.name}`}
                     onClick={(event) => event.stopPropagation()}
                   >
-                    <MessageCircle className="text-success" aria-hidden />
+                    <WhatsAppIcon className="text-success" aria-hidden />
                   </a>
                 </Button>
               ) : null}
@@ -304,12 +304,12 @@ export function CustomersPage() {
                     rel="noreferrer"
                     aria-label={`${debtUsageLabels.messageTitle}: ${row.name}`}
                   >
-                    <MessageCircle className="text-success" aria-hidden />
+                    <WhatsAppIcon className="text-success" aria-hidden />
                   </a>
                 </Button>
               ) : (
                 <Button variant="outline" size="icon" title={t('customers.invalidPhone')} disabled>
-                  <MessageCircle aria-hidden />
+                  <WhatsAppIcon aria-hidden />
                 </Button>
               )
             ) : null}
@@ -492,7 +492,7 @@ export function CustomersPage() {
                           aria-label={`${debtUsageLabels.messageTitle}: ${row.name}`}
                           onClick={(event) => event.stopPropagation()}
                         >
-                          <MessageCircle className="text-success" aria-hidden />
+                          <WhatsAppIcon className="text-success" aria-hidden />
                         </a>
                       </Button>
                     ) : null}
@@ -532,7 +532,7 @@ export function CustomersPage() {
                           rel="noreferrer"
                           aria-label={`${debtUsageLabels.messageTitle}: ${row.name}`}
                         >
-                          <MessageCircle className="text-success" aria-hidden />
+                          <WhatsAppIcon className="text-success" aria-hidden />
                         </a>
                       </Button>
                     ) : (
@@ -542,7 +542,7 @@ export function CustomersPage() {
                         title={t('customers.invalidPhone')}
                         disabled
                       >
-                        <MessageCircle aria-hidden />
+                        <WhatsAppIcon aria-hidden />
                       </Button>
                     )
                   ) : null}

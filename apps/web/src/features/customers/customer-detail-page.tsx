@@ -19,6 +19,7 @@ import {
 } from '@oh/money';
 import {
   Button,
+  WhatsAppIcon,
   Card,
   CardBody,
   CardHeader,
@@ -41,7 +42,6 @@ import {
   ArrowLeft,
   CreditCard,
   FileText,
-  MessageCircle,
   Pencil,
   Plus,
   ShoppingBag,
@@ -439,7 +439,7 @@ export function CustomerDetailPage() {
                     target="_blank"
                     rel="noreferrer"
                   >
-                    <MessageCircle className="text-success" aria-hidden />
+                    <WhatsAppIcon className="text-success" aria-hidden />
                     {
                       {
                         ar: 'إرسال تذكير بالسداد',

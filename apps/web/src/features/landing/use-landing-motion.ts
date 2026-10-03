@@ -1,12 +1,14 @@
 import { useEffect, type RefObject } from 'react';
 
-export function useLandingMotion(root: RefObject<HTMLElement | null>) {
+export function useLandingMotion(root: RefObject<HTMLElement | null>, paused = false) {
   useEffect(() => {
     const element = root.current;
     if (!element) return;
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
     const frames = new Set<number>();
     let scrollFrame = 0;
+    let smoothScroll = window.scrollY;
+    const disabled = () => paused || reduce.matches;
     const items = element.querySelectorAll<HTMLElement>('[data-reveal], [data-counter]');
     const finish = () =>
       items.forEach((item) => {
@@ -15,7 +17,7 @@ export function useLandingMotion(root: RefObject<HTMLElement | null>) {
       });
     const animateCounter = (item: HTMLElement) => {
       const target = Number(item.dataset.counter);
-      if (reduce.matches) {
+      if (disabled()) {
         item.textContent = String(target);
         return;
       }
@@ -41,29 +43,48 @@ export function useLandingMotion(root: RefObject<HTMLElement | null>) {
                 if (!entry.isIntersecting) return;
                 const item = entry.target as HTMLElement;
                 item.dataset.visible = 'true';
-                if (item.dataset.counter) animateCounter(item);
+                if (item.dataset.counter && item.dataset.counted !== 'true') {
+                  item.dataset.counted = 'true';
+                  animateCounter(item);
+                }
                 observer?.unobserve(item);
               });
             },
             { threshold: 0.12 },
           )
         : null;
-    if (reduce.matches || !observer) finish();
-    else {
+    if (disabled() || !observer) {
+      delete element.dataset.motion;
+      finish();
+    } else {
       element.dataset.motion = 'true';
-      items.forEach((item) => observer.observe(item));
+      items.forEach((item) => {
+        if (item.dataset.counter && item.dataset.counted !== 'true') item.textContent = '0';
+        observer.observe(item);
+      });
     }
     const updateScroll = () => {
       scrollFrame = 0;
       element.dataset.scrolled = String(window.scrollY > 24);
-      const shift = reduce.matches ? 0 : Math.min(window.scrollY * 0.045, 32);
+      smoothScroll = disabled()
+        ? window.scrollY
+        : smoothScroll + (window.scrollY - smoothScroll) * 0.14;
+      const shift = disabled() ? 0 : Math.min(smoothScroll * 0.045, 32);
       element.style.setProperty('--hero-shift', `${shift}px`);
+      const scrollable = Math.max(1, element.scrollHeight - window.innerHeight);
+      element.style.setProperty(
+        '--money-progress',
+        String(disabled() ? 0 : smoothScroll / scrollable),
+      );
+      if (!disabled() && Math.abs(window.scrollY - smoothScroll) > 0.5)
+        scrollFrame = requestAnimationFrame(updateScroll);
     };
     const onScroll = () => {
       if (!scrollFrame) scrollFrame = requestAnimationFrame(updateScroll);
     };
     const onReducedMotion = () => {
-      if (reduce.matches) {
+      cancelAnimationFrame(scrollFrame);
+      if (disabled()) {
         frames.forEach(cancelAnimationFrame);
         frames.clear();
         observer?.disconnect();
@@ -82,5 +103,5 @@ export function useLandingMotion(root: RefObject<HTMLElement | null>) {
       window.removeEventListener('scroll', onScroll);
       reduce.removeEventListener('change', onReducedMotion);
     };
-  }, [root]);
+  }, [root, paused]);
 }

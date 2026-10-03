@@ -68,7 +68,7 @@
   object-fit: contain;
 }
 .oh-brand > span {
-  font-size: 19px;
+  font-size: calc(19px * var(--a11y-scale, 1));
   line-height: 1.25;
 }
 .oh-brand strong {
@@ -77,7 +77,7 @@
 .oh-brand small {
   display: block;
   margin-top: 4px;
-  font-size: 10px;
+  font-size: calc(10px * var(--a11y-scale, 1));
   color: currentColor;
   opacity: 0.68;
 }
@@ -90,7 +90,7 @@
 }
 .oh-desktop-nav a {
   padding-block: 12px;
-  font-size: 13px;
+  font-size: calc(13px * var(--a11y-scale, 1));
   font-weight: 500;
   text-decoration: none;
   transition: color 160ms;
@@ -115,7 +115,7 @@
   border-radius: 6px;
   background: transparent;
   color: inherit;
-  font-size: 12px;
+  font-size: calc(12px * var(--a11y-scale, 1));
   cursor: pointer;
   padding: 6px 9px;
 }
@@ -132,7 +132,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 13px;
+  font-size: calc(13px * var(--a11y-scale, 1));
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
@@ -146,7 +146,7 @@
   padding: 12px 21px;
   border: 1px solid transparent;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: calc(14px * var(--a11y-scale, 1));
   font-weight: 650;
   line-height: 1.4;
   text-decoration: none;
@@ -183,7 +183,7 @@
 }
 .oh-header .oh-button {
   min-height: 42px;
-  font-size: 12px;
+  font-size: calc(12px * var(--a11y-scale, 1));
   padding: 10px 14px;
 }
 .oh-header .oh-button > svg:last-child {
@@ -225,7 +225,7 @@
   justify-content: space-between;
   padding: 15px 0;
   border-bottom: 1px solid #edf1ee;
-  font-size: 16px;
+  font-size: calc(16px * var(--a11y-scale, 1));
 }
 .oh-landing-menu__actions {
   display: flex;
@@ -270,7 +270,7 @@
   align-items: center;
   gap: 10px;
   color: #d1d5c8;
-  font-size: 12px;
+  font-size: calc(12px * var(--a11y-scale, 1));
   margin-bottom: 26px;
 }
 .oh-hero__eyebrow > span {
@@ -281,7 +281,7 @@
 .oh-hero h1 {
   width: fit-content;
   margin: 0 0 25px;
-  font-size: 64px;
+  font-size: calc(64px * var(--a11y-scale, 1));
   line-height: 1.1;
   font-weight: 650;
 }
@@ -290,7 +290,7 @@
 }
 .oh-hero__headline {
   margin: 0 0 22px;
-  font-size: 32px;
+  font-size: calc(32px * var(--a11y-scale, 1));
   line-height: 1.65;
   font-weight: 500;
 }
@@ -302,7 +302,7 @@
   margin: 0;
   max-width: 480px;
   color: #c3cbc1;
-  font-size: 16px;
+  font-size: calc(16px * var(--a11y-scale, 1));
   line-height: 1.95;
 }
 .oh-hero__actions {
@@ -316,7 +316,7 @@
   gap: 9px;
   align-items: center;
   margin-top: 29px;
-  font-size: 12px;
+  font-size: calc(12px * var(--a11y-scale, 1));
   color: #bac6b6;
   text-decoration: none;
 }
@@ -330,7 +330,7 @@
   position: absolute;
   color: #b8bc9c;
   opacity: 0.32;
-  font-size: 20px;
+  font-size: calc(20px * var(--a11y-scale, 1));
   animation: oh-float 7s ease-in-out infinite;
 }
 .oh-hero__symbols > span:nth-child(1) {
@@ -385,7 +385,7 @@
 }
 .oh-landing h2 {
   margin: 14px 0 0;
-  font-size: 38px;
+  font-size: calc(38px * var(--a11y-scale, 1));
   line-height: 1.6;
   font-weight: 650;
 }
@@ -394,7 +394,7 @@
   align-items: center;
   gap: 10px;
   color: #287c46;
-  font-size: 12px;
+  font-size: calc(12px * var(--a11y-scale, 1));
   font-weight: 650;
 }
 .oh-eyebrow::before {
@@ -417,7 +417,7 @@
 .oh-about__text p {
   margin: 0 0 24px;
   color: var(--oh-muted);
-  font-size: 16px;
+  font-size: calc(16px * var(--a11y-scale, 1));
   line-height: 2;
 }
 .oh-text-button {
@@ -429,7 +429,7 @@
   padding: 0;
   color: #247b42;
   background: transparent;
-  font-size: 13px;
+  font-size: calc(13px * var(--a11y-scale, 1));
   font-weight: 650;
   text-decoration: none;
   cursor: pointer;
@@ -446,7 +446,7 @@
 .oh-section-heading > p {
   margin: 16px auto 0;
   max-width: 500px;
-  font-size: 15px;
+  font-size: calc(15px * var(--a11y-scale, 1));
   line-height: 1.95;
   color: var(--oh-muted);
 }
@@ -470,7 +470,7 @@
   border-radius: 6px;
   color: #627267;
   background: transparent;
-  font-size: 13px;
+  font-size: calc(13px * var(--a11y-scale, 1));
   white-space: nowrap;
 }
 .oh-screen-tabs button[aria-selected='true'] {
@@ -517,7 +517,7 @@
 }
 .oh-window-bar > small {
   margin-inline: auto;
-  font-size: 8px;
+  font-size: calc(8px * var(--a11y-scale, 1));
 }
 .oh-laptop__screen > img {
   display: block;
@@ -536,7 +536,7 @@
 }
 .oh-device-stage figcaption {
   margin-top: 16px;
-  font-size: 12px;
+  font-size: calc(12px * var(--a11y-scale, 1));
   text-align: center;
   color: #6b7c70;
 }
@@ -558,7 +558,7 @@
 .oh-gallery-note > p {
   margin: 0;
   color: #59685f;
-  font-size: 11px;
+  font-size: calc(11px * var(--a11y-scale, 1));
   line-height: 1.9;
   text-align: center;
 }
@@ -608,13 +608,13 @@
 }
 .oh-feature h3 {
   margin: 0 0 10px;
-  font-size: 17px;
+  font-size: calc(17px * var(--a11y-scale, 1));
   font-weight: 650;
 }
 .oh-feature p {
   margin: 0;
   color: var(--oh-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--a11y-scale, 1));
   line-height: 1.95;
 }
 .oh-facts {
@@ -632,7 +632,7 @@
   border-inline-start: 1px solid #d6e0d1;
 }
 .oh-facts dt {
-  font-size: 44px;
+  font-size: calc(44px * var(--a11y-scale, 1));
   line-height: 1.15;
   font-weight: 550;
   color: #236f3d;
@@ -640,7 +640,7 @@
 }
 .oh-facts dd {
   margin: 13px 0 0;
-  font-size: 13px;
+  font-size: calc(13px * var(--a11y-scale, 1));
   color: #5f745f;
 }
 .oh-steps {
@@ -671,19 +671,19 @@
   width: fit-content;
   margin-bottom: 24px;
   color: #8aa088;
-  font-size: 29px;
+  font-size: calc(29px * var(--a11y-scale, 1));
   font-weight: 400;
 }
 .oh-steps h3 {
   margin: 0 0 14px;
-  font-size: 17px;
+  font-size: calc(17px * var(--a11y-scale, 1));
   line-height: 1.6;
   font-weight: 650;
 }
 .oh-steps p {
   margin: 0;
   color: var(--oh-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--a11y-scale, 1));
   line-height: 1.95;
 }
 .oh-security {
@@ -700,7 +700,7 @@
   max-width: 480px;
   margin: 18px 0 0;
   color: var(--oh-muted);
-  font-size: 15px;
+  font-size: calc(15px * var(--a11y-scale, 1));
   line-height: 1.95;
 }
 .oh-security__details > svg {
@@ -718,7 +718,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 15px;
+  font-size: calc(15px * var(--a11y-scale, 1));
 }
 .oh-security__details li svg {
   color: #27854b;
@@ -735,12 +735,12 @@
   text-align: center;
 }
 .oh-contact h2 {
-  font-size: 40px;
+  font-size: calc(40px * var(--a11y-scale, 1));
 }
 .oh-contact p {
   max-width: 510px;
   margin: 21px auto 0;
-  font-size: 15px;
+  font-size: calc(15px * var(--a11y-scale, 1));
   line-height: 1.95;
   color: var(--oh-muted);
 }
@@ -763,7 +763,7 @@
 }
 .oh-footer__main > p {
   grid-column: 1;
-  font-size: 12px;
+  font-size: calc(12px * var(--a11y-scale, 1));
   color: #aebdb1;
   margin: 18px 0 0;
 }
@@ -780,7 +780,7 @@
   align-items: center;
   gap: 9px;
   color: #c4d1c2;
-  font-size: 12px;
+  font-size: calc(12px * var(--a11y-scale, 1));
   text-decoration: none;
 }
 .oh-footer__contact a:hover,
@@ -795,7 +795,7 @@
   margin-top: 36px;
   padding-top: 22px;
   border-top: 1px solid #ffffff18;
-  font-size: 10px;
+  font-size: calc(10px * var(--a11y-scale, 1));
   color: #9dae9f;
 }
 .oh-footer__bottom p {
@@ -871,16 +871,16 @@
     margin-bottom: 12px;
   }
   .oh-hero h1 {
-    font-size: 48px;
+    font-size: calc(48px * var(--a11y-scale, 1));
     margin-bottom: 12px;
   }
   .oh-hero__headline {
-    font-size: 24px;
+    font-size: calc(24px * var(--a11y-scale, 1));
     line-height: 1.45;
     margin-bottom: 10px;
   }
   .oh-hero__description {
-    font-size: 14px;
+    font-size: calc(14px * var(--a11y-scale, 1));
     line-height: 1.8;
   }
   .oh-hero__actions {
@@ -901,13 +901,13 @@
     gap: 12px;
   }
   .oh-header__actions > .oh-login-link {
-    font-size: 12px;
+    font-size: calc(12px * var(--a11y-scale, 1));
   }
   .oh-hero h1 {
-    font-size: 54px;
+    font-size: calc(54px * var(--a11y-scale, 1));
   }
   .oh-hero__headline {
-    font-size: 28px;
+    font-size: calc(28px * var(--a11y-scale, 1));
   }
   .oh-about__layout,
   .oh-security__layout {
@@ -965,17 +965,17 @@
   }
   .oh-hero h1 {
     margin: 0 auto 17px;
-    font-size: 44px;
+    font-size: calc(44px * var(--a11y-scale, 1));
   }
   .oh-hero__headline {
-    font-size: 27px;
+    font-size: calc(27px * var(--a11y-scale, 1));
     line-height: 1.55;
     margin-bottom: 17px;
   }
   .oh-hero__description {
     margin-inline: auto;
     max-width: 470px;
-    font-size: 15px;
+    font-size: calc(15px * var(--a11y-scale, 1));
     line-height: 1.9;
   }
   .oh-hero__actions {
@@ -1002,13 +1002,13 @@
     scroll-margin-top: calc(84px + env(safe-area-inset-top, 0px));
   }
   .oh-landing h2 {
-    font-size: 30px;
+    font-size: calc(30px * var(--a11y-scale, 1));
   }
   .oh-about__layout {
     gap: 36px;
   }
   .oh-about__text p {
-    font-size: 14px;
+    font-size: calc(14px * var(--a11y-scale, 1));
   }
   .oh-screen-tabs {
     flex-wrap: wrap;
@@ -1049,15 +1049,15 @@
     height: 38px;
   }
   .oh-brand > span {
-    font-size: 15px;
+    font-size: calc(15px * var(--a11y-scale, 1));
   }
   .oh-brand small {
-    font-size: 9px;
+    font-size: calc(9px * var(--a11y-scale, 1));
   }
   .oh-header .oh-button {
     min-height: 38px;
     padding: 8px 12px;
-    font-size: 11px;
+    font-size: calc(11px * var(--a11y-scale, 1));
     gap: 6px;
   }
   .oh-header .oh-button svg {
@@ -1081,20 +1081,20 @@
     padding-top: calc(254px + env(safe-area-inset-top, 0px));
   }
   .oh-hero__eyebrow {
-    font-size: 10px;
+    font-size: calc(10px * var(--a11y-scale, 1));
     margin-bottom: 13px;
   }
   .oh-hero h1 {
-    font-size: 38px;
+    font-size: calc(38px * var(--a11y-scale, 1));
     margin-bottom: 15px;
   }
   .oh-hero__headline {
-    font-size: 23px;
+    font-size: calc(23px * var(--a11y-scale, 1));
     line-height: 1.6;
   }
   .oh-hero__description {
     max-width: 350px;
-    font-size: 14px;
+    font-size: calc(14px * var(--a11y-scale, 1));
   }
   .oh-hero__actions {
     gap: 10px;
@@ -1102,10 +1102,10 @@
   }
   .oh-hero__actions .oh-button {
     padding: 12px 16px;
-    font-size: 13px;
+    font-size: calc(13px * var(--a11y-scale, 1));
   }
   .oh-hero__explore {
-    font-size: 11px;
+    font-size: calc(11px * var(--a11y-scale, 1));
     margin-top: 20px;
   }
   .oh-about__layout,
@@ -1114,7 +1114,7 @@
     gap: 27px;
   }
   .oh-landing h2 {
-    font-size: 29px;
+    font-size: calc(29px * var(--a11y-scale, 1));
     line-height: 1.55;
   }
   .oh-section {
@@ -1124,10 +1124,10 @@
     margin-bottom: 30px;
   }
   .oh-section-heading > p {
-    font-size: 14px;
+    font-size: calc(14px * var(--a11y-scale, 1));
   }
   .oh-about__text p {
-    font-size: 15px;
+    font-size: calc(15px * var(--a11y-scale, 1));
     margin-bottom: 20px;
   }
   .oh-screen-tabs {
@@ -1141,7 +1141,7 @@
     min-height: 57px;
     padding: 9px 4px;
     flex-direction: column;
-    font-size: 10px;
+    font-size: calc(10px * var(--a11y-scale, 1));
     gap: 5px;
   }
   .oh-device-stage {
@@ -1168,10 +1168,10 @@
     margin-bottom: 16px;
   }
   .oh-feature h3 {
-    font-size: 18px;
+    font-size: calc(18px * var(--a11y-scale, 1));
   }
   .oh-feature p {
-    font-size: 14px;
+    font-size: calc(14px * var(--a11y-scale, 1));
   }
   .oh-facts {
     padding-block: 32px;
@@ -1184,24 +1184,24 @@
     border-inline-start: 0;
   }
   .oh-facts dt {
-    font-size: 36px;
+    font-size: calc(36px * var(--a11y-scale, 1));
   }
   .oh-facts dd {
-    font-size: 12px;
+    font-size: calc(12px * var(--a11y-scale, 1));
   }
   .oh-steps {
     gap: 29px 24px;
     margin-top: 35px;
   }
   .oh-step-number {
-    font-size: 26px;
+    font-size: calc(26px * var(--a11y-scale, 1));
     margin-bottom: 15px;
   }
   .oh-steps h3 {
-    font-size: 15px;
+    font-size: calc(15px * var(--a11y-scale, 1));
   }
   .oh-steps p {
-    font-size: 12px;
+    font-size: calc(12px * var(--a11y-scale, 1));
   }
   .oh-security__details {
     padding-top: 26px;
@@ -1214,7 +1214,7 @@
     gap: 10px;
   }
   .oh-contact__actions .oh-button {
-    font-size: 13px;
+    font-size: calc(13px * var(--a11y-scale, 1));
     padding: 12px 15px;
   }
   .oh-footer {
@@ -1233,7 +1233,7 @@
   }
   .oh-footer__bottom {
     margin-top: 28px;
-    font-size: 11px;
+    font-size: calc(11px * var(--a11y-scale, 1));
   }
 }
 @media (max-width: 850px) and (max-height: 720px) {
@@ -1250,11 +1250,11 @@
     margin-bottom: 10px;
   }
   .oh-hero h1 {
-    font-size: 32px;
+    font-size: calc(32px * var(--a11y-scale, 1));
     margin-bottom: 10px;
   }
   .oh-hero__headline {
-    font-size: 22px;
+    font-size: calc(22px * var(--a11y-scale, 1));
     margin-bottom: 12px;
   }
   .oh-hero__description {
